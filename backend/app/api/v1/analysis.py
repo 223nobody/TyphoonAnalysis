@@ -8,28 +8,28 @@ from sqlalchemy import select, desc
 from app.core.database import get_db
 from app.models.typhoon import ImageAnalysis
 from app.schemas.typhoon import ImageAnalysisCreate, ImageAnalysisResponse
-from app.services.ai.qwen_service import qwen_service
+from app.services.ai.ai_factory import ai_factory
 
 router = APIRouter(prefix="/analysis", tags=["分析"])
 
 
-@router.post("/image", response_model=ImageAnalysisResponse)
-async def analyze_image(
+@router.post("/satellite-image", response_model=ImageAnalysisResponse)
+async def analyze_satellite_image(
     image_url: str = Body(None, description="图片URL"),
     image_path: str = Body(None, description="图片本地路径"),
     typhoon_id: str = Body(None, description="台风编号"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    分析台风预报图
-    
+    分析台风卫星图像
+
     使用通义千问Qwen3-VL模型智能解析台风预报图，提取结构化信息
-    
+
     Args:
-        image_url: 图片URL
+        image_url: 图片URL（支持http/https URL或base64编码）
         image_path: 图片本地路径
         typhoon_id: 台风编号（可选）
-        
+
     Returns:
         ImageAnalysisResponse: 分析结果
     """
@@ -40,7 +40,7 @@ async def analyze_image(
         )
     
     # 调用AI服务分析图片
-    result = await qwen_service.analyze_typhoon_image(
+    result = await ai_factory.analyze_typhoon_image(
         image_path=image_path,
         image_url=image_url
     )
@@ -55,18 +55,38 @@ async def analyze_image(
     extracted_data = result.get("extracted_data", {})
     if not typhoon_id and extracted_data:
         typhoon_id = extracted_data.get("typhoon_id")
-    
+
+    # 处理 analysis_text，确保是字符串类型
+    analysis_text = result.get("analysis_text", "")
+    if isinstance(analysis_text, list):
+        # 如果是列表，提取文本内容并合并
+        text_parts = []
+        for item in analysis_text:
+            if isinstance(item, dict) and "text" in item:
+                text_parts.append(str(item["text"]))
+            elif isinstance(item, str):
+                text_parts.append(item)
+            else:
+                text_parts.append(str(item))
+        analysis_text = "\n".join(text_parts)
+    elif not isinstance(analysis_text, str):
+        analysis_text = str(analysis_text) if analysis_text else ""
+
+    # 处理 extracted_data，确保是字典类型（用于JSON序列化）
+    if not isinstance(extracted_data, dict):
+        extracted_data = {"raw_data": str(extracted_data)} if extracted_data else {}
+
     # 保存分析结果
     db_analysis = ImageAnalysis(
         typhoon_id=typhoon_id,
         typhoon_name=extracted_data.get("typhoon_name"),
         image_url=image_url or "",
         image_path=image_path or "",
-        analysis_result=result["analysis_text"],
+        analysis_result=analysis_text,
         extracted_data=extracted_data,
-        model_used=result["model_used"]
+        model_used=result.get("model_used", "unknown")
     )
-    
+
     db.add(db_analysis)
     await db.commit()
     await db.refresh(db_analysis)

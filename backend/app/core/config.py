@@ -20,12 +20,20 @@ class Settings(BaseSettings):
     # 数据库配置
     DATABASE_URL: str = "sqlite+aiosqlite:///./typhoon_analysis.db"
 
-    # DashScope API配置
-    DASHSCOPE_API_KEY: str = Field(..., description="阿里云DashScope API密钥")
+    # AI服务提供商选择
+    AI_PROVIDER: str = Field(default="qwen", description="AI服务提供商，可选值: qwen, deepseek")
 
-    # AI模型配置
+    # DashScope API配置（通义千问）
+    DASHSCOPE_API_KEY: str = Field(..., description="阿里云DashScope API密钥")
     QWEN_PLUS_MODEL: str = "qwen-plus"
     QWEN_VL_MODEL: str = "qwen-vl-max"
+
+    # DeepSeek API配置
+    DEEPSEEK_API_KEY: str = Field(default="", description="DeepSeek API密钥")
+    DEEPSEEK_MODEL: str = Field(default="deepseek-chat", description="DeepSeek模型名称")
+    DEEPSEEK_API_BASE_URL: str = Field(default="https://api.deepseek.com", description="DeepSeek API基础URL")
+
+    # AI通用配置
     AI_TIMEOUT: int = 30
 
     # CORS配置
