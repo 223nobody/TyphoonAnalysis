@@ -1,6 +1,6 @@
 """
-DeepSeek AI服务
-提供基于DeepSeek API的台风报告生成功能
+GLM AI服务
+提供基于GLM API的台风报告生成功能
 
 特性：
 - 支持自动重试机制（最多3次）
@@ -18,13 +18,13 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-class DeepSeekService:
-    """DeepSeek AI服务类 - 专注于文本报告生成"""
+class GlmService:
+    """GLM AI服务类 - 专注于文本报告生成"""
 
     def __init__(self):
         self.api_key = settings.AI_API_KEY  # 使用统一的API Key
         self.base_url = settings.AI_API_BASE_URL  # 使用统一的Base URL
-        self.model = settings.DEEPSEEK_MODEL
+        self.model = settings.GLM_MODEL
         self.timeout = settings.AI_TIMEOUT  # 使用配置的超时时间（120秒）
         self.max_tokens = settings.AI_MAX_TOKENS  # 使用配置的最大token数
         self.max_retries = 3  # 最大重试次数
@@ -52,12 +52,12 @@ class DeepSeekService:
         last_error = None
 
         # 记录配置信息（用于诊断）
-        logger.info(f"DeepSeek API配置 - Base URL: {self.base_url}, Model: {self.model}")
-        logger.info(f"DeepSeek API配置 - API Key前缀: {self.api_key[:20]}...")
+        logger.info(f"GLM API配置 - Base URL: {self.base_url}, Model: {self.model}")
+        logger.info(f"GLM API配置 - API Key前缀: {self.api_key[:20]}...")
 
         for attempt in range(1, self.max_retries + 1):
             try:
-                logger.info(f"DeepSeek API请求 - 第{attempt}次尝试")
+                logger.info(f"GLM API请求 - 第{attempt}次尝试")
                 logger.info(f"  - 请求URL: {endpoint}")
                 logger.info(f"  - 请求模型: {payload.get('model')}")
                 logger.info(f"  - 超时设置: {self.timeout}秒")
@@ -73,20 +73,20 @@ class DeepSeekService:
                     response.encoding = "utf-8"
 
                     # 记录响应状态
-                    logger.info(f"DeepSeek API响应 - 状态码: {response.status_code}")
+                    logger.info(f"GLM API响应 - 状态码: {response.status_code}")
 
                     # 其他错误直接抛出
                     response.raise_for_status()
 
                     # 成功返回结果
                     result = response.json()
-                    logger.info(f"DeepSeek API请求成功 - 第{attempt}次尝试")
+                    logger.info(f"GLM API请求成功 - 第{attempt}次尝试")
                     logger.info(f"  - 响应数据: {json.dumps(result, ensure_ascii=False)[:200]}...")
                     return result
 
             except httpx.TimeoutException as e:
                 last_error = e
-                logger.warning(f"DeepSeek API超时 - 第{attempt}次尝试")
+                logger.warning(f"GLM API超时 - 第{attempt}次尝试")
                 logger.warning(f"  - 超时时间: {self.timeout}秒")
                 logger.warning(f"  - 错误详情: {e}")
                 if attempt < self.max_retries:
@@ -96,7 +96,7 @@ class DeepSeekService:
 
             except httpx.HTTPStatusError as e:
                 last_error = e
-                logger.error(f"DeepSeek API HTTP错误 - 第{attempt}次尝试")
+                logger.error(f"GLM API HTTP错误 - 第{attempt}次尝试")
                 logger.error(f"  - 状态码: {e.response.status_code}")
                 logger.error(f"  - 错误信息: {e}")
 
@@ -110,7 +110,7 @@ class DeepSeekService:
 
             except Exception as e:
                 last_error = e
-                logger.error(f"DeepSeek API请求异常 - 第{attempt}次尝试")
+                logger.error(f"GLM API请求异常 - 第{attempt}次尝试")
                 logger.error(f"  - 异常类型: {type(e).__name__}")
                 logger.error(f"  - 异常信息: {e}")
                 if attempt < self.max_retries:
@@ -118,9 +118,9 @@ class DeepSeekService:
                     await asyncio.sleep(wait_time)
 
         # 所有重试都失败
-        logger.error("DeepSeek API所有重试均失败")
+        logger.error("GLM API所有重试均失败")
         logger.error(f"  - 最后错误: {last_error}")
-        raise last_error or Exception("DeepSeek API请求失败，已达到最大重试次数")
+        raise last_error or Exception("GLM API请求失败，已达到最大重试次数")
 
     async def generate_typhoon_report(
         self,
@@ -131,7 +131,7 @@ class DeepSeekService:
         prediction_data: Optional[Dict] = None
     ) -> Dict:
         """
-        使用DeepSeek生成台风分析报告（支持三种报告类型）
+        使用GLM生成台风分析报告（支持三种报告类型）
 
         Args:
             typhoon_id: 台风编号
@@ -174,7 +174,8 @@ class DeepSeekService:
                 ],
                 "stream": False,
                 "temperature": 0.5,
-                "max_tokens": self.max_tokens,  # 使用配置的最大token数
+                "max_tokens": self.max_tokens,  # 使用配置的最大token数（8192）
+                "top_p": 0.9,
                 "frequency_penalty": 0.3,
                 "response_format": {"type": "text"}
             }
@@ -190,7 +191,7 @@ class DeepSeekService:
             # 提取生成的报告内容
             report_content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
 
-            logger.info(f"DeepSeek报告生成成功 - 内容长度: {len(report_content)}")
+            logger.info(f"GLM报告生成成功 - 内容长度: {len(report_content)}")
 
             return {
                 "success": True,
@@ -199,13 +200,13 @@ class DeepSeekService:
             }
 
         except Exception as e:
-            logger.error(f"DeepSeek报告生成失败: {e}")
+            logger.error(f"GLM报告生成失败: {e}")
             logger.error(f"错误类型: {type(e).__name__}")
             logger.error(f"错误详情: {str(e)}")
 
             return {
                 "success": False,
-                "error": f"DeepSeek服务调用失败: {str(e)}",
+                "error": f"GLM服务调用失败: {str(e)}",
                 "report_content": ""
             }
 
@@ -361,4 +362,6 @@ class DeepSeekService:
 
 
 # 创建全局服务实例
-deepseek_service = DeepSeekService()
+glm_service = GlmService()
+
+

@@ -148,7 +148,7 @@ def start_scheduler():
     
     # 如果配置了启动时执行，则立即执行一次
     if settings.CRAWLER_START_ON_STARTUP:
-        logger.info("配置了启动时执行，将在5秒后执行首次爬取...")
+        logger.info("配置了启动时执行，正在执行首次爬取...")
         scheduler.add_job(
             fetch_and_update_typhoons,
             trigger='date',

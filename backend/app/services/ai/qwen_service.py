@@ -7,69 +7,111 @@ import json
 import logging
 from typing import Dict, Optional
 from pathlib import Path
+from io import BytesIO
 import httpx
+from PIL import Image
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# DashScope API端点
-DASHSCOPE_BASE_URL = "https://dashscope.aliyuncs.com/api/v1"
-
 
 class QwenService:
     """通义千问服务类"""
-    
+
     def __init__(self):
-        self.api_key = settings.DASHSCOPE_API_KEY
-        self.timeout = settings.AI_TIMEOUT
-        self.qwen_plus_model = settings.QWEN_PLUS_MODEL
-        self.qwen_vl_model = settings.QWEN_VL_MODEL
+        self.api_key = settings.AI_API_KEY  # 使用统一的API Key
+        self.base_url = settings.AI_API_BASE_URL  # 使用统一的Base URL
+        self.timeout = settings.AI_TIMEOUT  # 使用配置的超时时间
+        self.max_tokens = settings.AI_MAX_TOKENS  # 使用配置的最大token数
+        self.qwen_text_model = settings.QWEN_TEXT_MODEL  # 文本生成模型
+        self.qwen_vl_model = settings.QWEN_VL_MODEL  # 视觉理解模型
+        self.max_retries = 3  # 最大重试次数
+        self.retry_delay = 2  # 重试间隔（秒）
     
-    def _encode_image(self, image_path: str) -> str:
+    def _encode_image(self, image_path: str, max_size: int = 1024, quality: int = 85) -> str:
         """
-        将图片编码为base64
-        
+        将图片编码为base64（带压缩功能）
+
         Args:
             image_path: 图片路径
-            
+            max_size: 图片最大尺寸（宽或高），默认1024像素
+            quality: JPEG压缩质量（1-100），默认85
+
         Returns:
             base64编码的图片字符串
         """
         try:
-            with open(image_path, 'rb') as image_file:
-                image_data = image_file.read()
+            # 检查文件大小
+            file_size = Path(image_path).stat().st_size
+            file_size_mb = file_size / (1024 * 1024)
+            logger.info(f"原始图片大小: {file_size_mb:.2f} MB")
+
+            # 如果文件过大（>10MB），返回错误
+            if file_size > 10 * 1024 * 1024:
+                raise ValueError(f"图片文件过大 ({file_size_mb:.2f} MB)，请使用小于10MB的图片")
+
+            # 打开图片
+            with Image.open(image_path) as img:
+                # 记录原始尺寸
+                original_size = img.size
+                logger.info(f"原始图片尺寸: {original_size[0]}x{original_size[1]}")
+
+                # 转换为RGB模式（如果是RGBA或其他模式）
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    # 创建白色背景
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                    img = background
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+
+                # 计算压缩后的尺寸
+                width, height = img.size
+                if width > max_size or height > max_size:
+                    # 按比例缩放
+                    if width > height:
+                        new_width = max_size
+                        new_height = int(height * (max_size / width))
+                    else:
+                        new_height = max_size
+                        new_width = int(width * (max_size / height))
+
+                    img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                    logger.info(f"压缩后图片尺寸: {new_width}x{new_height}")
+
+                # 保存到内存缓冲区
+                buffer = BytesIO()
+                img.save(buffer, format='JPEG', quality=quality, optimize=True)
+                buffer.seek(0)
+
+                # 编码为base64
+                image_data = buffer.read()
+                compressed_size_mb = len(image_data) / (1024 * 1024)
+                logger.info(f"压缩后大小: {compressed_size_mb:.2f} MB")
+
                 base64_image = base64.b64encode(image_data).decode('utf-8')
-                
-                # 确定图片类型
-                image_ext = Path(image_path).suffix.lower()
-                mime_type_map = {
-                    '.jpg': 'image/jpeg',
-                    '.jpeg': 'image/jpeg',
-                    '.png': 'image/png',
-                    '.gif': 'image/gif',
-                    '.webp': 'image/webp'
-                }
-                mime_type = mime_type_map.get(image_ext, 'image/jpeg')
-                
-                return f"data:{mime_type};base64,{base64_image}"
-        
+
+                return f"data:image/jpeg;base64,{base64_image}"
+
         except Exception as e:
             logger.error(f"图片编码失败: {e}")
             raise
     
     async def analyze_typhoon_image(
-        self, 
+        self,
         image_path: Optional[str] = None,
         image_url: Optional[str] = None
     ) -> Dict:
         """
         使用Qwen3-VL分析台风路径预报图
-        
+
         Args:
             image_path: 图片本地路径
             image_url: 图片URL
-            
+
         Returns:
             Dict: 分析结果
         """
@@ -81,7 +123,7 @@ class QwenService:
                 image_input = self._encode_image(image_path)
             else:
                 raise ValueError("必须提供image_path或image_url")
-            
+
             # 构建提示词
             prompt = """请仔细分析这张台风路径预报图，提取以下关键信息并以JSON格式返回：
 
@@ -97,52 +139,70 @@ class QwenService:
 
 
 请以JSON格式返回提取的信息，确保经纬度、时间等数据准确。如果某些信息无法识别，请标记为null。"""
-            
+
+            # 使用 OpenAI 兼容格式的 payload
             payload = {
                 "model": self.qwen_vl_model,
-                "input": {
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": [
-                                {"image": image_input},
-                                {"text": prompt}
-                            ]
-                        }
-                    ]
-                },
-                "parameters": {
-                    "temperature": 0.5,
-                    "max_tokens": 2000
-                }
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": image_input
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": prompt
+                            }
+                        ]
+                    }
+                ],
+                "stream": False,
+                "temperature": 0.5,
+                "max_tokens": self.max_tokens  # 使用配置的最大token数（8192）
             }
-            
+
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
-            
+
+            logger.info(f"开始分析台风图像 - 模型: {self.qwen_vl_model}")
+
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                endpoint = f"{DASHSCOPE_BASE_URL}/services/aigc/multimodal-generation/generation"
+                endpoint = f"{self.base_url}/chat/completions"
                 response = await client.post(endpoint, json=payload, headers=headers)
+
+                # 确保响应使用 UTF-8 编码
+                response.encoding = "utf-8"
+
                 response.raise_for_status()
                 result = response.json()
-                
-                # 提取分析结果
-                analysis_text = result.get("output", {}).get("choices", [{}])[0].get("message", {}).get("content", "")
-                
+
+                logger.info(f"图像分析API返回结果: {json.dumps(result, ensure_ascii=False)[:500]}")
+
+                # 提取分析结果（OpenAI 兼容格式）
+                analysis_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
                 # 尝试解析JSON数据
                 extracted_data = self._parse_json_from_text(analysis_text)
-                
+
+                logger.info(f"图像分析成功 - 内容长度: {len(analysis_text)}")
+
                 return {
                     "success": True,
                     "analysis_text": analysis_text,
                     "extracted_data": extracted_data,
                     "model_used": self.qwen_vl_model
                 }
-        
+
         except Exception as e:
             logger.error(f"图像分析失败: {e}")
+            logger.error(f"错误类型: {type(e).__name__}")
+            logger.error(f"错误详情: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),
@@ -185,84 +245,56 @@ class QwenService:
                 raise ValueError(f"不支持的报告类型: {report_type}")
 
             payload = {
-                "model": self.qwen_plus_model,
-                "input": {
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "你是气象分析专家，擅长生成详尽专业的台风报告。请使用Markdown格式输出，包括标题（##）、列表（-）、加粗（**）等格式。"
-                        },
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ]
-                },
-                "parameters": {
-                    "temperature": 0.5,
-                    "max_tokens": 2000
-                }
+                "model": self.qwen_text_model,  # 使用文本生成模型
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "你是气象分析专家，擅长生成详尽专业的台风报告。请使用Markdown格式输出，包括标题（##）、列表（-）、加粗（**）等格式。"
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "stream": False,
+                "temperature": 0.6,
+                "max_tokens": self.max_tokens,  # 使用配置的最大token数（8192）
+                "top_p": 0.9,
+                "frequency_penalty": 0.3,
+                "response_format": {"type": "text"}
             }
-            
+
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
-            
+
             async with httpx.AsyncClient(timeout=self.timeout) as client:
+                endpoint = f"{self.base_url}/chat/completions"
                 response = await client.post(
-                    f"{DASHSCOPE_BASE_URL}/services/aigc/text-generation/generation",
+                    endpoint,
                     json=payload,
                     headers=headers
                 )
+
+                # 确保响应使用 UTF-8 编码
+                response.encoding = "utf-8"
+
                 response.raise_for_status()
                 result = response.json()
 
                 # 记录API返回结果，便于调试
                 logger.info(f"通义千问API返回结果: {json.dumps(result, ensure_ascii=False)[:500]}")
 
-                # 提取生成的报告内容 - 支持多种返回格式
-                report_content = ""
-                output = result.get("output", {})
+                # 提取生成的报告内容（OpenAI 兼容格式）
+                report_content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
 
-                # 格式1: output.choices[0].message.content
-                if "choices" in output and len(output["choices"]) > 0:
-                    choice = output["choices"][0]
-                    if isinstance(choice, dict):
-                        message = choice.get("message", {})
-                        if isinstance(message, dict):
-                            report_content = message.get("content", "")
-
-                # 格式2: output.text (通义千问常用格式)
-                if not report_content and "text" in output:
-                    report_content = output["text"]
-
-                # 格式3: output 直接是字符串
-                if not report_content and isinstance(output, str):
-                    report_content = output
-
-                # 处理列表类型的内容
-                if isinstance(report_content, list):
-                    text_parts = []
-                    for item in report_content:
-                        if isinstance(item, dict) and "text" in item:
-                            text_parts.append(str(item["text"]))
-                        elif isinstance(item, str):
-                            text_parts.append(item)
-                        else:
-                            text_parts.append(str(item))
-                    report_content = "\n".join(text_parts)
-
-                # 确保是字符串
-                if not isinstance(report_content, str):
-                    report_content = str(report_content) if report_content else ""
-
-                logger.info(f"提取的报告内容长度: {len(report_content)}")
+                logger.info(f"通义千问报告生成成功 - 内容长度: {len(report_content)}")
 
                 return {
                     "success": True,
                     "report_content": report_content.strip(),
-                    "model_used": self.qwen_plus_model
+                    "model_used": self.qwen_vl_model
                 }
         
         except httpx.TimeoutException as e:
@@ -331,7 +363,7 @@ class QwenService:
 
 【输出要求】
 - **使用Markdown格式输出**，包括标题（##）、列表（-）、加粗（**）等
-- 报告总字数不少于**1000字**
+- 报告总字数不少于**1500字**
 - 每个章节至少包含**4-6个分析要点**
 - 关键数据使用**加粗**突出显示
 - 语言专业详尽，逻辑清晰
@@ -379,7 +411,7 @@ class QwenService:
 
 【输出要求】
 - **使用Markdown格式输出**，包括标题（##）、列表（-）、加粗（**）等
-- 报告总字数不少于**1000字**
+- 报告总字数不少于**1500字**
 - 每个章节至少包含**4-6个分析要点**
 - 关键预测数据使用**加粗**突出显示
 - 语言专业详尽，逻辑清晰
@@ -435,7 +467,7 @@ class QwenService:
 
 【输出要求】
 - **使用Markdown格式输出**，包括标题（##）、列表（-）、加粗（**）等
-- 报告总字数不少于**1000字**
+- 报告总字数不少于**1500字**
 - 每个章节至少包含**5-7个分析要点**
 - 风险等级使用**加粗**明确标注
 - 语言专业详尽，逻辑清晰

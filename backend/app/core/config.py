@@ -21,24 +21,25 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./typhoon_analysis.db"
 
     # AI服务提供商选择
-    AI_PROVIDER: str = Field(default="qwen", description="AI服务提供商，可选值: qwen, deepseek")
+    AI_PROVIDER: str = Field(default="", description="AI服务提供商，可选值: qwen, deepseek, glm")
 
-    # DashScope API配置（通义千问）
-    DASHSCOPE_API_KEY: str = Field(..., description="阿里云DashScope API密钥")
-    QWEN_PLUS_MODEL: str = "qwen-plus"
-    QWEN_VL_MODEL: str = "qwen-vl-max"
+    # 统一AI API配置（aiping.cn）
+    AI_API_KEY: str = Field(..., description="统一AI API密钥（用于DeepSeek、Qwen和GLM）")
+    AI_API_BASE_URL: str = Field(default="https://aiping.cn/api/v1", description="统一AI API基础URL")
 
-    # DeepSeek API配置
-    DEEPSEEK_API_KEY: str = Field(default="", description="DeepSeek API密钥")
-    DEEPSEEK_MODEL: str = Field(default="deepseek-ai/DeepSeek-V3", description="DeepSeek模型名称（推荐使用deepseek-chat以获得更快响应）")
-    DEEPSEEK_API_BASE_URL: str = Field(default="https://api.siliconflow.cn/v1", description="DeepSeek API基础URL（使用SiliconFlow代理端点）")
+    # AI模型名称配置
+    DEEPSEEK_MODEL: str = Field(default="", description="DeepSeek模型名称")
+    QWEN_TEXT_MODEL: str = Field(default="", description="Qwen文本生成模型")
+    QWEN_VL_MODEL: str = Field(default="", description="Qwen视觉理解模型")
+    GLM_MODEL: str = Field(default="", description="GLM模型名称")
 
     # AI通用配置
-    AI_TIMEOUT: int = 120  # 增加到120秒，确保有足够时间完成报告生成
+    AI_TIMEOUT: int = 120  # 增加超时时间以支持更长内容生成
+    AI_MAX_TOKENS: int = 2500
 
     # CORS配置
     CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
+        "http://localhost:8000",
         "http://localhost:5173",
     ]
 
@@ -68,4 +69,5 @@ class Settings(BaseSettings):
 
 # 创建全局配置实例
 settings = Settings()
+
 

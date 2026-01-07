@@ -1226,11 +1226,12 @@
       <div class="form-group">
         <label>AI模型选择</label>
         <select id="aiProvider">
+          <option value="glm">智谱GLM (GLM-4.7)</option>
           <option value="qwen">通义千问 (Qwen)</option>
           <option value="deepseek">DeepSeek</option>
         </select>
         <small style="color: #6b7280; display: block; margin-top: 5px">
-          💡 提示：通义千问和DeepSeek均支持中文报告生成
+          💡 提示：通义千问、DeepSeek和GLM均支持中文报告生成
         </small>
       </div>
       <button class="btn" id="generateReportBtn" type="button">
@@ -1254,35 +1255,109 @@
     <!-- Leaflet ChineseTmsProviders 插件 -->
     <script src="https://unpkg.com/leaflet.chinatmsproviders@3.0.2/src/leaflet.ChineseTmsProviders.js"></script>
 
-    <!-- Marked.js - Markdown解析库 -->
-    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
-
+    <!-- Marked.js - Markdown解析库（多CDN源自动回退） -->
     <script>
+      // ========== 多CDN源自动回退加载 marked.js ==========
+      (function () {
+        // 定义多个CDN源（按优先级排序）
+        const markedCdnUrls = [
+          "https://unpkg.com/marked@11.1.1/marked.min.js", // unpkg（国际，较稳定）
+          "https://cdn.bootcdn.net/ajax/libs/marked/11.1.1/marked.min.js", // bootcdn（国内）
+          "https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js", // cdnjs
+          "https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js", // jsdelivr（备用）
+        ];
+
+        let currentCdnIndex = 0;
+        let loadTimeout = null;
+
+        function loadMarkedScript(urls, index) {
+          if (index >= urls.length) {
+            console.error("❌ 所有CDN源均加载失败，marked.js无法加载");
+            console.error("尝试的CDN源:", urls);
+            return;
+          }
+
+          const url = urls[index];
+          console.log(
+            `🔄 尝试从CDN加载 marked.js [${index + 1}/${urls.length}]: ${url}`
+          );
+
+          const script = document.createElement("script");
+          script.src = url;
+
+          // 设置加载超时（10秒）
+          loadTimeout = setTimeout(() => {
+            console.warn(`⚠️ CDN源 ${index + 1} 加载超时: ${url}`);
+            script.remove();
+            loadMarkedScript(urls, index + 1);
+          }, 10000);
+
+          script.onload = function () {
+            clearTimeout(loadTimeout);
+            console.log(`✅ marked.js 加载成功 [CDN源 ${index + 1}]: ${url}`);
+            console.log(
+              "marked版本:",
+              typeof marked !== "undefined"
+                ? marked.version || "未知"
+                : "未定义"
+            );
+
+            // 测试Markdown解析
+            if (typeof marked !== "undefined" && marked.parse) {
+              try {
+                const testMarkdown = "## 测试标题\n- 列表项1\n- **加粗文本**";
+                const testHtml = marked.parse(testMarkdown);
+                console.log("✅ Markdown解析测试成功");
+                console.log("测试输入:", testMarkdown);
+                console.log("测试输出:", testHtml);
+              } catch (e) {
+                console.error("❌ Markdown解析测试失败:", e);
+              }
+            }
+          };
+
+          script.onerror = function () {
+            clearTimeout(loadTimeout);
+            console.warn(`⚠️ CDN源 ${index + 1} 加载失败: ${url}`);
+            script.remove();
+            loadMarkedScript(urls, index + 1);
+          };
+
+          document.head.appendChild(script);
+        }
+
+        // 开始加载
+        loadMarkedScript(markedCdnUrls, 0);
+      })();
+
       // ========== 检测marked.js是否加载成功 ==========
       window.addEventListener("load", function () {
         if (typeof marked !== "undefined" && marked.parse) {
-          console.log("✅ marked.js 加载成功");
-          console.log("marked版本:", marked.version || "未知");
-
-          // 测试Markdown解析
-          try {
-            const testMarkdown = "## 测试标题\n- 列表项1\n- **加粗文本**";
-            const testHtml = marked.parse(testMarkdown);
-            console.log("✅ Markdown解析测试成功");
-            console.log("测试输入:", testMarkdown);
-            console.log("测试输出:", testHtml);
-          } catch (e) {
-            console.error("❌ Markdown解析测试失败:", e);
-          }
+          console.log("✅ marked.js 最终加载状态: 成功");
         } else {
-          console.error("❌ marked.js 未加载或版本不兼容");
+          console.error("❌ marked.js 最终加载状态: 失败");
           console.log("marked对象:", typeof marked);
           console.log("marked.parse:", typeof marked?.parse);
+          console.warn("⚠️ 报告生成和图像分析的Markdown渲染功能将受影响");
         }
       });
     </script>
 
     <script>
+      // ========== 页面刷新检测（诊断用） ==========
+      window.addEventListener("beforeunload", function (e) {
+        console.log("⚠️⚠️⚠️ 页面即将刷新或关闭！");
+        console.log("触发时间:", new Date().toISOString());
+        console.log("触发原因: 可能是Live Server热重载、用户刷新或关闭页面");
+        console.trace("刷新触发调用栈:");
+      });
+
+      // 记录页面加载时间
+      console.log("📄 页面加载时间:", new Date().toISOString());
+      console.log(
+        '🔍 如果在报告生成后看到"页面即将刷新"日志，说明是Live Server热重载导致的跳转'
+      );
+
       const API_BASE_URL = "http://localhost:8000/api";
 
       // 全局变量
@@ -1484,6 +1559,33 @@
 
       // ========== 标签页切换 ==========
       function switchTab(event, tabName) {
+        // ========== 新增：调用栈追踪，帮助定位跳转来源 ==========
+        console.log("🔍 switchTab 被调用:", tabName);
+        console.log("调用来源:", event ? "用户点击" : "程序调用");
+        if (!event) {
+          console.log("调用栈:", new Error().stack);
+        }
+
+        // ========== 新增：防止在报告生成过程中切换标签 ==========
+        if (typeof isGeneratingReport !== "undefined" && isGeneratingReport) {
+          console.warn("⚠️ 报告生成中，阻止标签切换");
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return false;
+        }
+
+        // ========== 新增：防止在图像分析过程中切换标签 ==========
+        if (typeof isAnalyzing !== "undefined" && isAnalyzing) {
+          console.warn("⚠️ 图像分析中，阻止标签切换");
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return false;
+        }
+
         // 阻止默认行为（关键修复）
         if (event) {
           event.preventDefault();
@@ -1491,6 +1593,8 @@
         }
 
         try {
+          console.log(`🔄 切换到标签页: ${tabName}`);
+
           // 隐藏所有标签内容
           document.querySelectorAll(".tab-content").forEach((content) => {
             content.classList.remove("active");
@@ -1533,6 +1637,8 @@
               }
             });
           }
+
+          console.log(`✅ 标签页切换成功: ${tabName}`);
         } catch (error) {
           console.error("❌ 标签页切换失败:", error);
         }
@@ -2281,6 +2387,40 @@
 
           // 显示结果
           showResult("report", data);
+
+          // ========== 多次强制激活报告标签页，防止状态被重置 ==========
+          const lockReportTab = (attemptNumber) => {
+            const reportTabBtn = document.querySelector(
+              '.tab[onclick*="report"]'
+            );
+            if (reportTabBtn) {
+              document
+                .querySelectorAll(".tab")
+                .forEach((tab) => tab.classList.remove("active"));
+              reportTabBtn.classList.add("active");
+            }
+
+            const reportTabContent = document.getElementById("report");
+            if (reportTabContent) {
+              document
+                .querySelectorAll(".tab-content")
+                .forEach((content) => content.classList.remove("active"));
+              document
+                .querySelectorAll(".main-container")
+                .forEach((container) => (container.style.display = "none"));
+              reportTabContent.classList.add("active");
+            }
+
+            console.log(`✅ 报告标签页锁定 [第${attemptNumber}次]`);
+          };
+
+          // 多次锁定，覆盖可能的延迟跳转
+          setTimeout(() => lockReportTab(1), 50);
+          setTimeout(() => lockReportTab(2), 150);
+          setTimeout(() => lockReportTab(3), 300);
+          setTimeout(() => lockReportTab(4), 500);
+          setTimeout(() => lockReportTab(5), 1000);
+          console.log("✅ 报告标签页多次锁定已设置（5次，持续1秒）");
         } catch (error) {
           console.error("❌ 报告生成失败:", error.message);
 
@@ -2295,6 +2435,40 @@
             { error: error.message || "报告生成失败，请稍后重试" },
             true
           );
+
+          // ========== 错误情况下也多次强制激活报告标签页 ==========
+          const lockReportTabError = (attemptNumber) => {
+            const reportTabBtn = document.querySelector(
+              '.tab[onclick*="report"]'
+            );
+            if (reportTabBtn) {
+              document
+                .querySelectorAll(".tab")
+                .forEach((tab) => tab.classList.remove("active"));
+              reportTabBtn.classList.add("active");
+            }
+
+            const reportTabContent = document.getElementById("report");
+            if (reportTabContent) {
+              document
+                .querySelectorAll(".tab-content")
+                .forEach((content) => content.classList.remove("active"));
+              document
+                .querySelectorAll(".main-container")
+                .forEach((container) => (container.style.display = "none"));
+              reportTabContent.classList.add("active");
+            }
+
+            console.log(`✅ 报告标签页锁定（错误情况）[第${attemptNumber}次]`);
+          };
+
+          // 多次锁定，覆盖可能的延迟跳转
+          setTimeout(() => lockReportTabError(1), 50);
+          setTimeout(() => lockReportTabError(2), 150);
+          setTimeout(() => lockReportTabError(3), 300);
+          setTimeout(() => lockReportTabError(4), 500);
+          setTimeout(() => lockReportTabError(5), 1000);
+          console.log("✅ 报告标签页多次锁定已设置（错误情况，5次，持续1秒）");
         } finally {
           // 重置状态标志
           isGeneratingReport = false;

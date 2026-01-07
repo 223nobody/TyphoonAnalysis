@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from app.core.database import get_db
 from app.models.typhoon import Prediction, TyphoonPath
 from app.schemas.typhoon import PredictionCreate, PredictionResponse
-from app.services.ml.lstm_predictor import predict_typhoon_path
+from app.services.lstm.lstm_predictor import predict_typhoon_path
 
 router = APIRouter(prefix="/predictions", tags=["预测"])
 

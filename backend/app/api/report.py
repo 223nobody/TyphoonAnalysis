@@ -12,6 +12,7 @@ from app.schemas.typhoon import ReportCreate, ReportResponse
 from app.services.ai.ai_factory import AIServiceFactory
 from app.services.ai.qwen_service import qwen_service
 from app.services.ai.deepseek_service import deepseek_service
+from app.services.ai.glm_service import glm_service
 
 router = APIRouter(prefix="/report", tags=["报告"])
 
@@ -21,7 +22,7 @@ async def generate_report(
     typhoon_id: str = Body(..., description="台风编号"),
     typhoon_name: str = Body("", description="台风名称"),
     report_type: str = Body("comprehensive", description="报告类型：comprehensive/prediction/impact"),
-    ai_provider: Optional[str] = Body(None, description="AI服务提供商（qwen或deepseek）"),
+    ai_provider: Optional[str] = Body(None, description="AI服务提供商（qwen、deepseek或glm）"),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -36,7 +37,7 @@ async def generate_report(
         typhoon_id: 台风编号
         typhoon_name: 台风名称
         report_type: 报告类型
-        ai_provider: AI服务提供商（qwen或deepseek）
+        ai_provider: AI服务提供商（qwen、deepseek或glm）
 
     Returns:
         ReportResponse: 生成的报告
@@ -115,6 +116,8 @@ async def generate_report(
         ai_service = deepseek_service
     elif ai_provider and ai_provider.lower() == "qwen":
         ai_service = qwen_service
+    elif ai_provider and ai_provider.lower() == "glm":
+        ai_service = glm_service
     else:
         ai_service = AIServiceFactory.get_service()
 
