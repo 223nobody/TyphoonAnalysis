@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
 from app.core.database import get_db
-from app.models.typhoon import Report, Prediction
+from app.models.typhoon import Report, Prediction, TyphoonPath, Typhoon
 from app.schemas.typhoon import ReportCreate, ReportResponse
 from app.services.ai.ai_factory import AIServiceFactory
 from app.services.ai.qwen_service import qwen_service
@@ -20,43 +20,83 @@ router = APIRouter(prefix="/report", tags=["报告"])
 async def generate_report(
     typhoon_id: str = Body(..., description="台风编号"),
     typhoon_name: str = Body("", description="台风名称"),
-    report_type: str = Body("analysis", description="报告类型"),
-    ai_provider: Optional[str] = Body(None, description="AI服务提供商（qwen或deepseek，默认使用配置文件）"),
-    include_prediction: bool = Body(True, description="是否包含预测数据"),
-    include_analysis: bool = Body(True, description="是否包含分析数据"),
+    report_type: str = Body("comprehensive", description="报告类型：comprehensive/prediction/impact"),
+    ai_provider: Optional[str] = Body(None, description="AI服务提供商（qwen或deepseek）"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    生成台风分析报告
+    生成台风分析报告（支持三种报告类型）
 
-    支持使用通义千问或DeepSeek模型生成专业的中文台风分析简报
+    报告类型说明：
+    - comprehensive: 综合分析报告（基于历史路径数据）
+    - prediction: 预测报告（基于预测数据）
+    - impact: 影响评估报告（基于历史数据）
 
     Args:
         typhoon_id: 台风编号
         typhoon_name: 台风名称
         report_type: 报告类型
-        ai_provider: AI服务提供商（qwen或deepseek，默认使用配置文件中的设置）
-        include_prediction: 是否包含预测数据
-        include_analysis: 是否包含分析数据
+        ai_provider: AI服务提供商（qwen或deepseek）
 
     Returns:
         ReportResponse: 生成的报告
     """
-    # 获取预测数据
+    # 1. 查询台风基本信息
+    typhoon_query = select(Typhoon).where(Typhoon.typhoon_id == typhoon_id)
+    typhoon_result = await db.execute(typhoon_query)
+    typhoon = typhoon_result.scalar_one_or_none()
+
+    if not typhoon and not typhoon_name:
+        raise HTTPException(status_code=404, detail=f"台风 {typhoon_id} 不存在，且未提供台风名称")
+
+    # 使用数据库中的名称或传入的名称
+    final_typhoon_name = typhoon.typhoon_name_cn if typhoon and typhoon.typhoon_name_cn else (typhoon_name or "未知")
+
+    # 2. 根据报告类型准备数据
+    historical_data = {}
     prediction_data = {}
     prediction_id = None
 
-    if include_prediction:
-        query = select(Prediction).where(
+    if report_type in ["comprehensive", "impact"]:
+        # 综合分析报告和影响评估报告需要历史路径数据
+        path_query = select(TyphoonPath).where(
+            TyphoonPath.typhoon_id == typhoon_id
+        ).order_by(TyphoonPath.timestamp)
+
+        path_result = await db.execute(path_query)
+        paths = path_result.scalars().all()
+
+        if paths:
+            historical_data = {
+                "path_count": len(paths),
+                "paths": [
+                    {
+                        "timestamp": str(p.timestamp),
+                        "latitude": p.latitude,
+                        "longitude": p.longitude,
+                        "center_pressure": p.center_pressure,
+                        "max_wind_speed": p.max_wind_speed,
+                        "moving_speed": p.moving_speed,
+                        "moving_direction": p.moving_direction,
+                        "intensity": p.intensity
+                    }
+                    for p in paths
+                ]
+            }
+
+    if report_type == "prediction":
+        # 预测报告需要预测数据
+        pred_query = select(Prediction).where(
             Prediction.typhoon_id == typhoon_id
         ).order_by(desc(Prediction.created_at)).limit(10)
 
-        result = await db.execute(query)
-        predictions = result.scalars().all()
+        pred_result = await db.execute(pred_query)
+        predictions = pred_result.scalars().all()
 
         if predictions:
             prediction_id = predictions[0].id
             prediction_data = {
+                "prediction_count": len(predictions),
                 "predictions": [
                     {
                         "forecast_time": str(p.forecast_time),
@@ -70,41 +110,43 @@ async def generate_report(
                 ]
             }
 
-    # 根据参数选择AI服务
+    # 3. 选择AI服务
     if ai_provider and ai_provider.lower() == "deepseek":
         ai_service = deepseek_service
     elif ai_provider and ai_provider.lower() == "qwen":
         ai_service = qwen_service
     else:
-        # 使用配置文件中的默认服务
         ai_service = AIServiceFactory.get_service()
 
-    # 调用AI服务生成报告
+    # 4. 调用AI服务生成报告
     result = await ai_service.generate_typhoon_report(
         typhoon_id=typhoon_id,
-        typhoon_name=typhoon_name,
+        typhoon_name=final_typhoon_name,
+        report_type=report_type,
+        historical_data=historical_data,
         prediction_data=prediction_data
     )
-    
+
     if not result["success"]:
         raise HTTPException(
             status_code=500,
             detail=f"报告生成失败: {result.get('error', '未知错误')}"
         )
-    
-    # 保存报告
+
+    # 5. 保存报告
     db_report = Report(
         typhoon_id=typhoon_id,
-        typhoon_name=typhoon_name,
-        report_type="analysis",
+        typhoon_name=final_typhoon_name,
+        report_type=report_type,
         report_content=result["report_content"],
+        model_used=result.get("model_used", "未知"),
         related_prediction_id=prediction_id
     )
-    
+
     db.add(db_report)
     await db.commit()
     await db.refresh(db_report)
-    
+
     return db_report
 
 

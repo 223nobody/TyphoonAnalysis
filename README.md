@@ -40,10 +40,11 @@ TyphoonAnalysis/
 │   ├── app/                   # 应用模块
 │   │   ├── __init__.py
 │   │   ├── api/              # API路由
-│   │   │   ├── typhoons.py   # 台风数据API
+│   │   │   ├── typhoon.py    # 台风数据API
 │   │   │   ├── prediction.py # 预测API
 │   │   │   ├── analysis.py   # 图像分析API
-│   │   │   └── report.py     # 报告生成API
+│   │   │   ├── report.py     # 报告生成API
+│   │   │   └── crawler.py    # 爬虫API
 │   │   ├── models/           # 数据模型
 │   │   ├── services/         # 业务逻辑
 │   │   └── utils/            # 工具函数
@@ -188,11 +189,11 @@ python main.py
 
 ### 主要 API 端点
 
-- `GET /api/v1/typhoons` - 获取台风列表
-- `GET /api/v1/typhoons/{typhoon_id}` - 获取台风详情
-- `POST /api/v1/prediction/path` - 台风路径预测
-- `POST /api/v1/analysis/satellite-image` - 卫星图像分析
-- `POST /api/v1/report/generate` - 生成台风报告
+- `GET /api/typhoons` - 获取台风列表
+- `GET /api/typhoons/{typhoon_id}` - 获取台风详情
+- `POST /api/prediction/path` - 台风路径预测
+- `POST /api/analysis/satellite-image` - 卫星图像分析
+- `POST /api/report/generate` - 生成台风报告
 
 ---
 

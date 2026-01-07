@@ -126,12 +126,14 @@ class ReportResponse(ReportBase):
     """报告响应"""
     id: int
     report_content: str
+    model_used: Optional[str] = None
     related_prediction_id: Optional[int] = None
     related_analysis_id: Optional[int] = None
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
+        protected_namespaces = ()  # 允许使用 model_ 开头的字段名
 
 
 class TyphoonListResponse(BaseModel):

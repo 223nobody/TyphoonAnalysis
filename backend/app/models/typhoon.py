@@ -72,12 +72,13 @@ class ImageAnalysis(Base):
 class Report(Base):
     """报告记录表"""
     __tablename__ = "reports"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     typhoon_id = Column(String(50), index=True, nullable=False)
     typhoon_name = Column(String(100))
-    report_type = Column(String(50), comment="报告类型：analysis/forecast")
+    report_type = Column(String(50), comment="报告类型：comprehensive/prediction/impact")
     report_content = Column(Text, comment="报告内容")
+    model_used = Column(String(100), comment="使用的AI模型")
     related_prediction_id = Column(Integer, comment="关联的预测ID")
     related_analysis_id = Column(Integer, comment="关联的分析ID")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -30,11 +30,11 @@ class Settings(BaseSettings):
 
     # DeepSeek API配置
     DEEPSEEK_API_KEY: str = Field(default="", description="DeepSeek API密钥")
-    DEEPSEEK_MODEL: str = Field(default="deepseek-chat", description="DeepSeek模型名称")
-    DEEPSEEK_API_BASE_URL: str = Field(default="https://api.deepseek.com", description="DeepSeek API基础URL")
+    DEEPSEEK_MODEL: str = Field(default="deepseek-ai/DeepSeek-V3", description="DeepSeek模型名称（推荐使用deepseek-chat以获得更快响应）")
+    DEEPSEEK_API_BASE_URL: str = Field(default="https://api.siliconflow.cn/v1", description="DeepSeek API基础URL（使用SiliconFlow代理端点）")
 
     # AI通用配置
-    AI_TIMEOUT: int = 30
+    AI_TIMEOUT: int = 120  # 增加到120秒，确保有足够时间完成报告生成
 
     # CORS配置
     CORS_ORIGINS: List[str] = [
