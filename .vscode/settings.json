@@ -1,0 +1,19 @@
+{
+  "liveServer.settings.donotShowInfoMsg": true,
+  "liveServer.settings.donotVerifyTags": true,
+  "liveServer.settings.wait": 600000,
+  "liveServer.settings.fullReload": false,
+  "liveServer.settings.useWebExt": false,
+  "liveServer.settings.NoBrowser": false,
+  "liveServer.settings.AdvanceCustomBrowserCmdLine": "",
+  "liveServer.settings.ChromeDebuggingAttachment": false,
+  "liveServer.settings.AutoRefresh": "none",
+  "liveServer.settings.ignoreFiles": [
+    ".vscode/**",
+    "**/*.json",
+    "**/*.txt",
+    "**/*.log",
+    "**/*.md",
+    "**/*.html"
+  ]
+}

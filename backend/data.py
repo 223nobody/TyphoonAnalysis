@@ -219,10 +219,10 @@ def main():
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = SessionLocal()
 
-    print("开始获取2005-2025年的台风数据...")
+    print("开始获取2000-2025年的台风数据...")
 
     # 获取2005到2025年的所有台风数据
-    all_typhoons = spider_get_all_typhoons(2005, 2025)
+    all_typhoons = spider_get_all_typhoons(2000, 2025)
     if not all_typhoons:
         print("未获取到任何台风数据")
         session.close()
