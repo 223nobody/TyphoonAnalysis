@@ -9,7 +9,7 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
-from app.api import typhoon, prediction, analysis, report, crawler
+from app.api import typhoon, prediction, analysis, report, crawler, statistics, export, alert
 from app.services.scheduler import start_scheduler, shutdown_scheduler
 
 
@@ -74,6 +74,10 @@ app.include_router(prediction.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
 app.include_router(report.router, prefix="/api")
 app.include_router(crawler.router, prefix="/api")
+# 新增路由模块
+app.include_router(statistics.router, prefix="/api")
+app.include_router(export.router, prefix="/api")
+app.include_router(alert.router, prefix="/api")
 
 
 @app.get("/")
