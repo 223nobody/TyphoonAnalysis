@@ -418,3 +418,38 @@ table tr:hover {
   font-size: 14px;
   margin-bottom: 15px;
 }
+
+/* ========== 活跃台风标记动画样式 ========== */
+.active-typhoon-marker {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 活跃台风路径闪烁效果 */
+.active-typhoon-path {
+  animation: pathBlink 1.5s ease-in-out infinite;
+}
+
+@keyframes pathBlink {
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}

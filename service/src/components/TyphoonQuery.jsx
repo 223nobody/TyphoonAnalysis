@@ -10,6 +10,8 @@ import {
   getCrawlerLogs,
   getTyphoonPath,
 } from "../services/api";
+import "../styles/TyphoonQuery.css";
+import "../styles/common.css";
 
 function TyphoonQuery() {
   const [queryType, setQueryType] = useState("list");

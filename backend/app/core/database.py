@@ -8,7 +8,7 @@ from app.core.config import settings
 # 创建异步引擎
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=settings.DEBUG,
+    echo=False,  # 禁用SQL日志输出
     future=True,
 )
 
@@ -25,10 +25,10 @@ AsyncSessionLocal = async_sessionmaker(
 Base = declarative_base()
 
 
-async def get_db() -> AsyncSession:
+async def get_db():
     """
     获取数据库会话的依赖注入函数
-    
+
     Yields:
         AsyncSession: 数据库会话
     """

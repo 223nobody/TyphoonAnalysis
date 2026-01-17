@@ -1,7 +1,8 @@
 /**
  * 统计分析面板组件
  */
-import React, { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import * as echarts from "echarts";
 import {
   getYearlyStatistics,
   getIntensityStatistics,
@@ -9,6 +10,8 @@ import {
   exportTyphoon,
   exportBatchTyphoons,
 } from "../services/api";
+import "../styles/StatisticsPanel.css";
+import "../styles/common.css";
 
 function StatisticsPanel() {
   const [statisticsType, setStatisticsType] = useState("yearly");
@@ -16,9 +19,14 @@ function StatisticsPanel() {
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
 
+  // ECharts图表引用
+  const yearlyChartRef = useRef(null);
+  const intensityChartRef = useRef(null);
+  const comparisonChartRef = useRef(null);
+
   // 年度统计表单
   const [yearlyForm, setYearlyForm] = useState({
-    startYear: 2020,
+    startYear: 2000,
     endYear: 2025,
   });
 
@@ -69,6 +77,121 @@ function StatisticsPanel() {
     }
   };
 
+  // 渲染年度统计ECharts图表
+  useEffect(() => {
+    if (
+      result &&
+      result.type === "yearly" &&
+      result.data &&
+      yearlyChartRef.current
+    ) {
+      const chartDom = yearlyChartRef.current;
+      const myChart = echarts.init(chartDom);
+
+      const yearlyData = result.data.yearly_data || [];
+      const years = yearlyData.map((item) => item.year);
+      const counts = yearlyData.map((item) => item.count);
+
+      const option = {
+        title: {
+          text: "年度台风数量趋势",
+          left: "center",
+          textStyle: {
+            color: "#333",
+            fontSize: 16,
+            fontWeight: "bold",
+          },
+        },
+        tooltip: {
+          trigger: "axis",
+          axisPointer: {
+            type: "shadow",
+          },
+          formatter: "{b}年: {c}个台风",
+        },
+        grid: {
+          left: "10%",
+          right: "10%",
+          bottom: "15%",
+          top: "15%",
+          containLabel: true,
+        },
+        xAxis: {
+          type: "category",
+          data: years,
+          axisLabel: {
+            rotate: 45,
+            fontSize: 12,
+          },
+          name: "年份",
+          nameTextStyle: {
+            fontSize: 14,
+            fontWeight: "bold",
+          },
+        },
+        yAxis: {
+          type: "value",
+          name: "台风数量",
+          nameTextStyle: {
+            fontSize: 14,
+            fontWeight: "bold",
+          },
+          axisLabel: {
+            formatter: "{value}个",
+          },
+        },
+        series: [
+          {
+            name: "台风数量",
+            type: "line",
+            data: counts,
+            smooth: true,
+            lineStyle: {
+              width: 3,
+              color: "#667eea",
+            },
+            itemStyle: {
+              color: "#667eea",
+              borderWidth: 2,
+              borderColor: "#fff",
+            },
+            areaStyle: {
+              color: {
+                type: "linear",
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [
+                  { offset: 0, color: "rgba(102, 126, 234, 0.3)" },
+                  { offset: 1, color: "rgba(102, 126, 234, 0.05)" },
+                ],
+              },
+            },
+            emphasis: {
+              focus: "series",
+              itemStyle: {
+                color: "#764ba2",
+                borderWidth: 3,
+              },
+            },
+          },
+        ],
+      };
+
+      myChart.setOption(option);
+
+      // 响应式调整
+      const resizeHandler = () => myChart.resize();
+      window.addEventListener("resize", resizeHandler);
+
+      return () => {
+        window.removeEventListener("resize", resizeHandler);
+        myChart.dispose();
+      };
+    }
+  }, [result]);
+
   // 处理强度分布统计
   const handleIntensityStatistics = async () => {
     try {
@@ -85,6 +208,107 @@ function StatisticsPanel() {
       setLoading(false);
     }
   };
+
+  // 渲染强度分布ECharts图表
+  useEffect(() => {
+    if (
+      result &&
+      result.type === "intensity" &&
+      result.data &&
+      intensityChartRef.current
+    ) {
+      const chartDom = intensityChartRef.current;
+      const myChart = echarts.init(chartDom);
+
+      const intensityData = result.data.intensity_distribution || {};
+      const data = Object.entries(intensityData).map(([name, value]) => ({
+        name,
+        value,
+      }));
+
+      // 强度等级颜色映射
+      const colorMap = {
+        热带低压: "#3498db",
+        热带风暴: "#2ecc71",
+        强热带风暴: "#f1c40f",
+        台风: "#e67e22",
+        强台风: "#e74c3c",
+        超强台风: "#c0392b",
+      };
+
+      const option = {
+        title: {
+          text: "台风强度分布",
+          left: "center",
+          textStyle: {
+            color: "#333",
+            fontSize: 16,
+            fontWeight: "bold",
+          },
+        },
+        tooltip: {
+          trigger: "item",
+          formatter: "{b}: {c}个 ({d}%)",
+        },
+        legend: {
+          orient: "vertical",
+          left: "left",
+          top: "middle",
+          textStyle: {
+            fontSize: 12,
+          },
+        },
+        series: [
+          {
+            name: "强度分布",
+            type: "pie",
+            radius: ["40%", "70%"],
+            center: ["60%", "50%"],
+            avoidLabelOverlap: true,
+            itemStyle: {
+              borderRadius: 10,
+              borderColor: "#fff",
+              borderWidth: 2,
+            },
+            label: {
+              show: true,
+              formatter: "{b}\n{c}个 ({d}%)",
+              fontSize: 12,
+            },
+            emphasis: {
+              label: {
+                show: true,
+                fontSize: 14,
+                fontWeight: "bold",
+              },
+              itemStyle: {
+                shadowBlur: 10,
+                shadowOffsetX: 0,
+                shadowColor: "rgba(0, 0, 0, 0.5)",
+              },
+            },
+            data: data.map((item) => ({
+              ...item,
+              itemStyle: {
+                color: colorMap[item.name] || "#95a5a6",
+              },
+            })),
+          },
+        ],
+      };
+
+      myChart.setOption(option);
+
+      // 响应式调整
+      const resizeHandler = () => myChart.resize();
+      window.addEventListener("resize", resizeHandler);
+
+      return () => {
+        window.removeEventListener("resize", resizeHandler);
+        myChart.dispose();
+      };
+    }
+  }, [result]);
 
   // 处理台风对比
   const handleCompareTyphoons = async () => {
@@ -119,6 +343,137 @@ function StatisticsPanel() {
       setLoading(false);
     }
   };
+
+  // 渲染台风对比ECharts图表
+  useEffect(() => {
+    if (
+      result &&
+      result.type === "comparison" &&
+      result.data &&
+      result.data.typhoons &&
+      comparisonChartRef.current
+    ) {
+      const chartDom = comparisonChartRef.current;
+      const myChart = echarts.init(chartDom);
+
+      const typhoons = result.data.typhoons || [];
+      const typhoonNames = typhoons.map(
+        (t) => t.typhoon_name_cn || t.typhoon_name || t.typhoon_id
+      );
+      const maxWindSpeeds = typhoons.map((t) => t.max_wind_speed || 0);
+      const minPressures = typhoons.map((t) => t.min_pressure || 0);
+
+      const option = {
+        title: {
+          text: "台风对比分析",
+          left: "center",
+          textStyle: {
+            color: "#333",
+            fontSize: 16,
+            fontWeight: "bold",
+          },
+        },
+        tooltip: {
+          trigger: "axis",
+          axisPointer: {
+            type: "shadow",
+          },
+        },
+        legend: {
+          data: ["最大风速 (m/s)", "最低气压 (hPa)"],
+          top: "10%",
+        },
+        grid: {
+          left: "10%",
+          right: "10%",
+          bottom: "15%",
+          top: "20%",
+          containLabel: true,
+        },
+        xAxis: {
+          type: "category",
+          data: typhoonNames,
+          axisLabel: {
+            rotate: 30,
+            fontSize: 11,
+            interval: 0,
+          },
+        },
+        yAxis: [
+          {
+            type: "value",
+            name: "风速 (m/s)",
+            position: "left",
+            axisLabel: {
+              formatter: "{value}",
+            },
+          },
+          {
+            type: "value",
+            name: "气压 (hPa)",
+            position: "right",
+            axisLabel: {
+              formatter: "{value}",
+            },
+          },
+        ],
+        series: [
+          {
+            name: "最大风速 (m/s)",
+            type: "bar",
+            data: maxWindSpeeds,
+            itemStyle: {
+              color: "#667eea",
+            },
+            emphasis: {
+              itemStyle: {
+                color: "#764ba2",
+              },
+            },
+            label: {
+              show: true,
+              position: "top",
+              formatter: "{c}",
+              fontSize: 10,
+            },
+          },
+          {
+            name: "最低气压 (hPa)",
+            type: "line",
+            yAxisIndex: 1,
+            data: minPressures,
+            lineStyle: {
+              width: 3,
+              color: "#e74c3c",
+            },
+            itemStyle: {
+              color: "#e74c3c",
+              borderWidth: 2,
+              borderColor: "#fff",
+            },
+            label: {
+              show: true,
+              position: "bottom",
+              formatter: "{c}",
+              fontSize: 10,
+              color: "#e74c3c",
+            },
+          },
+        ],
+      };
+
+      myChart.setOption(option);
+
+      // 响应式调整
+      const resizeHandler = () => myChart.resize();
+      window.addEventListener("resize", resizeHandler);
+
+      return () => {
+        window.removeEventListener("resize", resizeHandler);
+        myChart.dispose();
+      };
+    }
+  }, [result]);
 
   // 处理单个导出
   const handleSingleExport = () => {
@@ -492,6 +847,20 @@ function StatisticsPanel() {
   function renderYearlyResult(data) {
     return (
       <div>
+        {/* ECharts图表容器 */}
+        <div
+          ref={yearlyChartRef}
+          style={{
+            width: "100%",
+            height: "400px",
+            marginBottom: "20px",
+            border: "1px solid #e5e7eb",
+            borderRadius: "8px",
+            padding: "10px",
+            backgroundColor: "#fff",
+          }}
+        ></div>
+
         <div className="info-card">
           <h4>📊 年度统计汇总</h4>
           {data.summary && (
@@ -543,6 +912,20 @@ function StatisticsPanel() {
   function renderIntensityResult(data) {
     return (
       <div>
+        {/* ECharts图表容器 */}
+        <div
+          ref={intensityChartRef}
+          style={{
+            width: "100%",
+            height: "450px",
+            marginBottom: "20px",
+            border: "1px solid #e5e7eb",
+            borderRadius: "8px",
+            padding: "10px",
+            backgroundColor: "#fff",
+          }}
+        ></div>
+
         {data.intensity_distribution && (
           <div className="info-card">
             <h4>💨 强度分布</h4>
@@ -588,38 +971,54 @@ function StatisticsPanel() {
     }
 
     return (
-      <div className="info-card">
-        <h4>🔍 台风对比结果</h4>
-        <table style={{ fontSize: "12px" }}>
-          <thead>
-            <tr>
-              <th>台风ID</th>
-              <th>名称</th>
-              <th>年份</th>
-              <th>最大强度</th>
-              <th>最大风速</th>
-              <th>最低气压</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.typhoons.map((t) => (
-              <tr key={t.typhoon_id}>
-                <td style={{ textAlign: "center" }}>{t.typhoon_id}</td>
-                <td>{t.typhoon_name_cn || t.typhoon_name}</td>
-                <td style={{ textAlign: "center" }}>{t.year}</td>
-                <td style={{ textAlign: "center" }}>
-                  {t.max_intensity || "N/A"}
-                </td>
-                <td style={{ textAlign: "center" }}>
-                  {t.max_wind_speed ? `${t.max_wind_speed}m/s` : "N/A"}
-                </td>
-                <td style={{ textAlign: "center" }}>
-                  {t.min_pressure ? `${t.min_pressure}hPa` : "N/A"}
-                </td>
+      <div>
+        {/* ECharts图表容器 */}
+        <div
+          ref={comparisonChartRef}
+          style={{
+            width: "100%",
+            height: "400px",
+            marginBottom: "20px",
+            border: "1px solid #e5e7eb",
+            borderRadius: "8px",
+            padding: "10px",
+            backgroundColor: "#fff",
+          }}
+        ></div>
+
+        <div className="info-card">
+          <h4>🔍 台风对比结果</h4>
+          <table style={{ fontSize: "12px" }}>
+            <thead>
+              <tr>
+                <th>台风ID</th>
+                <th>名称</th>
+                <th>年份</th>
+                <th>最大强度</th>
+                <th>最大风速</th>
+                <th>最低气压</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.typhoons.map((t) => (
+                <tr key={t.typhoon_id}>
+                  <td style={{ textAlign: "center" }}>{t.typhoon_id}</td>
+                  <td>{t.typhoon_name_cn || t.typhoon_name}</td>
+                  <td style={{ textAlign: "center" }}>{t.year}</td>
+                  <td style={{ textAlign: "center" }}>
+                    {t.max_intensity || "N/A"}
+                  </td>
+                  <td style={{ textAlign: "center" }}>
+                    {t.max_wind_speed ? `${t.max_wind_speed}m/s` : "N/A"}
+                  </td>
+                  <td style={{ textAlign: "center" }}>
+                    {t.min_pressure ? `${t.min_pressure}hPa` : "N/A"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }

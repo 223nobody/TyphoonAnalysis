@@ -10,7 +10,9 @@ from loguru import logger
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.api import typhoon, prediction, analysis, report, crawler, statistics, export, alert
+from app.api.v1 import images
 from app.services.scheduler import start_scheduler, shutdown_scheduler
+from app.services.crawler.bulletin_crawler import bulletin_crawler
 
 
 # 配置日志
@@ -32,6 +34,17 @@ async def lifespan(app: FastAPI):
 
     # 启动定时任务调度器
     start_scheduler()
+
+    # 启动时自动爬取一次台风公报
+    try:
+        logger.info("正在爬取台风公报...")
+        bulletin = bulletin_crawler.get_typhoon_bulletin()
+        if bulletin:
+            logger.info(f"成功爬取台风公报: {bulletin.get('typhoon_name', '未知')}")
+        else:
+            logger.info("当前没有活跃的台风公报")
+    except Exception as e:
+        logger.error(f"启动时爬取台风公报失败: {e}")
 
     logger.info(f"应用启动成功，监听 {settings.HOST}:{settings.PORT}")
 
@@ -78,6 +91,8 @@ app.include_router(crawler.router, prefix="/api")
 app.include_router(statistics.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
 app.include_router(alert.router, prefix="/api")
+# 图像分析路由（重构版本）
+app.include_router(images.router)
 
 
 @app.get("/")

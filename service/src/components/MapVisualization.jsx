@@ -8,10 +8,17 @@ import {
   TileLayer,
   Polyline,
   CircleMarker,
+  Circle,
   Tooltip,
 } from "react-leaflet";
-import { getTyphoonList, getTyphoonPath } from "../services/api";
+import {
+  getTyphoonList,
+  getTyphoonPath,
+  getTyphoonForecast,
+} from "../services/api";
 import "leaflet/dist/leaflet.css";
+import "../styles/MapVisualization.css";
+import "../styles/common.css";
 
 function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
   // 台风列表相关状态
@@ -22,7 +29,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
 
   // 筛选条件
   const [filters, setFilters] = useState({
-    year: "2025", // 默认2025年
+    year: "2026", // 默认2026年
     status: "",
     search: "",
   });
@@ -35,6 +42,14 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
 
   // 多台风叠加显示选项（默认为true）
   const [allowMultipleTyphoons, setAllowMultipleTyphoons] = useState(true);
+
+  // 预测路径数据状态
+  const [forecastData, setForecastData] = useState(new Map());
+  const [forecastLoading, setForecastLoading] = useState(false);
+  const [showForecast, setShowForecast] = useState(true);
+
+  // 地图图层状态
+  const [mapLayer, setMapLayer] = useState("terrain"); // "terrain" 或 "satellite"
 
   // 加载台风列表
   useEffect(() => {
@@ -138,11 +153,62 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
       }
 
       setPathsData(newPathsData);
+
+      // 同时加载预测路径数据
+      loadForecastPaths();
     } catch (err) {
       console.error("加载台风路径失败:", err);
       setPathError(err.message || "加载失败，请稍后重试");
     } finally {
       setPathLoading(false);
+    }
+  };
+
+  // 加载预测路径数据 - 只对活跃台风请求
+  const loadForecastPaths = async () => {
+    try {
+      setForecastLoading(true);
+      const newForecastData = new Map();
+
+      for (const typhoonId of selectedTyphoons) {
+        try {
+          // 查找台风信息，检查是否为活跃台风
+          const typhoonInfo = typhoons.find((t) => t.typhoon_id === typhoonId);
+
+          // 只对活跃台风（status=1）请求预报数据
+          if (!typhoonInfo || typhoonInfo.status !== 1) {
+            console.log(
+              `台风 ${typhoonId} 不是活跃台风（status=${typhoonInfo?.status}），跳过预报数据请求`
+            );
+            continue;
+          }
+
+          const data = await getTyphoonForecast(typhoonId);
+          if (data && Array.isArray(data) && data.length > 0) {
+            newForecastData.set(typhoonId, data);
+            console.log(`台风 ${typhoonId} 预测路径数据加载成功:`, data);
+            // 调试：检查是否包含中国香港数据
+            const agencies = data.map((d) => d.agency);
+            console.log(`台风 ${typhoonId} 的预报机构:`, agencies);
+            if (agencies.includes("中国香港")) {
+              const hkData = data.find((d) => d.agency === "中国香港");
+              console.log(`中国香港预报数据:`, hkData);
+            } else {
+              console.warn(`台风 ${typhoonId} 缺少中国香港预报数据`);
+            }
+          } else {
+            console.log(`台风 ${typhoonId} 暂无预测路径数据`);
+          }
+        } catch (err) {
+          console.error(`加载台风 ${typhoonId} 预测路径失败:`, err);
+        }
+      }
+
+      setForecastData(newForecastData);
+    } catch (err) {
+      console.error("加载预测路径失败:", err);
+    } finally {
+      setForecastLoading(false);
     }
   };
 
@@ -163,14 +229,14 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
     return years;
   };
 
-  // 根据强度获取颜色
+  // 根据强度获取颜色（优化配色方案）
   const getColorByIntensity = (intensity) => {
     const colorMap = {
-      热带低压: "#3498db",
-      热带风暴: "#2ecc71",
-      强热带风暴: "#f1c40f",
-      台风: "#e67e22",
-      强台风: "#e74c3c",
+      热带低压: "#3498db", // 蓝色
+      热带风暴: "#2ecc71", // 绿色
+      强热带风暴: "#f1c40f", // 黄色
+      台风: "#e67e22", // 橙色
+      强台风: "#e74c3c", // 红色
       超强台风: "#c0392b",
     };
     return colorMap[intensity] || "#667eea";
@@ -446,21 +512,48 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
       >
         {/* 地图 */}
         <MapContainer
-          center={[25, 125]}
-          zoom={5}
-          minZoom={3}
+          center={[30, 100]} // 调整中心点以更好地显示北半球（北纬30度，东经100度）
+          zoom={3} // 降低缩放级别以显示更大区域
+          minZoom={2} // 允许更小的缩放级别，可以看到更大范围
           maxZoom={18}
           style={{ width: "100%", height: "100%", zIndex: 1 }}
           ref={mapRef}
         >
-          {/* 使用高德地图瓦片服务（国内访问稳定） */}
-          <TileLayer
-            attribution='&copy; <a href="https://www.amap.com/">高德地图</a>'
-            url="https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}"
-            subdomains={["1", "2", "3", "4"]}
-            maxZoom={18}
-            minZoom={3}
-          />
+          {/* 根据选择显示不同的地图图层 */}
+          {mapLayer === "terrain" ? (
+            <>
+              {/* 高德地图全球版地形图 */}
+              <TileLayer
+                key="amap-global"
+                attribution='&copy; <a href="https://www.amap.com/">高德地图</a>'
+                url="https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}"
+                subdomains={["1", "2", "3", "4"]}
+                maxZoom={18}
+                minZoom={2}
+              />
+            </>
+          ) : (
+            <>
+              {/* 天地图卫星影像底图 */}
+              <TileLayer
+                key="tianditu-satellite"
+                attribution='&copy; <a href="http://www.tianditu.gov.cn/">天地图</a>'
+                url="http://t{s}.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=eb771030fd9565381964c832ef07698a"
+                subdomains={["0", "1", "2", "3", "4", "5", "6", "7"]}
+                maxZoom={18}
+                minZoom={2}
+              />
+              {/* 天地图卫星影像标注图层 - 中文地名 */}
+              <TileLayer
+                key="tianditu-labels"
+                url="http://t{s}.tianditu.gov.cn/cia_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cia&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=eb771030fd9565381964c832ef07698a"
+                subdomains={["0", "1", "2", "3", "4", "5", "6", "7"]}
+                maxZoom={18}
+                minZoom={2}
+                opacity={0.9}
+              />
+            </>
+          )}
 
           {/* 渲染台风路径 */}
           {Array.from(pathsData.entries()).map(([typhoonId, pathPoints]) => {
@@ -489,28 +582,326 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                 {pathPoints.map((point, index) => {
                   // 修复字段名映射
                   const windSpeed = point.max_wind_speed || point.wind_speed;
+                  const isLatestPoint = index === pathPoints.length - 1;
 
                   return (
-                    <CircleMarker
-                      key={`${typhoonId}-${index}`}
-                      center={[point.latitude, point.longitude]}
-                      radius={getRadiusByWindSpeed(windSpeed)}
-                      fillColor={getColorByIntensity(point.intensity)}
-                      color="white"
-                      weight={2}
-                      opacity={1}
-                      fillOpacity={0.8}
-                    >
-                      <Tooltip direction="top" offset={[0, -10]} opacity={0.95}>
-                        {createPopupContent(point)}
-                      </Tooltip>
-                    </CircleMarker>
+                    <React.Fragment key={`${typhoonId}-${index}`}>
+                      <CircleMarker
+                        center={[point.latitude, point.longitude]}
+                        radius={getRadiusByWindSpeed(windSpeed)}
+                        fillColor={getColorByIntensity(point.intensity)}
+                        color="white"
+                        weight={2}
+                        opacity={1}
+                        fillOpacity={0.8}
+                      >
+                        <Tooltip
+                          direction="top"
+                          offset={[0, -10]}
+                          opacity={0.95}
+                        >
+                          {createPopupContent(point)}
+                        </Tooltip>
+                      </CircleMarker>
+
+                      {/* 台风眼可视化效果 - 优化版 */}
+                      {isLatestPoint && (
+                        <>
+                          {/* 外层影响范围 - 7级风圈 */}
+                          <Circle
+                            center={[point.latitude, point.longitude]}
+                            radius={120000}
+                            pathOptions={{
+                              fillColor: "rgba(255, 0, 0, 0.08)",
+                              color: "rgba(255, 0, 0, 0.3)",
+                              weight: 1,
+                              fillOpacity: 0.08,
+                            }}
+                          />
+
+                          {/* 中层风圈 - 10级风圈 */}
+                          <Circle
+                            center={[point.latitude, point.longitude]}
+                            radius={65000}
+                            pathOptions={{
+                              fillColor: "rgba(255, 50, 0, 0.12)",
+                              color: "rgba(255, 50, 0, 0.4)",
+                              weight: 1,
+                              fillOpacity: 0.12,
+                            }}
+                          />
+
+                          {/* 内层强风圈 - 12级风圈 */}
+                          <Circle
+                            center={[point.latitude, point.longitude]}
+                            radius={30000}
+                            pathOptions={{
+                              fillColor: "rgba(255, 100, 0, 0.15)",
+                              color: "rgba(255, 100, 0, 0.5)",
+                              weight: 1.5,
+                              fillOpacity: 0.15,
+                            }}
+                          />
+
+                          {/* 台风眼墙区域 */}
+                          <Circle
+                            center={[point.latitude, point.longitude]}
+                            radius={15000}
+                            pathOptions={{
+                              fillColor: "rgba(255, 150, 0, 0.2)",
+                              color: "rgba(255, 150, 0, 0.6)",
+                              weight: 2,
+                              fillOpacity: 0.2,
+                            }}
+                          />
+
+                          {/* 台风眼中心区域 */}
+                          <Circle
+                            center={[point.latitude, point.longitude]}
+                            radius={6000}
+                            pathOptions={{
+                              fillColor: "rgba(255, 255, 255, 0.3)",
+                              color: "rgba(255, 200, 0, 0.7)",
+                              weight: 2,
+                              fillOpacity: 0.3,
+                            }}
+                          />
+
+                          {/* 台风眼中心点 */}
+                          <CircleMarker
+                            center={[point.latitude, point.longitude]}
+                            radius={4}
+                            pathOptions={{
+                              fillColor: "#ff0000",
+                              color: "#ffffff",
+                              weight: 2,
+                              fillOpacity: 1,
+                            }}
+                          />
+                        </>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </React.Fragment>
             );
           })}
+
+          {/* 渲染预测路径（按预报机构分组显示） */}
+          {showForecast &&
+            Array.from(forecastData.entries()).map(
+              ([typhoonId, agencyForecasts]) => {
+                if (!agencyForecasts || agencyForecasts.length === 0)
+                  return null;
+
+                return (
+                  <React.Fragment key={`forecast-${typhoonId}`}>
+                    {agencyForecasts.map((agencyForecast) => {
+                      const { agency, color, points } = agencyForecast;
+
+                      if (!points || points.length === 0) return null;
+
+                      // 获取预测路径坐标
+                      const forecastCoordinates = points.map((point) => [
+                        point.latitude,
+                        point.longitude,
+                      ]);
+
+                      return (
+                        <React.Fragment key={`forecast-${typhoonId}-${agency}`}>
+                          {/* 预测路径线（虚线） */}
+                          <Polyline
+                            positions={forecastCoordinates}
+                            color={color}
+                            weight={2}
+                            opacity={0.7}
+                            dashArray="5, 10"
+                          />
+
+                          {/* 预测路径点 */}
+                          {points.map((point, index) => (
+                            <CircleMarker
+                              key={`forecast-${typhoonId}-${agency}-${index}`}
+                              center={[point.latitude, point.longitude]}
+                              radius={4}
+                              fillColor={color}
+                              color="white"
+                              weight={1}
+                              opacity={0.8}
+                              fillOpacity={0.6}
+                            >
+                              <Tooltip
+                                direction="top"
+                                offset={[0, -10]}
+                                opacity={0.9}
+                              >
+                                <div
+                                  style={{
+                                    background: color,
+                                    color: "white",
+                                    padding: "2px 8px",
+                                    borderRadius: "4px",
+                                    marginBottom: "5px",
+                                    fontWeight: "bold",
+                                    fontSize: "11px",
+                                    textAlign: "center",
+                                  }}
+                                >
+                                  📊 {agency}预报
+                                </div>
+                                <div
+                                  style={{ fontSize: "12px", color: "#333" }}
+                                >
+                                  <div>
+                                    <strong>预报时间：</strong>
+                                    {new Date(
+                                      point.forecast_time
+                                    ).toLocaleString("zh-CN")}
+                                  </div>
+                                  <div>
+                                    <strong>中心位置：</strong>
+                                    {point.latitude.toFixed(2)}°N,{" "}
+                                    {point.longitude.toFixed(2)}°E
+                                  </div>
+                                  {point.center_pressure && (
+                                    <div>
+                                      <strong>中心气压：</strong>
+                                      {point.center_pressure} hPa
+                                    </div>
+                                  )}
+                                  {point.max_wind_speed && (
+                                    <div>
+                                      <strong>最大风速：</strong>
+                                      {point.max_wind_speed} m/s
+                                    </div>
+                                  )}
+                                  {point.intensity && (
+                                    <div>
+                                      <strong>强度：</strong>
+                                      {point.intensity}
+                                    </div>
+                                  )}
+                                </div>
+                              </Tooltip>
+                            </CircleMarker>
+                          ))}
+                        </React.Fragment>
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              }
+            )}
         </MapContainer>
+
+        {/* 地图图层切换按钮 - 缩小版 */}
+        <div
+          style={{
+            position: "absolute",
+            top: "10px",
+            left: "10px",
+            zIndex: 1000,
+            display: "flex",
+            flexDirection: "column",
+            gap: "4px",
+            background: "white",
+            padding: "5px",
+            borderRadius: "4px",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+          }}
+        >
+          {/* 图层切换按钮组 - 并排排列 */}
+          <div style={{ display: "flex", gap: "4px" }}>
+            <button
+              onClick={() => setMapLayer("terrain")}
+              style={{
+                padding: "4px 6px",
+                border:
+                  mapLayer === "terrain"
+                    ? "1px solid #667eea"
+                    : "1px solid #ddd",
+                background: mapLayer === "terrain" ? "#f0f4ff" : "white",
+                color: mapLayer === "terrain" ? "#667eea" : "#333",
+                borderRadius: "3px",
+                cursor: "pointer",
+                fontSize: "11px",
+                fontWeight: mapLayer === "terrain" ? "bold" : "normal",
+                transition: "all 0.2s",
+                whiteSpace: "nowrap",
+              }}
+            >
+              🗺️ 地形
+            </button>
+            <button
+              onClick={() => setMapLayer("satellite")}
+              style={{
+                padding: "4px 6px",
+                border:
+                  mapLayer === "satellite"
+                    ? "1px solid #667eea"
+                    : "1px solid #ddd",
+                background: mapLayer === "satellite" ? "#f0f4ff" : "white",
+                color: mapLayer === "satellite" ? "#667eea" : "#333",
+                borderRadius: "3px",
+                cursor: "pointer",
+                fontSize: "11px",
+                fontWeight: mapLayer === "satellite" ? "bold" : "normal",
+                transition: "all 0.2s",
+                whiteSpace: "nowrap",
+              }}
+            >
+              🛰️ 卫星
+            </button>
+          </div>
+
+          {/* 缩放按钮组 */}
+          <div style={{ display: "flex", gap: "4px" }}>
+            <button
+              onClick={() => {
+                if (mapRef.current) {
+                  mapRef.current.setZoom(mapRef.current.getZoom() + 1);
+                }
+              }}
+              style={{
+                flex: 1,
+                padding: "4px 6px",
+                border: "1px solid #ddd",
+                background: "white",
+                color: "#333",
+                borderRadius: "3px",
+                cursor: "pointer",
+                fontSize: "14px",
+                fontWeight: "bold",
+                transition: "all 0.2s",
+              }}
+              title="放大"
+            >
+              +
+            </button>
+            <button
+              onClick={() => {
+                if (mapRef.current) {
+                  mapRef.current.setZoom(mapRef.current.getZoom() - 1);
+                }
+              }}
+              style={{
+                flex: 1,
+                padding: "4px 6px",
+                border: "1px solid #ddd",
+                background: "white",
+                color: "#333",
+                borderRadius: "3px",
+                cursor: "pointer",
+                fontSize: "14px",
+                fontWeight: "bold",
+                transition: "all 0.2s",
+              }}
+              title="缩小"
+            >
+              −
+            </button>
+          </div>
+        </div>
 
         {/* 加载提示 */}
         {pathLoading && (
@@ -759,6 +1150,76 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                   <span>风速较大 (~50m/s)</span>
                 </div>
               </div>
+
+              {/* 预测路径图例 */}
+              {forecastData.size > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "5px",
+                    paddingTop: "8px",
+                    borderTop: "1px solid #e0e0e0",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: "#666",
+                      marginBottom: "3px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span>预测路径</span>
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        cursor: "pointer",
+                        fontSize: "11px",
+                        fontWeight: "normal",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={showForecast}
+                        onChange={(e) => setShowForecast(e.target.checked)}
+                        style={{ cursor: "pointer" }}
+                      />
+                      显示
+                    </label>
+                  </div>
+                  {Array.from(forecastData.values())
+                    .flat()
+                    .map((agencyForecast) => (
+                      <div
+                        key={agencyForecast.agency}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          fontSize: "12px",
+                          color: "#555",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "20px",
+                            height: "2px",
+                            background: agencyForecast.color,
+                            borderRadius: "1px",
+                            border: `1px dashed ${agencyForecast.color}`,
+                          }}
+                        ></div>
+                        <span>{agencyForecast.agency}预报</span>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           </div>
         )}

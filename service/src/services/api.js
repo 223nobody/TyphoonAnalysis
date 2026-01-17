@@ -140,7 +140,7 @@ export const getActiveAlerts = async () => {
 /**
  * 获取历史预警
  */
-export const getAlertHistory = async (typhoonId, level, limit = 20) => {
+export const getAlertHistory = async (typhoonId, level, limit = 50) => {
   const params = { limit };
   if (typhoonId) params.typhoon_id = typhoonId;
   if (level) params.alert_level = level;
@@ -159,6 +159,13 @@ export const getAlertRules = async () => {
  */
 export const createAlertRule = async (ruleData) => {
   return apiClient.post("/alert/rules", ruleData);
+};
+
+/**
+ * 获取台风预报路径数据（按预报机构分组）
+ */
+export const getTyphoonForecast = async (typhoonId) => {
+  return apiClient.get(`/typhoons/${typhoonId}/forecast`);
 };
 
 // ========== 数据导出API ==========
@@ -275,7 +282,69 @@ export const predictIntensity = async (typhoonId, hours) => {
 // ========== 图像分析API ==========
 
 /**
- * 卫星云图分析
+ * 上传图像文件
+ */
+export const uploadImage = async (file, typhoonId = null) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (typhoonId) {
+    formData.append("typhoon_id", typhoonId);
+  }
+  formData.append("image_type", "satellite");
+
+  return apiClient.post("/images/upload", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+};
+
+/**
+ * 分析图像（重构版本）
+ * @param {number} imageId - 图像ID
+ * @param {string} analysisType - 分析类型（basic/advanced/opencv/fusion）
+ * @param {string} imageType - 图像类型（infrared/visible）
+ */
+export const analyzeImage = async (
+  imageId,
+  analysisType = "fusion",
+  imageType = "infrared"
+) => {
+  return apiClient.post(
+    `/images/analyze/${imageId}?analysis_type=${analysisType}&image_type=${imageType}`
+  );
+};
+
+/**
+ * 获取台风的图像列表
+ */
+export const getTyphoonImages = async (
+  typhoonId,
+  imageType = null,
+  limit = 20
+) => {
+  const params = { limit };
+  if (imageType) params.image_type = imageType;
+  return apiClient.get(`/images/typhoon/${typhoonId}`, { params });
+};
+
+/**
+ * 获取图像分析历史
+ */
+export const getImageAnalysisHistory = async (imageId) => {
+  return apiClient.get(`/images/analysis/history/${imageId}`);
+};
+
+/**
+ * 删除图像
+ */
+export const deleteImage = async (imageId) => {
+  return apiClient.delete(`/images/${imageId}`);
+};
+
+/**
+ * 卫星云图分析（旧版本，保持向后兼容）
+ * @deprecated 请使用 uploadImage + analyzeImage 替代
  */
 export const analyzeSatelliteImage = async (typhoonId, imageUrl) => {
   return apiClient.post("/analysis/satellite", {

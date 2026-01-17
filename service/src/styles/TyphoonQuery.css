@@ -1,0 +1,322 @@
+/* 台风数据查询组件样式 */
+
+.query-container {
+  padding: 20px;
+}
+
+.query-header {
+  margin-bottom: 20px;
+}
+
+.query-title {
+  margin: 0 0 10px 0;
+  color: #1f2937;
+}
+
+.query-description {
+  color: #6b7280;
+  margin: 0;
+}
+
+/* 功能选择器 */
+.function-selector {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.function-button {
+  padding: 10px 20px;
+  border: 2px solid #e5e7eb;
+  background: white;
+  color: #374151;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.function-button:hover {
+  background: #f3f4f6;
+}
+
+.function-button.active {
+  border-color: #667eea;
+  background: #667eea;
+  color: white;
+  font-weight: 600;
+}
+
+/* 查询表单 */
+.query-form {
+  background: #f9fafb;
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.form-grid-full {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* 按钮样式 */
+.btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  background: #6b7280;
+}
+
+.btn-secondary:hover {
+  background: #4b5563;
+  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.4);
+}
+
+/* 加载和错误状态 */
+.loading-container {
+  text-align: center;
+  padding: 40px;
+  color: #667eea;
+}
+
+.error-container {
+  background: #fee;
+  color: #c00;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #fcc;
+}
+
+/* 结果容器 */
+.result-container {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.result-title {
+  margin: 0 0 15px 0;
+  color: #1f2937;
+  font-size: 18px;
+}
+
+/* 台风列表样式 */
+.typhoon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 15px;
+}
+
+.typhoon-card {
+  background: #f9fafb;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s;
+}
+
+.typhoon-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.typhoon-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.typhoon-card-name {
+  font-size: 16px;
+  font-weight: bold;
+  color: #1f2937;
+}
+
+.typhoon-status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.typhoon-status-active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.typhoon-status-inactive {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.typhoon-card-info {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+/* 台风详情样式 */
+.typhoon-detail {
+  background: #f9fafb;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.detail-section {
+  margin-bottom: 20px;
+}
+
+.detail-section-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #1f2937;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #667eea;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.detail-item {
+  padding: 10px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.detail-label {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.detail-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* 表格样式 */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.data-table th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+}
+
+.data-table tr:hover {
+  background: #f9fafb;
+}
+
+/* 爬虫状态样式 */
+.crawler-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px;
+  background: #f0f9ff;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.status-indicator.running {
+  background: #22c55e;
+  animation: pulse 2s infinite;
+}
+
+.status-indicator.stopped {
+  background: #ef4444;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

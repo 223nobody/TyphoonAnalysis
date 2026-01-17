@@ -11,6 +11,7 @@ import {
 } from "react-router-dom";
 import Header from "./components/Header";
 import TabNavigation from "./components/TabNavigation";
+import AlertBanner from "./components/AlertBanner";
 import MapVisualization from "./components/MapVisualization";
 import TyphoonQuery from "./components/TyphoonQuery";
 import Prediction from "./components/Prediction";
@@ -79,6 +80,9 @@ function AppContent() {
         activeTab={getActiveTab()}
         onTabChange={handleTabChange}
       />
+
+      {/* 预警通知横幅 - 在所有页面顶部显示 */}
+      <AlertBanner />
 
       <div className="content-card">
         <Routes>

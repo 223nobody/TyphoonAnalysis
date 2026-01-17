@@ -50,7 +50,7 @@ class Settings(BaseSettings):
 
     # 定时爬取配置
     CRAWLER_ENABLED: bool = True  # 是否启用自动爬取
-    CRAWLER_INTERVAL_HOURS: int = 1  # 爬取间隔时间（小时）
+    CRAWLER_INTERVAL_MINUTES: int = 10  # 爬取间隔时间（分钟）
     CRAWLER_START_ON_STARTUP: bool = True  # 是否在项目启动时立即执行一次爬取
 
     # 日志配置

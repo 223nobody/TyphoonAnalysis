@@ -1,6 +1,7 @@
 """
 分析API路由
 """
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
@@ -94,7 +95,7 @@ async def analyze_satellite_image(
     return db_analysis
 
 
-@router.get("/{typhoon_id}", response_model=list[ImageAnalysisResponse])
+@router.get("/{typhoon_id}", response_model=List[ImageAnalysisResponse])
 async def get_analyses(
     typhoon_id: str,
     limit: int = 50,
@@ -104,9 +105,9 @@ async def get_analyses(
     query = select(ImageAnalysis).where(
         ImageAnalysis.typhoon_id == typhoon_id
     ).order_by(desc(ImageAnalysis.created_at)).limit(limit)
-    
+
     result = await db.execute(query)
     analyses = result.scalars().all()
-    
+
     return analyses
 

@@ -12,32 +12,47 @@ function TyphoonList({ selectedTyphoons, onTyphoonSelect }) {
 
   // 筛选条件
   const [filters, setFilters] = useState({
-    year: "",
+    year: 2026, // 默认年份设置为2026
     search: "",
   });
 
-  // 加载台风列表
+  // 加载台风列表 - 当年份筛选改变时重新加载
   useEffect(() => {
     loadTyphoons();
-  }, []);
+  }, [filters.year]);
 
-  // 应用筛选
+  // 应用搜索筛选（仅客户端筛选搜索关键词）
   useEffect(() => {
     applyFilters();
-  }, [typhoons, filters]);
+  }, [typhoons, filters.search]);
 
   const loadTyphoons = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getTyphoonList();
+
+      // 构建查询参数 - 使用服务端筛选年份
+      const params = {};
+      if (filters.year) {
+        params.year = parseInt(filters.year);
+      }
+
+      const data = await getTyphoonList(params);
 
       // 修复：后端返回的是 data.items，不是 data.typhoons
       if (data && data.items && Array.isArray(data.items)) {
         setTyphoons(data.items);
+        console.log(
+          `加载了 ${data.items.length} 个台风数据（年份：${
+            filters.year || "全部"
+          }）`
+        );
       } else if (data && Array.isArray(data)) {
         // 兼容直接返回数组的情况
         setTyphoons(data);
+        console.log(
+          `加载了 ${data.length} 个台风数据（年份：${filters.year || "全部"}）`
+        );
       } else {
         console.error("API返回数据格式错误:", data);
         setError("加载台风列表失败：数据格式错误");
@@ -53,11 +68,7 @@ function TyphoonList({ selectedTyphoons, onTyphoonSelect }) {
   const applyFilters = () => {
     let filtered = [...typhoons];
 
-    // 年份筛选
-    if (filters.year) {
-      filtered = filtered.filter((t) => t.year === parseInt(filters.year));
-    }
-
+    // 年份筛选已在服务端完成，这里只做搜索筛选
     // 搜索筛选
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
@@ -80,10 +91,25 @@ function TyphoonList({ selectedTyphoons, onTyphoonSelect }) {
     onTyphoonSelect(typhoonId);
   };
 
-  // 获取唯一年份列表
+  // 获取唯一年份列表 - 从后端获取所有年份的台风来生成年份列表
   const getYears = () => {
-    const years = [...new Set(typhoons.map((t) => t.year))];
-    return years.sort((a, b) => b - a);
+    // 如果当前已经筛选了年份，需要包含当前选中的年份
+    const years = new Set();
+
+    // 添加当前台风列表中的年份
+    typhoons.forEach((t) => years.add(t.year));
+
+    // 确保当前选中的年份在列表中
+    if (filters.year) {
+      years.add(parseInt(filters.year));
+    }
+
+    // 添加常见年份（2020-2026）确保用户可以切换
+    for (let year = 2020; year <= 2026; year++) {
+      years.add(year);
+    }
+
+    return Array.from(years).sort((a, b) => b - a);
   };
 
   if (loading) {

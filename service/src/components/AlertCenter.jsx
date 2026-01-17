@@ -1,13 +1,10 @@
 /**
  * 预警中心组件
  */
-import React, { useState, useEffect } from "react";
-import {
-  getActiveAlerts,
-  getAlertHistory,
-  getAlertRules,
-  createAlertRule,
-} from "../services/api";
+import { useState, useEffect } from "react";
+import { getActiveAlerts, getAlertHistory } from "../services/api";
+import "../styles/AlertCenter.css";
+import "../styles/common.css";
 
 function AlertCenter() {
   const [alertFunction, setAlertFunction] = useState("active");
@@ -18,16 +15,7 @@ function AlertCenter() {
   // 历史预警筛选表单
   const [historyForm, setHistoryForm] = useState({
     typhoonId: "",
-    level: "",
-    limit: 20, // 添加limit参数，默认20
-  });
-
-  // 预警规则表单
-  const [ruleForm, setRuleForm] = useState({
-    ruleName: "",
-    windSpeedThreshold: "",
-    pressureThreshold: "",
-    alertLevel: "yellow",
+    limit: 50,
   });
 
   // 加载活跃预警
@@ -36,10 +24,7 @@ function AlertCenter() {
       setLoading(true);
       setError(null);
       const data = await getActiveAlerts();
-      // 修复：处理不同的数据格式
-      const alerts =
-        data.items || data.alerts || (Array.isArray(data) ? data : []);
-      setResult({ type: "active", data: { alerts } });
+      setResult({ type: "active", data: data });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -54,56 +39,12 @@ function AlertCenter() {
       setError(null);
       const data = await getAlertHistory(
         historyForm.typhoonId,
-        historyForm.level,
-        historyForm.limit // 添加limit参数
+        null,
+        historyForm.limit
       );
-      // 修复：处理不同的数据格式
       const alerts =
         data.items || data.alerts || (Array.isArray(data) ? data : []);
       setResult({ type: "history", data: { alerts } });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 加载预警规则
-  const loadAlertRules = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await getAlertRules();
-      // 修复：处理不同的数据格式
-      const rules =
-        data.items || data.rules || (Array.isArray(data) ? data : []);
-      setResult({ type: "rules", data: { rules } });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 创建预警规则
-  const handleCreateRule = async () => {
-    if (!ruleForm.ruleName) {
-      alert("请输入规则名称");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      await createAlertRule({
-        rule_name: ruleForm.ruleName,
-        wind_speed_threshold: parseFloat(ruleForm.windSpeedThreshold) || null,
-        pressure_threshold: parseFloat(ruleForm.pressureThreshold) || null,
-        alert_level: ruleForm.alertLevel,
-      });
-      alert("预警规则创建成功！");
-      // 重新加载规则列表
-      await loadAlertRules();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -115,12 +56,10 @@ function AlertCenter() {
   useEffect(() => {
     if (alertFunction === "active") {
       loadActiveAlerts();
-    } else if (alertFunction === "rules") {
-      loadAlertRules();
     }
   }, [alertFunction]);
 
-  // 获取预警级别颜色 - 参考index.html，支持中文和英文
+  // 获取预警级别颜色
   const getAlertLevelColor = (level) => {
     const colors = {
       红色: "#ef4444",
@@ -135,26 +74,11 @@ function AlertCenter() {
     return colors[level] || "#6b7280";
   };
 
-  // 获取预警级别中文名 - 参考index.html
-  const getAlertLevelName = (level) => {
-    const names = {
-      红色: "红色预警",
-      橙色: "橙色预警",
-      黄色: "黄色预警",
-      蓝色: "蓝色预警",
-      red: "红色预警",
-      orange: "橙色预警",
-      yellow: "黄色预警",
-      blue: "蓝色预警",
-    };
-    return names[level] || level;
-  };
-
   // 渲染活跃预警表单
   const renderActiveForm = () => (
     <div>
       <button className="btn" onClick={loadActiveAlerts} disabled={loading}>
-        🔄 刷新活跃预警
+        🔄 刷新台风公报
       </button>
     </div>
   );
@@ -177,198 +101,186 @@ function AlertCenter() {
           />
         </div>
         <div className="form-group">
-          <label>预警级别（可选）</label>
-          <select
-            value={historyForm.level}
+          <label>查询数量</label>
+          <input
+            type="number"
+            placeholder="默认50条"
+            value={historyForm.limit}
             onChange={(e) =>
-              setHistoryForm({ ...historyForm, level: e.target.value })
+              setHistoryForm({
+                ...historyForm,
+                limit: parseInt(e.target.value) || 50,
+              })
             }
-          >
-            <option value="">全部级别</option>
-            <option value="红色">红色预警</option>
-            <option value="橙色">橙色预警</option>
-            <option value="黄色">黄色预警</option>
-            <option value="蓝色">蓝色预警</option>
-          </select>
+          />
         </div>
       </div>
-      <div className="form-group">
-        <label>查询数量</label>
-        <input
-          type="number"
-          placeholder="默认20条"
-          value={historyForm.limit}
-          min="1"
-          max="100"
-          onChange={(e) =>
-            setHistoryForm({
-              ...historyForm,
-              limit: parseInt(e.target.value) || 20,
-            })
-          }
-        />
-      </div>
       <button className="btn" onClick={loadAlertHistory} disabled={loading}>
-        🔍 查询历史预警
+        � 查询历史预警
       </button>
     </div>
   );
 
-  // 渲染预警规则表单
-  const renderRulesForm = () => (
-    <div>
-      <div className="info-card">
-        <h4>➕ 创建新规则</h4>
-        <div className="form-group">
-          <label>规则名称</label>
-          <input
-            type="text"
-            placeholder="例如: 强台风预警规则"
-            value={ruleForm.ruleName}
-            onChange={(e) =>
-              setRuleForm({ ...ruleForm, ruleName: e.target.value })
-            }
-          />
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "15px",
-          }}
-        >
-          <div className="form-group">
-            <label>风速阈值 (m/s)</label>
-            <input
-              type="number"
-              placeholder="例如: 50"
-              value={ruleForm.windSpeedThreshold}
-              onChange={(e) =>
-                setRuleForm({ ...ruleForm, windSpeedThreshold: e.target.value })
-              }
-            />
-          </div>
-          <div className="form-group">
-            <label>气压阈值 (hPa)</label>
-            <input
-              type="number"
-              placeholder="例如: 950"
-              value={ruleForm.pressureThreshold}
-              onChange={(e) =>
-                setRuleForm({ ...ruleForm, pressureThreshold: e.target.value })
-              }
-            />
-          </div>
-        </div>
-        <div className="form-group">
-          <label>预警级别</label>
-          <select
-            value={ruleForm.alertLevel}
-            onChange={(e) =>
-              setRuleForm({ ...ruleForm, alertLevel: e.target.value })
-            }
-          >
-            <option value="blue">蓝色预警</option>
-            <option value="yellow">黄色预警</option>
-            <option value="orange">橙色预警</option>
-            <option value="red">红色预警</option>
-          </select>
-        </div>
-        <button className="btn" onClick={handleCreateRule} disabled={loading}>
-          ✅ 创建规则
-        </button>
-      </div>
-      <div
-        className="info-card"
-        style={{
-          marginBottom: "20px",
-          height: "200px",
-          minHeight: "200px",
-        }}
-      >
-        <h4>📋 现有规则</h4>
-        <button className="btn" onClick={loadAlertRules} disabled={loading}>
-          🔄 刷新规则列表
-        </button>
-      </div>
-    </div>
-  );
-
-  // 渲染活跃预警结果 - 参考index.html的displayAlertResult函数
+  // 渲染活跃预警结果 - 显示台风公报数据
   const renderActiveResult = (data) => {
-    const alerts = data.alerts || [];
-    const count = data.count || alerts.length;
-
-    if (alerts.length === 0) {
+    // 检查是否有台风公报
+    if (!data.has_bulletin || !data.bulletin) {
       return (
         <div className="info-card">
-          <p>✅ 当前没有活跃预警</p>
+          <p>✅ 当前没有活跃的台风公报</p>
         </div>
       );
     }
 
+    const bulletin = data.bulletin;
+
     return (
       <div className="info-card">
-        <h4>🚨 当前活跃预警 ({count}个)</h4>
-        {alerts.map((alert, index) => {
-          // 支持alert_level和level两种字段名
-          const alertLevel = alert.alert_level || alert.level;
-          const levelColor = getAlertLevelColor(alertLevel);
+        <h4>🚨 台风公报</h4>
 
-          return (
+        {/* 台风基本信息 */}
+        <div
+          style={{
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            color: "white",
+            padding: "15px",
+            borderRadius: "8px",
+            marginBottom: "15px",
+          }}
+        >
+          <h3 style={{ margin: "0 0 10px 0", fontSize: "18px" }}>
+            {bulletin.typhoon_name}
+          </h3>
+          <p style={{ margin: "5px 0", fontSize: "14px" }}>
+            <strong>编号：</strong>
+            {bulletin.typhoon_number}
+          </p>
+          <p style={{ margin: "5px 0", fontSize: "14px" }}>
+            <strong>发布时间：</strong>
+            {bulletin.release_time}
+          </p>
+        </div>
+
+        {/* 详细信息列表 */}
+        <div style={{ display: "grid", gap: "12px" }}>
+          {bulletin.time && (
             <div
-              key={index}
               style={{
-                borderLeft: `4px solid ${levelColor}`,
                 padding: "10px",
-                margin: "10px 0",
                 background: "#f9fafb",
+                borderRadius: "6px",
               }}
             >
-              <h5 style={{ margin: "0 0 8px 0", color: levelColor }}>
-                {alertLevel}预警
-              </h5>
-              <p>
-                <strong>台风:</strong>{" "}
-                {alert.typhoon_name_cn || alert.typhoon_name} (
-                {alert.typhoon_id})
-              </p>
-              <p>
-                <strong>原因:</strong> {alert.alert_reason || alert.message}
-              </p>
-              {alert.current_intensity && (
-                <p>
-                  <strong>当前强度:</strong> {alert.current_intensity}
-                </p>
-              )}
-              {alert.current_wind_speed && (
-                <p>
-                  <strong>最大风速:</strong> {alert.current_wind_speed} m/s
-                </p>
-              )}
-              {alert.current_pressure && (
-                <p>
-                  <strong>中心气压:</strong> {alert.current_pressure} hPa
-                </p>
-              )}
-              {alert.latest_position && (
-                <p>
-                  <strong>最新位置:</strong> {alert.latest_position.latitude}°N,{" "}
-                  {alert.latest_position.longitude}°E
-                </p>
-              )}
-              <p style={{ color: "#6b7280", fontSize: "12px" }}>
-                <strong>预警时间:</strong>{" "}
-                {new Date(alert.alert_time).toLocaleString("zh-CN")}
-              </p>
+              <strong style={{ color: "#667eea" }}>观测时间：</strong>
+              <span style={{ marginLeft: "10px" }}>{bulletin.time}</span>
             </div>
-          );
-        })}
+          )}
+
+          {bulletin.position && (
+            <div
+              style={{
+                padding: "10px",
+                background: "#f9fafb",
+                borderRadius: "6px",
+              }}
+            >
+              <strong style={{ color: "#667eea" }}>中心位置：</strong>
+              <span style={{ marginLeft: "10px" }}>{bulletin.position}</span>
+            </div>
+          )}
+
+          {bulletin.intensity && (
+            <div
+              style={{
+                padding: "10px",
+                background: "#f9fafb",
+                borderRadius: "6px",
+              }}
+            >
+              <strong style={{ color: "#667eea" }}>强度等级：</strong>
+              <span style={{ marginLeft: "10px" }}>{bulletin.intensity}</span>
+            </div>
+          )}
+
+          {bulletin.max_wind && (
+            <div
+              style={{
+                padding: "10px",
+                background: "#f9fafb",
+                borderRadius: "6px",
+              }}
+            >
+              <strong style={{ color: "#667eea" }}>最大风力：</strong>
+              <span style={{ marginLeft: "10px" }}>{bulletin.max_wind}</span>
+            </div>
+          )}
+
+          {bulletin.center_pressure && (
+            <div
+              style={{
+                padding: "10px",
+                background: "#f9fafb",
+                borderRadius: "6px",
+              }}
+            >
+              <strong style={{ color: "#667eea" }}>中心气压：</strong>
+              <span style={{ marginLeft: "10px" }}>
+                {bulletin.center_pressure}
+              </span>
+            </div>
+          )}
+
+          {bulletin.reference_position && (
+            <div
+              style={{
+                padding: "10px",
+                background: "#f9fafb",
+                borderRadius: "6px",
+              }}
+            >
+              <strong style={{ color: "#667eea" }}>参考位置：</strong>
+              <span style={{ marginLeft: "10px" }}>
+                {bulletin.reference_position}
+              </span>
+            </div>
+          )}
+
+          {bulletin.wind_circle && (
+            <div
+              style={{
+                padding: "10px",
+                background: "#f9fafb",
+                borderRadius: "6px",
+              }}
+            >
+              <strong style={{ color: "#667eea" }}>风圈半径：</strong>
+              <div style={{ marginTop: "5px", whiteSpace: "pre-line" }}>
+                {bulletin.wind_circle}
+              </div>
+            </div>
+          )}
+
+          {bulletin.forecast && (
+            <div
+              style={{
+                padding: "12px",
+                background: "#fef3c7",
+                borderRadius: "6px",
+                borderLeft: "4px solid #f59e0b",
+              }}
+            >
+              <strong style={{ color: "#d97706" }}>预报结论：</strong>
+              <div style={{ marginTop: "5px", lineHeight: "1.6" }}>
+                {bulletin.forecast}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
 
-  // 渲染历史预警结果 - 参考index.html的displayAlertResult函数
+  // 渲染历史预警结果
   const renderHistoryResult = (data) => {
     const items = data.alerts || [];
     const total = data.total || items.length;
@@ -408,7 +320,6 @@ function AlertCenter() {
           </thead>
           <tbody>
             {items.map((item, index) => {
-              // 支持alert_level和level两种字段名
               const alertLevel = item.alert_level || item.level;
               const levelColor = getAlertLevelColor(alertLevel);
 
@@ -458,66 +369,6 @@ function AlertCenter() {
     );
   };
 
-  // 渲染预警规则结果 - 参考index.html的displayAlertResult函数
-  const renderRulesResult = (data) => {
-    const rules = data.rules || [];
-    const count = data.count || rules.length;
-
-    if (rules.length === 0) {
-      return (
-        <div className="info-card">
-          <p>暂无预警规则</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="info-card">
-        <h4>📋 预警规则列表 (共{count}条)</h4>
-        {rules.map((rule, index) => (
-          <div
-            key={index}
-            style={{
-              border: "1px solid #e5e7eb",
-              padding: "12px",
-              margin: "10px 0",
-              borderRadius: "6px",
-              background: rule.enabled ? "#f0fdf4" : "#f9fafb",
-            }}
-          >
-            <h5 style={{ margin: "0 0 8px 0" }}>
-              {rule.rule_name} {rule.enabled ? "✅" : "❌"}
-            </h5>
-            <p style={{ fontSize: "12px", color: "#6b7280" }}>
-              <strong>条件:</strong>
-            </p>
-            <ul
-              style={{ margin: "5px 0", paddingLeft: "20px", fontSize: "12px" }}
-            >
-              {rule.conditions?.intensity && (
-                <li>强度: {rule.conditions.intensity.join(", ")}</li>
-              )}
-              {rule.conditions?.wind_speed_min && (
-                <li>最小风速: {rule.conditions.wind_speed_min} m/s</li>
-              )}
-              {rule.conditions?.pressure_max && (
-                <li>最大气压: {rule.conditions.pressure_max} hPa</li>
-              )}
-              {rule.conditions?.distance_to_land_km && (
-                <li>距离陆地: {rule.conditions.distance_to_land_km} km</li>
-              )}
-            </ul>
-            {rule.notification_channels && (
-              <p style={{ fontSize: "11px", color: "#9ca3af" }}>
-                通知渠道: {rule.notification_channels.join(", ")}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   return (
     <div>
       <h2>🚨 预警中心</h2>
@@ -529,16 +380,14 @@ function AlertCenter() {
           value={alertFunction}
           onChange={(e) => setAlertFunction(e.target.value)}
         >
-          <option value="active">活跃预警</option>
+          <option value="active">台风公报</option>
           <option value="history">历史预警</option>
-          <option value="rules">预警规则</option>
         </select>
       </div>
 
       {/* 根据功能渲染不同表单 */}
       {alertFunction === "active" && renderActiveForm()}
       {alertFunction === "history" && renderHistoryForm()}
-      {alertFunction === "rules" && renderRulesForm()}
 
       {/* 错误提示 */}
       {error && (
@@ -555,7 +404,6 @@ function AlertCenter() {
         <div style={{ marginTop: "20px" }}>
           {result.type === "active" && renderActiveResult(result.data)}
           {result.type === "history" && renderHistoryResult(result.data)}
-          {result.type === "rules" && renderRulesResult(result.data)}
         </div>
       )}
     </div>
