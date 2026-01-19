@@ -8,8 +8,6 @@ import html2pdf from "html2pdf.js";
 import "../styles/ReportGeneration.css";
 import "../styles/common.css";
 
-const API_BASE_URL = "http://localhost:8000/api";
-
 function ReportGeneration() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -35,7 +33,7 @@ function ReportGeneration() {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.post(`${API_BASE_URL}/report/generate`, {
+      const response = await axios.post(`api/report/generate`, {
         typhoon_id: reportForm.typhoonId,
         report_type: reportForm.reportType,
         ai_provider: reportForm.aiProvider,

@@ -35,7 +35,7 @@ class Settings(BaseSettings):
 
     # AI通用配置
     AI_TIMEOUT: int = 120  # 增加超时时间以支持更长内容生成
-    AI_MAX_TOKENS: int = 2500
+    AI_MAX_TOKENS: int = 3000
 
     # CORS配置
     CORS_ORIGINS: List[str] = [

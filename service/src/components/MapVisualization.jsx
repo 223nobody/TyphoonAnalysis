@@ -11,7 +11,10 @@ import {
   Circle,
   Tooltip,
   useMap,
+  Polygon,
+  Marker,
 } from "react-leaflet";
+import L from "leaflet";
 import {
   getTyphoonList,
   getTyphoonPath,
@@ -20,6 +23,50 @@ import {
 import "leaflet/dist/leaflet.css";
 import "../styles/MapVisualization.css";
 import "../styles/common.css";
+import taifengIcon from "../pictures/taifeng.gif";
+
+// 创建台风眼图标
+const createTyphoonIcon = () => {
+  return L.icon({
+    iconUrl: taifengIcon,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -20],
+  });
+};
+
+const generateIrregularWindCircle = (center, baseRadius, windLevel) => {
+  const [lat, lng] = center;
+  const points = [];
+  const numPoints = 1800;
+  const northwestRadiusMultiplier = 1.5;
+
+  // 遍历360度，计算每个角度的半径
+  for (let i = 0; i <= numPoints; i++) {
+    const angle = (i * 360) / numPoints;
+
+    const radian = (angle * Math.PI) / 180;
+
+    let radiusMultiplier;
+    if (angle > 90 && angle < 180) {
+      // 西北象限（地图左上角）：半径放大
+      radiusMultiplier = northwestRadiusMultiplier;
+    } else {
+      // 其他方向：保持原始半径
+      radiusMultiplier = 1.0;
+    }
+
+    const radius = baseRadius * radiusMultiplier;
+
+    const latOffset = (radius / 111) * Math.sin(radian);
+    const lngOffset =
+      (radius / (111 * Math.cos((lat * Math.PI) / 180))) * Math.cos(radian);
+
+    points.push([lat + latOffset, lng + lngOffset]);
+  }
+
+  return points;
+};
 
 // 地图控制器组件 - 用于处理地图定位
 function MapController({ center, zoom }) {
@@ -127,7 +174,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
 
       // 构建查询参数
       const params = {
-        limit: 100, // 修复：后端限制最大值为100
+        limit: 100,
       };
 
       // 如果选择了年份，传递给后端
@@ -297,7 +344,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
 
           // 更新地图中心和缩放级别
           setMapCenter([lat, lng]);
-          setMapZoom(4); // 设置缩放级别为4（原来的一半），适合查看台风详情
+          setMapZoom(5);
         } else {
           console.warn(`⚠️ 台风 ${typhoonId} 的路径点缺少经纬度信息`);
         }
@@ -697,80 +744,71 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                         </Tooltip>
                       </CircleMarker>
 
-                      {/* 台风眼可视化效果 - 优化版 */}
+                      {/* 台风风圈可视化效果 - 非对称风圈 */}
                       {isLatestPoint && (
                         <>
-                          {/* 外层影响范围 - 7级风圈 */}
-                          <Circle
-                            center={[point.latitude, point.longitude]}
-                            radius={120000}
+                          {/* 外层影响范围 - 7级风圈（不规则扇形） */}
+                          <Polygon
+                            positions={generateIrregularWindCircle(
+                              [point.latitude, point.longitude],
+                              120,
+                              7
+                            )}
                             pathOptions={{
-                              fillColor: "rgba(255, 0, 0, 0.08)",
-                              color: "rgba(255, 0, 0, 0.3)",
-                              weight: 1,
-                              fillOpacity: 0.08,
-                            }}
-                          />
-
-                          {/* 中层风圈 - 10级风圈 */}
-                          <Circle
-                            center={[point.latitude, point.longitude]}
-                            radius={65000}
-                            pathOptions={{
-                              fillColor: "rgba(255, 50, 0, 0.12)",
-                              color: "rgba(255, 50, 0, 0.4)",
-                              weight: 1,
-                              fillOpacity: 0.12,
-                            }}
-                          />
-
-                          {/* 内层强风圈 - 12级风圈 */}
-                          <Circle
-                            center={[point.latitude, point.longitude]}
-                            radius={30000}
-                            pathOptions={{
-                              fillColor: "rgba(255, 100, 0, 0.15)",
-                              color: "rgba(255, 100, 0, 0.5)",
-                              weight: 1.5,
-                              fillOpacity: 0.15,
-                            }}
-                          />
-
-                          {/* 台风眼墙区域 */}
-                          <Circle
-                            center={[point.latitude, point.longitude]}
-                            radius={15000}
-                            pathOptions={{
-                              fillColor: "rgba(255, 150, 0, 0.2)",
-                              color: "rgba(255, 150, 0, 0.6)",
+                              fillColor: "rgba(200, 200, 200, 0.45)",
+                              color: "#aaa",
                               weight: 2,
-                              fillOpacity: 0.2,
+                              fillOpacity: 0.45,
                             }}
                           />
 
-                          {/* 台风眼中心区域 */}
-                          <Circle
-                            center={[point.latitude, point.longitude]}
-                            radius={6000}
+                          {/* 中层风圈 - 10级风圈（不规则扇形） */}
+                          <Polygon
+                            positions={generateIrregularWindCircle(
+                              [point.latitude, point.longitude],
+                              65,
+                              10
+                            )}
                             pathOptions={{
-                              fillColor: "rgba(255, 255, 255, 0.3)",
-                              color: "rgba(255, 200, 0, 0.7)",
+                              fillColor: "rgba(255, 165, 0, 0.35)",
+                              color: "rgba(255, 165, 0, 0.6)",
                               weight: 2,
-                              fillOpacity: 0.3,
+                              fillOpacity: 0.35,
                             }}
                           />
 
-                          {/* 台风眼中心点 */}
-                          <CircleMarker
-                            center={[point.latitude, point.longitude]}
-                            radius={4}
+                          {/* 内层强风圈 - 12级风圈（不规则扇形） */}
+                          <Polygon
+                            positions={generateIrregularWindCircle(
+                              [point.latitude, point.longitude],
+                              30,
+                              12
+                            )}
                             pathOptions={{
-                              fillColor: "#ff0000",
-                              color: "#ffffff",
-                              weight: 2,
-                              fillOpacity: 1,
+                              fillColor: "rgba(255, 255, 0, 0.4)",
+                              color: "rgba(255, 255, 0, 0.7)",
+                              weight: 2.5,
+                              fillOpacity: 0.4,
                             }}
                           />
+
+                          {/* 台风眼中心点 - 使用台风图标 */}
+                          <Marker
+                            position={[point.latitude, point.longitude]}
+                            icon={createTyphoonIcon()}
+                          >
+                            <Tooltip
+                              direction="top"
+                              offset={[0, -16]}
+                              opacity={0.9}
+                            >
+                              <div
+                                style={{ fontSize: "12px", fontWeight: "bold" }}
+                              >
+                                台风眼中心
+                              </div>
+                            </Tooltip>
+                          </Marker>
                         </>
                       )}
                     </React.Fragment>
