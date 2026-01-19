@@ -33,9 +33,6 @@ class Settings(BaseSettings):
     QWEN_VL_MODEL: str = Field(default="", description="Qwen视觉理解模型")
     GLM_MODEL: str = Field(default="", description="GLM模型名称")
 
-    # AI通用配置
-    AI_TIMEOUT: int = 120  # 增加超时时间以支持更长内容生成
-    AI_MAX_TOKENS: int = 3000
 
     # CORS配置
     CORS_ORIGINS: List[str] = [

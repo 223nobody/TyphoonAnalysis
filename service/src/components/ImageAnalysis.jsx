@@ -1,5 +1,5 @@
 /**
- * 图像分析组件（重构版本）
+ * 图像分析组件
  *
  * 重构说明：
  * - 支持新的分析类型：basic/advanced/opencv/fusion
@@ -268,7 +268,7 @@ function ImageAnalysis() {
 
   return (
     <div>
-      <h2>🖼️ 图像分析（重构版本）</h2>
+      <h2>🖼️ 图像分析</h2>
 
       <h3>卫星云图分析</h3>
 
