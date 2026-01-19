@@ -6,6 +6,7 @@ import http.client
 import json
 import logging
 import time
+import ssl  # 新增：导入SSL模块
 from typing import Optional, Dict
 from datetime import datetime
 
@@ -26,6 +27,15 @@ class BulletinCrawler:
         self._cached_bulletin = None
         self._cache_time = None
         self._cache_duration = 300  # 缓存5分钟
+
+    def _create_ssl_context(self) -> ssl.SSLContext:
+        """创建跳过SSL证书验证的上下文（解决自签名证书问题）"""
+        ctx = ssl.create_default_context()
+        # 禁用证书验证（仅解决当前自签名证书问题，生产环境建议替换为可信CA证书）
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        logger.warning("已禁用SSL证书验证（仅适配自签名证书场景，生产环境请配置可信CA）")
+        return ctx
     
     def get_typhoon_bulletin(self) -> Optional[Dict]:
         """
@@ -42,7 +52,15 @@ class BulletinCrawler:
         
         conn = None
         try:
-            conn = http.client.HTTPSConnection(self.base_url, port=443, timeout=10)
+            # 新增：创建跳过SSL验证的上下文
+            ssl_context = self._create_ssl_context()
+            # 修改：传入SSL上下文，解决证书验证失败问题
+            conn = http.client.HTTPSConnection(
+                self.base_url, 
+                port=443, 
+                timeout=10,
+                context=ssl_context  # 核心：传入自定义SSL上下文
+            )
             
             # 添加时间戳参数避免缓存
             t = int(time.time() * 1000)
@@ -82,6 +100,9 @@ class BulletinCrawler:
             return None
         except json.JSONDecodeError as e:
             logger.error(f"JSON解析失败: {e}")
+            return None
+        except ssl.SSLError as e:
+            logger.error(f"SSL证书验证失败: {e}")
             return None
         except Exception as e:
             logger.error(f"获取台风公报失败: {e}")
@@ -139,4 +160,3 @@ class BulletinCrawler:
 
 # 创建全局实例
 bulletin_crawler = BulletinCrawler()
-

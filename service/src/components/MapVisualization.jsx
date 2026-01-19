@@ -10,6 +10,7 @@ import {
   CircleMarker,
   Circle,
   Tooltip,
+  useMap,
 } from "react-leaflet";
 import {
   getTyphoonList,
@@ -19,6 +20,25 @@ import {
 import "leaflet/dist/leaflet.css";
 import "../styles/MapVisualization.css";
 import "../styles/common.css";
+
+// 地图控制器组件 - 用于处理地图定位
+function MapController({ center, zoom }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (center && center.length === 2 && zoom) {
+      console.log(
+        `🗺️ 地图定位到: [${center[0]}, ${center[1]}], 缩放级别: ${zoom}`
+      );
+      map.setView(center, zoom, {
+        animate: true,
+        duration: 1.0,
+      });
+    }
+  }, [center, zoom, map]);
+
+  return null;
+}
 
 function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
   // 台风列表相关状态
@@ -51,6 +71,13 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
   // 地图图层状态
   const [mapLayer, setMapLayer] = useState("terrain"); // "terrain" 或 "satellite"
 
+  // 地图中心和缩放状态
+  const [mapCenter, setMapCenter] = useState([23.5, 120.0]); // 默认中心位置
+  const [mapZoom, setMapZoom] = useState(3); // 默认缩放级别（调整为原来的一半）
+
+  // 跟踪上一次选中的台风集合，用于检测新选中的台风
+  const [prevSelectedTyphoons, setPrevSelectedTyphoons] = useState(new Set());
+
   // 加载台风列表
   useEffect(() => {
     loadTyphoons();
@@ -63,12 +90,31 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typhoons, filters.search]); // 当台风数据或搜索关键词变化时重新筛选
 
-  // 当选中的台风变化时，加载路径数据
+  // 当选中的台风变化时，加载路径数据并定位地图
   useEffect(() => {
     if (selectedTyphoons && selectedTyphoons.size > 0) {
       loadTyphoonPaths();
+
+      // 检测新选中的台风并定位地图
+      const newlySelected = Array.from(selectedTyphoons).find(
+        (id) => !prevSelectedTyphoons.has(id)
+      );
+
+      if (newlySelected) {
+        // 找到新选中的台风数据
+        const typhoon = typhoons.find((t) => t.typhoon_id === newlySelected);
+        if (typhoon) {
+          centerMapOnTyphoon(newlySelected);
+        }
+      }
+
+      // 更新上一次选中的台风集合
+      setPrevSelectedTyphoons(new Set(selectedTyphoons));
     } else {
+      // 当没有选中任何台风时，清空所有路径数据
       setPathsData(new Map());
+      setForecastData(new Map()); // 同时清空预测路径数据
+      setPrevSelectedTyphoons(new Set());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTyphoons]);
@@ -205,6 +251,9 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
       }
 
       setForecastData(newForecastData);
+      console.log(
+        `✅ 预测路径数据已更新，当前包含 ${newForecastData.size} 个台风的预测数据`
+      );
     } catch (err) {
       console.error("加载预测路径失败:", err);
     } finally {
@@ -216,6 +265,47 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
   const handleTyphoonClick = (typhoonId) => {
     if (onTyphoonSelect) {
       onTyphoonSelect(typhoonId);
+    }
+  };
+
+  // 将地图中心定位到指定台风
+  const centerMapOnTyphoon = async (typhoonId) => {
+    try {
+      console.log(`🔍 开始定位台风 ${typhoonId}...`);
+
+      // 获取台风路径数据
+      const pathData = await getTyphoonPath(typhoonId);
+      console.log(`📍 获取到台风 ${typhoonId} 的路径数据:`, pathData);
+
+      if (
+        pathData &&
+        pathData.items &&
+        Array.isArray(pathData.items) &&
+        pathData.items.length > 0
+      ) {
+        // 获取最新的路径点（最后一个点）
+        const latestPoint = pathData.items[pathData.items.length - 1];
+        console.log(`📍 最新路径点:`, latestPoint);
+
+        if (latestPoint && latestPoint.latitude && latestPoint.longitude) {
+          const lat = parseFloat(latestPoint.latitude);
+          const lng = parseFloat(latestPoint.longitude);
+
+          console.log(
+            `✅ 地图定位到台风 ${typhoonId} 的中心位置: [${lat}, ${lng}]`
+          );
+
+          // 更新地图中心和缩放级别
+          setMapCenter([lat, lng]);
+          setMapZoom(4); // 设置缩放级别为4（原来的一半），适合查看台风详情
+        } else {
+          console.warn(`⚠️ 台风 ${typhoonId} 的路径点缺少经纬度信息`);
+        }
+      } else {
+        console.warn(`⚠️ 台风 ${typhoonId} 暂无路径数据`);
+      }
+    } catch (error) {
+      console.error(`❌ 定位台风 ${typhoonId} 失败:`, error);
     }
   };
 
@@ -513,12 +603,15 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
         {/* 地图 */}
         <MapContainer
           center={[30, 100]} // 调整中心点以更好地显示北半球（北纬30度，东经100度）
-          zoom={3} // 降低缩放级别以显示更大区域
-          minZoom={2} // 允许更小的缩放级别，可以看到更大范围
+          zoom={1.5} // 降低缩放级别为1.5（原来的一半），显示更大区域
+          minZoom={1} // 允许更小的缩放级别，可以看到更大范围
           maxZoom={18}
           style={{ width: "100%", height: "100%", zIndex: 1 }}
           ref={mapRef}
         >
+          {/* 地图控制器 - 用于动态定位 */}
+          <MapController center={mapCenter} zoom={mapZoom} />
+
           {/* 根据选择显示不同的地图图层 */}
           {mapLayer === "terrain" ? (
             <>
