@@ -1,7 +1,7 @@
 """
 数据库模型 - 台风数据
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, JSON
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, JSON, Boolean
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -148,4 +148,26 @@ class ActiveTyphoonForecast(Base):
     power_level = Column(Integer, comment="预报风力等级")
     intensity = Column(String(50), comment="预报强度等级")
     base_time = Column(DateTime, comment="预报基准时间（发布时间）")
+
+
+class Question(Base):
+    """AI客服问题表"""
+    __tablename__ = "questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    question = Column(Text, nullable=False, comment="问题内容")
+    answer = Column(Text, nullable=False, comment="答案内容")
+    weight = Column(Integer, default=0, index=True, comment="权重，用于排序")
+
+
+class AskHistory(Base):
+    """AI客服对话历史表"""
+    __tablename__ = "askhistory"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(100), index=True, nullable=False, comment="对话会话ID")
+    question = Column(Text, nullable=False, comment="用户提问内容")
+    answer = Column(Text, nullable=False, comment="AI回答内容")
+    is_ai_generated = Column(Boolean, default=False, nullable=False, comment="是否由AI生成（True=AI生成，False=预设问题匹配）")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
 

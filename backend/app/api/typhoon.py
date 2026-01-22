@@ -320,3 +320,4 @@ async def get_typhoon_forecast(
         ))
 
     return response
+

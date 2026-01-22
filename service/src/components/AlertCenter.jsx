@@ -134,6 +134,81 @@ function AlertCenter() {
 
     const bulletin = data.bulletin;
 
+    // 检查是否有实质性的台风信息（台风名称、编号、位置等）
+    const hasActiveTyphoonInfo =
+      bulletin.typhoon_name ||
+      bulletin.typhoon_number ||
+      bulletin.position ||
+      bulletin.intensity;
+
+    // 如果没有活跃台风信息，但有summary或description，显示简化版公报
+    if (!hasActiveTyphoonInfo && (bulletin.summary || bulletin.description)) {
+      return (
+        <div className="info-card">
+          <h4>📢 台风公报</h4>
+
+          {/* 发布时间 */}
+          {bulletin.release_time && (
+            <div
+              style={{
+                background: "#f0f9ff",
+                padding: "12px",
+                borderRadius: "8px",
+                marginBottom: "15px",
+                borderLeft: "4px solid #3b82f6",
+              }}
+            >
+              <p style={{ margin: "0", fontSize: "14px", color: "#1e40af" }}>
+                <strong>发布时间：</strong>
+                {bulletin.release_time}
+              </p>
+            </div>
+          )}
+
+          {/* 公报摘要 */}
+          {bulletin.summary && (
+            <div
+              style={{
+                padding: "15px",
+                background: "#fef3c7",
+                borderRadius: "8px",
+                marginBottom: "12px",
+                borderLeft: "4px solid #f59e0b",
+              }}
+            >
+              <strong style={{ color: "#d97706", fontSize: "15px" }}>
+                📋 公报摘要
+              </strong>
+              <div
+                style={{
+                  marginTop: "8px",
+                  lineHeight: "1.8",
+                  color: "#92400e",
+                  fontSize: "14px",
+                }}
+              >
+                {bulletin.summary}
+              </div>
+            </div>
+          )}
+          {/* 提示信息 */}
+          <div
+            style={{
+              marginTop: "15px",
+              padding: "10px",
+              background: "#dcfce7",
+              borderRadius: "6px",
+              fontSize: "14px",
+              color: "#166534",
+            }}
+          >
+            ✅ 当前没有活跃的台风
+          </div>
+        </div>
+      );
+    }
+
+    // 有活跃台风信息时，显示完整的台风公报
     return (
       <div className="info-card">
         <h4>🚨 台风公报</h4>
@@ -149,16 +224,20 @@ function AlertCenter() {
           }}
         >
           <h3 style={{ margin: "0 0 10px 0", fontSize: "18px" }}>
-            {bulletin.typhoon_name}
+            {bulletin.typhoon_name || "台风信息"}
           </h3>
-          <p style={{ margin: "5px 0", fontSize: "14px" }}>
-            <strong>编号：</strong>
-            {bulletin.typhoon_number}
-          </p>
-          <p style={{ margin: "5px 0", fontSize: "14px" }}>
-            <strong>发布时间：</strong>
-            {bulletin.release_time}
-          </p>
+          {bulletin.typhoon_number && (
+            <p style={{ margin: "5px 0", fontSize: "14px" }}>
+              <strong>编号：</strong>
+              {bulletin.typhoon_number}
+            </p>
+          )}
+          {bulletin.release_time && (
+            <p style={{ margin: "5px 0", fontSize: "14px" }}>
+              <strong>发布时间：</strong>
+              {bulletin.release_time}
+            </p>
+          )}
         </div>
 
         {/* 详细信息列表 */}
@@ -275,6 +354,40 @@ function AlertCenter() {
               </div>
             </div>
           )}
+
+          {/* 显示summary和description（如果有） */}
+          {bulletin.summary && (
+            <div
+              style={{
+                padding: "12px",
+                background: "#f0f9ff",
+                borderRadius: "6px",
+                borderLeft: "4px solid #3b82f6",
+              }}
+            >
+              <strong style={{ color: "#1e40af" }}>公报摘要：</strong>
+              <div style={{ marginTop: "5px", lineHeight: "1.6" }}>
+                {bulletin.summary}
+              </div>
+            </div>
+          )}
+
+          {bulletin.description &&
+            bulletin.description !== bulletin.summary && (
+              <div
+                style={{
+                  padding: "12px",
+                  background: "#f9fafb",
+                  borderRadius: "6px",
+                  borderLeft: "4px solid #6b7280",
+                }}
+              >
+                <strong style={{ color: "#374151" }}>详细描述：</strong>
+                <div style={{ marginTop: "5px", lineHeight: "1.6" }}>
+                  {bulletin.description}
+                </div>
+              </div>
+            )}
         </div>
       </div>
     );

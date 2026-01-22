@@ -148,20 +148,6 @@ export const getAlertHistory = async (typhoonId, level, limit = 50) => {
 };
 
 /**
- * 获取预警规则
- */
-export const getAlertRules = async () => {
-  return apiClient.get("/alert/rules");
-};
-
-/**
- * 创建预警规则
- */
-export const createAlertRule = async (ruleData) => {
-  return apiClient.post("/alert/rules", ruleData);
-};
-
-/**
  * 获取台风预报路径数据（按预报机构分组）
  */
 export const getTyphoonForecast = async (typhoonId) => {

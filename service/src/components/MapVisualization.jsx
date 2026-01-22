@@ -35,6 +35,35 @@ const createTyphoonIcon = () => {
   });
 };
 
+// 创建警戒线文字标注图标 - 竖排显示
+const createWarningLineLabel = (text, color) => {
+  // 将文字拆分成单个字符，竖排显示
+  const chars = text.split("");
+  const charsHtml = chars.map((char) => `<div>${char}</div>`).join("");
+
+  return L.divIcon({
+    className: "warning-line-label",
+    html: `<div style="
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 10px;
+      font-weight: bold;
+      color: ${color};
+      text-shadow:
+        -1px -1px 0 rgba(255, 255, 255, 0.8),
+        1px -1px 0 rgba(255, 255, 255, 0.8),
+        -1px 1px 0 rgba(255, 255, 255, 0.8),
+        1px 1px 0 rgba(255, 255, 255, 0.8),
+        0 0 3px rgba(255, 255, 255, 0.9);
+      line-height: 1.3;
+      letter-spacing: 2px;
+    ">${charsHtml}</div>`,
+    iconSize: [24, 120],
+    iconAnchor: [12, 60],
+  });
+};
+
 const generateIrregularWindCircle = (center, baseRadius, windLevel) => {
   const [lat, lng] = center;
   const points = [];
@@ -68,8 +97,8 @@ const generateIrregularWindCircle = (center, baseRadius, windLevel) => {
   return points;
 };
 
-// 地图控制器组件 - 用于处理地图定位
-function MapController({ center, zoom }) {
+// 地图控制器组件 - 用于处理地图定位和缩放监听
+function MapController({ center, zoom, onZoomChange }) {
   const map = useMap();
 
   useEffect(() => {
@@ -83,6 +112,31 @@ function MapController({ center, zoom }) {
       });
     }
   }, [center, zoom, map]);
+
+  // 监听地图缩放变化
+  useEffect(() => {
+    const handleZoomEnd = () => {
+      const currentZoom = map.getZoom();
+      console.log(`🔍 地图缩放级别变化: ${currentZoom}`);
+      if (onZoomChange) {
+        onZoomChange(currentZoom);
+      }
+    };
+
+    // 监听缩放结束事件
+    map.on("zoomend", handleZoomEnd);
+
+    // 初始化时也触发一次，获取当前缩放级别
+    const initialZoom = map.getZoom();
+    console.log(`🔍 地图初始缩放级别: ${initialZoom}`);
+    if (onZoomChange) {
+      onZoomChange(initialZoom);
+    }
+
+    return () => {
+      map.off("zoomend", handleZoomEnd);
+    };
+  }, [map, onZoomChange]);
 
   return null;
 }
@@ -125,6 +179,17 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
   // 跟踪上一次选中的台风集合，用于检测新选中的台风
   const [prevSelectedTyphoons, setPrevSelectedTyphoons] = useState(new Set());
 
+  // 跟踪最近一次被可视化的台风ID
+  const [latestVisualizedTyphoon, setLatestVisualizedTyphoon] = useState(null);
+
+  // 视频播放相关状态
+  const [videoModalVisible, setVideoModalVisible] = useState(false);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoError, setVideoError] = useState(null);
+  const [currentTyphoonId, setCurrentTyphoonId] = useState(null);
+  const videoRef = useRef(null);
+
   // 加载台风列表
   useEffect(() => {
     loadTyphoons();
@@ -153,6 +218,8 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
         if (typhoon) {
           centerMapOnTyphoon(newlySelected);
         }
+        // 更新最近一次被可视化的台风ID
+        setLatestVisualizedTyphoon(newlySelected);
       }
 
       // 更新上一次选中的台风集合
@@ -162,6 +229,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
       setPathsData(new Map());
       setForecastData(new Map()); // 同时清空预测路径数据
       setPrevSelectedTyphoons(new Set());
+      setLatestVisualizedTyphoon(null); // 清空最近可视化的台风ID
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTyphoons]);
@@ -247,10 +315,9 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
 
       setPathsData(newPathsData);
 
-      // 同时加载预测路径数据
       loadForecastPaths();
     } catch (err) {
-      console.error("加载台风路径失败:", err);
+      console.error("加载台风预测路径失败:", err);
       setPathError(err.message || "加载失败，请稍后重试");
     } finally {
       setPathLoading(false);
@@ -280,15 +347,8 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
           if (data && Array.isArray(data) && data.length > 0) {
             newForecastData.set(typhoonId, data);
             console.log(`台风 ${typhoonId} 预测路径数据加载成功:`, data);
-            // 调试：检查是否包含中国香港数据
             const agencies = data.map((d) => d.agency);
             console.log(`台风 ${typhoonId} 的预报机构:`, agencies);
-            if (agencies.includes("中国香港")) {
-              const hkData = data.find((d) => d.agency === "中国香港");
-              console.log(`中国香港预报数据:`, hkData);
-            } else {
-              console.warn(`台风 ${typhoonId} 缺少中国香港预报数据`);
-            }
           } else {
             console.log(`台风 ${typhoonId} 暂无预测路径数据`);
           }
@@ -318,21 +378,15 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
   // 将地图中心定位到指定台风
   const centerMapOnTyphoon = async (typhoonId) => {
     try {
-      console.log(`🔍 开始定位台风 ${typhoonId}...`);
-
       // 获取台风路径数据
       const pathData = await getTyphoonPath(typhoonId);
-      console.log(`📍 获取到台风 ${typhoonId} 的路径数据:`, pathData);
-
       if (
         pathData &&
         pathData.items &&
         Array.isArray(pathData.items) &&
         pathData.items.length > 0
       ) {
-        // 获取最新的路径点（最后一个点）
         const latestPoint = pathData.items[pathData.items.length - 1];
-        console.log(`📍 最新路径点:`, latestPoint);
 
         if (latestPoint && latestPoint.latitude && latestPoint.longitude) {
           const lat = parseFloat(latestPoint.latitude);
@@ -440,6 +494,54 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
         </p>
       </div>
     );
+  };
+
+  // 🎬 视频播放处理函数 - 直接拼接OSS视频URL
+  const handlePlayVideo = async (typhoonId) => {
+    try {
+      setVideoLoading(true);
+      setVideoError(null);
+      setCurrentTyphoonId(typhoonId);
+
+      // 将台风ID转换为6位格式（年份2位 + 编号4位）
+      const formatTyphoonId = (id) => {
+        const idStr = String(id);
+        // 如果已经是6位，直接返回
+        if (idStr.length === 6) {
+          return idStr;
+        }
+        // 如果是4位（如2501），前面补20（表示20xx年）
+        if (idStr.length === 4) {
+          return "20" + idStr;
+        }
+      };
+
+      // 拼接视频URL
+      const formattedId = formatTyphoonId(typhoonId);
+      const videoUrl = `https://typhoonanalysis.oss-cn-wuhan-lr.aliyuncs.com/typhoons/${formattedId}.mp4`;
+
+      setVideoUrl(videoUrl);
+      setVideoModalVisible(true);
+      setVideoLoading(false);
+    } catch (error) {
+      console.error("加载视频失败:", error);
+      setVideoError(error.message || "加载视频失败，请稍后重试");
+      setVideoLoading(false);
+    }
+  };
+
+  // 关闭视频模态窗口
+  const handleCloseVideo = () => {
+    setVideoModalVisible(false);
+    setVideoUrl("");
+    setVideoError(null);
+    setCurrentTyphoonId(null);
+
+    // 停止视频播放
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
   };
 
   return (
@@ -656,8 +758,12 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
           style={{ width: "100%", height: "100%", zIndex: 1 }}
           ref={mapRef}
         >
-          {/* 地图控制器 - 用于动态定位 */}
-          <MapController center={mapCenter} zoom={mapZoom} />
+          {/* 地图控制器 - 用于动态定位和缩放监听 */}
+          <MapController
+            center={mapCenter}
+            zoom={mapZoom}
+            onZoomChange={setMapZoom}
+          />
 
           {/* 根据选择显示不同的地图图层 */}
           {mapLayer === "terrain" ? (
@@ -694,6 +800,56 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
               />
             </>
           )}
+
+          {/* 2. 蓝色虚线 - 48小时警戒线（7次定位界线） */}
+          <Polyline
+            positions={[
+              [0, 105],
+              [0, 120],
+              [15, 132],
+              [34, 132],
+            ]}
+            color="#FF0000"
+            weight={1}
+            dashArray="5, 5"
+            opacity={0.8}
+          />
+
+          {/* 48小时警戒线标注 - 使用Marker显示，始终显示以便调试 */}
+          <Marker
+            position={[28, 132]}
+            icon={createWarningLineLabel("48小时警戒线", "#0000FF")}
+          />
+
+          {/* 3. 黄色虚线 - 24小时警戒线 */}
+          <Polyline
+            positions={[
+              // 东海段
+              [0, 105],
+              [4.5, 113],
+              // 台湾海峡段
+              [4.5, 113],
+              [11, 119],
+              // 南海北部粤闽段
+              [11, 119],
+              [18, 119],
+              // 南海北部琼桂段
+              [18, 119],
+              [22, 127],
+              [22, 127],
+              [34, 127],
+            ]}
+            color="#FFFF00"
+            weight={3}
+            dashArray="5, 5"
+            opacity={0.9}
+          />
+
+          {/* 24小时警戒线标注 - 使用Marker显示，始终显示以便调试 */}
+          <Marker
+            position={[28, 127]}
+            icon={createWarningLineLabel("24小时警戒线", "#FFB85C")}
+          />
 
           {/* 渲染台风路径 */}
           {Array.from(pathsData.entries()).map(([typhoonId, pathPoints]) => {
@@ -837,6 +993,17 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                         point.latitude,
                         point.longitude,
                       ]);
+
+                      // 🔗 关键修复：将历史路径的最后一个点添加到预测路径的开头，实现路径连接
+                      const historicalPath = pathsData.get(typhoonId);
+                      if (historicalPath && historicalPath.length > 0) {
+                        const lastHistoricalPoint =
+                          historicalPath[historicalPath.length - 1];
+                        forecastCoordinates.unshift([
+                          lastHistoricalPoint.latitude,
+                          lastHistoricalPoint.longitude,
+                        ]);
+                      }
 
                       return (
                         <React.Fragment key={`forecast-${typhoonId}-${agency}`}>
@@ -1351,6 +1518,249 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                     ))}
                 </div>
               )}
+              {selectedTyphoons &&
+                selectedTyphoons.size > 0 &&
+                latestVisualizedTyphoon && (
+                  <div
+                    style={{
+                      paddingTop: "12px",
+                      borderTop: "1px solid #e0e0e0",
+                    }}
+                  >
+                    <button
+                      onClick={() => {
+                        // 播放最近一次被可视化的台风视频
+                        handlePlayVideo(latestVisualizedTyphoon);
+                      }}
+                      disabled={videoLoading}
+                      style={{
+                        width: "100%",
+                        padding: "10px 15px",
+                        background: videoLoading
+                          ? "#ccc"
+                          : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        cursor: videoLoading ? "not-allowed" : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
+                        transition: "all 0.3s ease",
+                        boxShadow: videoLoading
+                          ? "none"
+                          : "0 4px 15px rgba(102, 126, 234, 0.4)",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!videoLoading) {
+                          e.target.style.transform = "translateY(-2px)";
+                          e.target.style.boxShadow =
+                            "0 6px 20px rgba(102, 126, 234, 0.6)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!videoLoading) {
+                          e.target.style.transform = "translateY(0)";
+                          e.target.style.boxShadow =
+                            "0 4px 15px rgba(102, 126, 234, 0.4)";
+                        }
+                      }}
+                    >
+                      <span style={{ fontSize: "16px" }}>
+                        {videoLoading ? "⏳" : "▶️"}
+                      </span>
+                      <span>
+                        {videoLoading ? "加载中..." : "路径动态可视化"}
+                      </span>
+                    </button>
+
+                    {/* 视频错误提示 */}
+                    {videoError && (
+                      <div
+                        style={{
+                          marginTop: "8px",
+                          padding: "8px",
+                          background: "#fff3cd",
+                          border: "1px solid #ffc107",
+                          borderRadius: "6px",
+                          fontSize: "12px",
+                          color: "#856404",
+                          textAlign: "center",
+                        }}
+                      >
+                        ⚠️ {videoError}
+                      </div>
+                    )}
+                  </div>
+                )}
+            </div>
+          </div>
+        )}
+
+        {/* 🎬 视频播放模态窗口 */}
+        {videoModalVisible && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(0, 0, 0, 0.85)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 10000,
+            }}
+            onClick={handleCloseVideo}
+          >
+            <div
+              style={{
+                position: "relative",
+                width: "48vw",
+                height: "48vh",
+                maxWidth: "960px",
+                maxHeight: "540px",
+                background: "#000",
+                borderRadius: "12px",
+                overflow: "hidden",
+                boxShadow: "0 10px 40px rgba(0, 0, 0, 0.6)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 关闭按钮 */}
+              <button
+                onClick={handleCloseVideo}
+                style={{
+                  position: "absolute",
+                  top: "10px",
+                  right: "10px",
+                  width: "36px",
+                  height: "36px",
+                  background: "rgba(255, 255, 255, 0.2)",
+                  border: "2px solid white",
+                  borderRadius: "50%",
+                  color: "white",
+                  fontSize: "18px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 10001,
+                  transition: "all 0.3s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = "rgba(255, 255, 255, 0.3)";
+                  e.target.style.transform = "scale(1.1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = "rgba(255, 255, 255, 0.2)";
+                  e.target.style.transform = "scale(1)";
+                }}
+              >
+                ✕
+              </button>
+
+              <video
+                ref={videoRef}
+                controls
+                autoPlay
+                preload="auto"
+                width="100%"
+                height="100%"
+                onLoadStart={() => {
+                  console.log("🎬 视频开始加载...");
+                  console.log("📍 视频URL:", videoUrl);
+                }}
+                onLoadedMetadata={() => {
+                  console.log("✅ 视频元数据加载完成");
+                }}
+                onCanPlay={() => {
+                  console.log("✅ 视频可以播放");
+                  setVideoError(null);
+                }}
+                onError={(e) => {
+                  const video = e.target;
+
+                  // 检查是否是source标签的错误
+                  if (e.target.tagName === "SOURCE") {
+                    console.error("❌ Source标签加载失败");
+                    setVideoError("视频资源加载失败，请检查后端服务是否正常");
+                    return;
+                  }
+
+                  // 获取错误代码
+                  let errorCode = "未知";
+                  let errorDetail = null;
+
+                  if (video.error) {
+                    errorCode = video.error.code;
+                    errorDetail = video.error.message || null;
+                  }
+
+                  // 错误代码映射
+                  const errorMessages = {
+                    1: "视频加载被中止",
+                    2: "网络错误导致视频下载失败",
+                    3: "视频解码失败（可能是格式不支持）",
+                    4: "视频资源不可用或格式不支持",
+                  };
+
+                  const errorMsg = errorMessages[errorCode] || "视频加载失败";
+
+                  // 提供更友好的错误提示
+                  let userMessage = errorMsg;
+                  if (errorCode === 2) {
+                    userMessage += "。请检查网络连接或后端服务是否正常。";
+                  } else if (errorCode === 3 || errorCode === 4) {
+                    userMessage +=
+                      "。视频格式可能不被浏览器支持，建议使用Chrome或Edge浏览器。";
+                  } else if (errorCode === "未知") {
+                    userMessage =
+                      "视频加载失败，请检查后端代理服务是否正常运行。";
+                  }
+
+                  setVideoError(userMessage);
+                }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  display: "block",
+                  objectFit: "contain",
+                  backgroundColor: "#000",
+                }}
+              >
+                <source
+                  src={videoUrl}
+                  type="video/mp4"
+                  onError={() => {
+                    setVideoError("视频资源加载失败，请稍后重试");
+                  }}
+                />
+                您的浏览器不支持视频播放
+              </video>
+
+              {/* 视频标题 */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  background:
+                    "linear-gradient(to top, rgba(0,0,0,0.8), transparent)",
+                  padding: "15px 15px 10px",
+                  color: "white",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                }}
+              >
+                台风 {currentTyphoonId} 路径动态可视化
+              </div>
             </div>
           </div>
         )}

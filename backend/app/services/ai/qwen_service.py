@@ -52,7 +52,6 @@ class QwenService:
 
         # 记录配置信息（用于诊断）
         logger.info(f"通义千问API配置 - Base URL: {self.base_url}, Model: {payload.get('model')}")
-        logger.info(f"通义千问API配置 - API Key前缀: {self.api_key[:20]}...")
 
         for attempt in range(1, self.max_retries + 1):
             try:

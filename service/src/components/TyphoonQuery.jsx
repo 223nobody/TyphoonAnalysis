@@ -2,6 +2,7 @@
  * 台风数据查询组件
  */
 import React, { useState } from "react";
+import ReactECharts from "echarts-for-react";
 import {
   getTyphoonList,
   getTyphoonById,
@@ -301,7 +302,7 @@ function TyphoonQuery() {
     );
   };
 
-  // 渲染台风详情结果
+  // 渲染台风详情结果 - 优化为表格形式
   const renderDetailResult = (data) => {
     if (!data) {
       return (
@@ -314,59 +315,98 @@ function TyphoonQuery() {
     return (
       <div className="info-card" style={{ marginTop: "20px" }}>
         <h4>🌀 台风详情</h4>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "15px",
-          }}
-        >
-          <div>
-            <p>
-              <strong>台风ID:</strong> {data.typhoon_id}
-            </p>
-            <p>
-              <strong>中文名:</strong> {data.typhoon_name_cn || "暂无数据"}
-            </p>
-            <p>
-              <strong>英文名:</strong> {data.typhoon_name || "暂无数据"}
-            </p>
-            <p>
-              <strong>年份:</strong> {data.year}
-            </p>
-            <p>
-              <strong>状态:</strong> {data.status === 1 ? "活跃" : "已停止"}
-            </p>
-          </div>
-          <div>
-            <p>
-              <strong>最大风速:</strong>{" "}
-              {data.max_wind_speed ? `${data.max_wind_speed} m/s` : "暂无数据"}
-            </p>
-            <p>
-              <strong>最低气压:</strong>{" "}
-              {data.min_pressure ? `${data.min_pressure} hPa` : "暂无数据"}
-            </p>
-            <p>
-              <strong>最大强度:</strong> {data.max_intensity || "暂无数据"}
-            </p>
-            <p>
-              <strong>起始时间:</strong>{" "}
-              {data.start_time
-                ? new Date(data.start_time).toLocaleString("zh-CN")
-                : data.created_at
-                ? new Date(data.created_at).toLocaleString("zh-CN")
-                : "暂无数据"}
-            </p>
-            <p>
-              <strong>结束时间:</strong>{" "}
-              {data.end_time
-                ? new Date(data.end_time).toLocaleString("zh-CN")
-                : data.updated_at
-                ? new Date(data.updated_at).toLocaleString("zh-CN")
-                : "暂无数据"}
-            </p>
-          </div>
+        <div style={{ overflowX: "auto" }}>
+          <table className="detail-table">
+            <tbody>
+              <tr>
+                <td>
+                  <strong>台风ID</strong>
+                </td>
+                <td>{data.typhoon_id}</td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>中文名</strong>
+                </td>
+                <td>{data.typhoon_name_cn || "暂无数据"}</td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>英文名</strong>
+                </td>
+                <td>{data.typhoon_name || "暂无数据"}</td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>年份</strong>
+                </td>
+                <td>{data.year}</td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>状态</strong>
+                </td>
+                <td>
+                  <span
+                    style={{
+                      color: data.status === 1 ? "#10b981" : "#6b7280",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {data.status === 1 ? "活跃" : "已停止"}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>最大风速</strong>
+                </td>
+                <td>
+                  {data.max_wind_speed
+                    ? `${data.max_wind_speed} m/s`
+                    : "暂无数据"}
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>最低气压</strong>
+                </td>
+                <td>
+                  {data.min_pressure ? `${data.min_pressure} hPa` : "暂无数据"}
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>最大强度</strong>
+                </td>
+                <td>{data.max_intensity || "暂无数据"}</td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>起始时间</strong>
+                </td>
+                <td>
+                  {data.start_time
+                    ? new Date(data.start_time).toLocaleString("zh-CN")
+                    : data.created_at
+                    ? new Date(data.created_at).toLocaleString("zh-CN")
+                    : "暂无数据"}
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>结束时间</strong>
+                </td>
+                <td>
+                  {data.end_time
+                    ? new Date(data.end_time).toLocaleString("zh-CN")
+                    : data.updated_at
+                    ? new Date(data.updated_at).toLocaleString("zh-CN")
+                    : "暂无数据"}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     );
@@ -430,9 +470,236 @@ function TyphoonQuery() {
       );
     }
 
+    // 准备ECharts图表数据
+    const getPathChartOption = () => {
+      // 提取经纬度用于折线图
+      const latitudes = data.map((p) => p.latitude);
+      const longitudes = data.map((p) => p.longitude);
+      const windSpeeds = data.map((p) => p.max_wind_speed || p.wind_speed || 0);
+      const timeLabels = data.map((p, index) => {
+        const timestamp = p.timestamp || p.record_time || p.time;
+        return timestamp
+          ? new Date(timestamp).toLocaleString("zh-CN", {
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+            })
+          : `点${index + 1}`;
+      });
+
+      return {
+        title: {
+          text: "台风路径可视化",
+          left: "center",
+          textStyle: {
+            color: "#1f2937",
+            fontSize: 18,
+            fontWeight: "bold",
+          },
+        },
+        tooltip: {
+          trigger: "axis",
+          backgroundColor: "rgba(255, 255, 255, 0.95)",
+          borderColor: "#667eea",
+          borderWidth: 1,
+          textStyle: {
+            color: "#1f2937",
+          },
+          formatter: function (params) {
+            const index = params[0].dataIndex;
+            const point = data[index];
+            const timestamp =
+              point.timestamp || point.record_time || point.time;
+            const windSpeed = point.max_wind_speed || point.wind_speed;
+            const pressure = point.center_pressure || point.pressure;
+
+            return `
+              <div style="padding: 8px;">
+                <strong style="color: #667eea;">路径点 ${
+                  index + 1
+                }</strong><br/>
+                <strong>时间：</strong>${
+                  timestamp
+                    ? new Date(timestamp).toLocaleString("zh-CN")
+                    : "暂无数据"
+                }<br/>
+                <strong>经度：</strong>${point.longitude?.toFixed(2)}°E<br/>
+                <strong>纬度：</strong>${point.latitude?.toFixed(2)}°N<br/>
+                <strong>风速：</strong>${windSpeed || "暂无数据"} m/s<br/>
+                <strong>气压：</strong>${pressure || "暂无数据"} hPa<br/>
+                <strong>强度：</strong>${point.intensity || "暂无数据"}
+              </div>
+            `;
+          },
+        },
+        legend: {
+          data: ["纬度", "经度", "风速"],
+          top: 40,
+          textStyle: {
+            color: "#374151",
+          },
+        },
+        grid: {
+          left: "3%",
+          right: "4%",
+          bottom: "3%",
+          top: 100,
+          containLabel: true,
+        },
+        xAxis: {
+          type: "category",
+          data: timeLabels,
+          boundaryGap: false,
+          axisLabel: {
+            rotate: 45,
+            color: "#6b7280",
+            fontSize: 11,
+          },
+          axisLine: {
+            lineStyle: {
+              color: "#e5e7eb",
+            },
+          },
+        },
+        yAxis: [
+          {
+            type: "value",
+            name: "经纬度 (°)",
+            position: "left",
+            axisLabel: {
+              color: "#6b7280",
+              formatter: "{value}°",
+            },
+            axisLine: {
+              lineStyle: {
+                color: "#e5e7eb",
+              },
+            },
+            splitLine: {
+              lineStyle: {
+                color: "#f3f4f6",
+              },
+            },
+          },
+          {
+            type: "value",
+            name: "风速 (m/s)",
+            position: "right",
+            axisLabel: {
+              color: "#6b7280",
+              formatter: "{value} m/s",
+            },
+            axisLine: {
+              lineStyle: {
+                color: "#e5e7eb",
+              },
+            },
+            splitLine: {
+              show: false,
+            },
+          },
+        ],
+        series: [
+          {
+            name: "纬度",
+            type: "line",
+            data: latitudes,
+            smooth: true,
+            symbol: "circle",
+            symbolSize: 8,
+            lineStyle: {
+              color: "#667eea",
+              width: 3,
+            },
+            itemStyle: {
+              color: "#667eea",
+            },
+            areaStyle: {
+              color: {
+                type: "linear",
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [
+                  { offset: 0, color: "rgba(102, 126, 234, 0.3)" },
+                  { offset: 1, color: "rgba(102, 126, 234, 0.05)" },
+                ],
+              },
+            },
+          },
+          {
+            name: "经度",
+            type: "line",
+            data: longitudes,
+            smooth: true,
+            symbol: "circle",
+            symbolSize: 8,
+            lineStyle: {
+              color: "#10b981",
+              width: 3,
+            },
+            itemStyle: {
+              color: "#10b981",
+            },
+            areaStyle: {
+              color: {
+                type: "linear",
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [
+                  { offset: 0, color: "rgba(16, 185, 129, 0.3)" },
+                  { offset: 1, color: "rgba(16, 185, 129, 0.05)" },
+                ],
+              },
+            },
+          },
+          {
+            name: "风速",
+            type: "line",
+            yAxisIndex: 1,
+            data: windSpeeds,
+            smooth: true,
+            symbol: "diamond",
+            symbolSize: 10,
+            lineStyle: {
+              color: "#FF9FE7",
+              width: 2,
+              type: "dashed",
+            },
+            itemStyle: {
+              color: "#FF40CF",
+            },
+          },
+        ],
+      };
+    };
+
     return (
       <div className="info-card" style={{ marginTop: "20px" }}>
         <h4>🗺️ 台风路径数据（共 {data.length} 个点）</h4>
+
+        {/* ECharts可视化图表 */}
+        <div
+          style={{
+            marginTop: "20px",
+            marginBottom: "30px",
+            background: "white",
+            padding: "20px",
+            borderRadius: "10px",
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+          }}
+        >
+          <ReactECharts
+            option={getPathChartOption()}
+            style={{ height: "500px", width: "100%" }}
+            opts={{ renderer: "canvas" }}
+          />
+        </div>
+
+        {/* 数据表格 */}
         <div
           style={{ overflowX: "auto", maxHeight: "600px", overflowY: "auto" }}
         >

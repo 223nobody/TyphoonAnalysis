@@ -19,6 +19,8 @@ import ImageAnalysis from "./components/ImageAnalysis";
 import ReportGeneration from "./components/ReportGeneration";
 import StatisticsPanel from "./components/StatisticsPanel";
 import AlertCenter from "./components/AlertCenter";
+import AIAgent from "./components/AIAgent";
+import AIAgentButton from "./components/AIAgentButton";
 
 function AppContent() {
   const navigate = useNavigate();
@@ -118,8 +120,12 @@ function AppContent() {
             }
           />
           <Route path="/alert" element={<AlertCenter />} />
+          <Route path="/AI_agent" element={<AIAgent />} />
         </Routes>
       </div>
+
+      {/* AI客服悬浮按钮 */}
+      <AIAgentButton />
     </div>
   );
 }

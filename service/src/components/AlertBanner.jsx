@@ -8,6 +8,7 @@ import { getActiveAlerts } from "../services/api";
 
 function AlertBanner() {
   const [bulletin, setBulletin] = useState(null);
+  const [hasBulletin, setHasBulletin] = useState(false);
   const [visible, setVisible] = useState(true);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -18,13 +19,17 @@ function AlertBanner() {
       setLoading(true);
       const data = await getActiveAlerts();
 
+      // 使用后端返回的 has_bulletin 字段判断是否有活跃台风
+      setHasBulletin(data.has_bulletin);
+
       // 检查是否有台风预警
       if (data.has_bulletin && data.bulletin) {
         setBulletin(data.bulletin);
         setVisible(true);
       } else {
-        setBulletin(null);
-        setVisible(false);
+        // 没有活跃台风时，设置一个空的 bulletin 对象用于显示"无活跃台风"状态
+        setBulletin({ message: data.message || "当前没有活跃台风" });
+        setVisible(true);
       }
     } catch (err) {
       console.error("加载台风预警失败:", err);
@@ -67,7 +72,9 @@ function AlertBanner() {
         position: "relative",
         padding: "15px 20px",
         marginBottom: "20px",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        background: !hasBulletin
+          ? "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
+          : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         borderRadius: "8px",
         display: "flex",
         alignItems: "center",
