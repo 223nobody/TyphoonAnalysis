@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     AI_API_BASE_URL: str = Field(default="https://aiping.cn/api/v1", description="统一AI API基础URL")
 
     # AI模型名称配置
-    DEEPSEEK_MODEL: str = Field(default="", description="DeepSeek模型名称")
+    DEEPSEEK_MODEL: str = Field(default="", description="DeepSeek模型名称（深度思考模式）")
+    DEEPSEEK_NOTHINK_MODEL: str = Field(default="", description="DeepSeek模型名称（非深度思考模式）")
     QWEN_TEXT_MODEL: str = Field(default="", description="Qwen文本生成模型")
     QWEN_VL_MODEL: str = Field(default="", description="Qwen视觉理解模型")
     GLM_MODEL: str = Field(default="", description="GLM模型名称")

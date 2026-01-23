@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Tuple
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import uuid
 import logging
 
@@ -15,6 +15,14 @@ from app.models.typhoon import Question, AskHistory
 
 router = APIRouter(tags=["AI客服"])
 logger = logging.getLogger(__name__)
+
+# 定义北京时区（UTC+8）
+BEIJING_TZ = timezone(timedelta(hours=8))
+
+
+def get_beijing_time():
+    """获取当前北京时间"""
+    return datetime.now(BEIJING_TZ)
 
 
 class QuestionResponse(BaseModel):
@@ -33,6 +41,7 @@ class AskRequest(BaseModel):
     session_id: str
     question: str
     model: str = "deepseek"  # 模型选择：deepseek, glm, qwen
+    deep_thinking: bool = False  # 是否启用深度思考模式
 
 
 class AskResponse(BaseModel):
@@ -136,32 +145,39 @@ async def call_ai_service_with_retry(
     import asyncio
 
     # 优化的系统提示词
-    system_prompt = """你是一个专业的台风分析助手，具备以下能力：
+    system_prompt = """你是一个通用型智能助手，具备多领域的知识解答能力，需严格遵循以下规则：
 
-1. **台风预测**：能够分析台风的发展趋势、强度变化和可能的路径
-2. **路径分析**：基于气象数据和历史规律，预测台风的移动方向和速度
-3. **灾害评估**：评估台风可能带来的风雨影响、风暴潮、次生灾害等
-4. **防灾建议**：提供科学的防台风措施和应急准备建议
-5. **数据解读**：解释台风相关的气象数据和预警信息
+1. 核心能力：
+   - 通用知识解答：回答生活、科技、文化、教育、气象、职场等多领域的常见问题；
+   - 逻辑分析：针对用户的问题提供清晰、有条理的分析和解决方案；
+   - 信息解读：用通俗易懂的语言解释专业概念、数据和规则；
+   - 建议给出：基于客观事实为用户提供合理、可落地的建议；
+   - 多轮对话：结合历史上下文保持回答的连贯性和一致性。
 
-请用简洁、专业、易懂的语言回答用户的问题，回答长度控制在200字以内。如果问题涉及实时数据，请说明需要查看最新的气象资料。"""
+2. 回答准则（强制遵守）：
+   - 格式要求：
+     1. 仅使用纯文本回答,禁止使用任何markdown标记(包括**、###、---、` `、🔍、📱等符号/表情);
+     2. 复杂问题优先用数字序号分点说明,层级用“1.1/1.2”或“-”区分，避免杂乱排版;
+     3. 使用数字序号分点说明时每个分点回答完需要换行;
+     4. 关键信息直接陈述，无需额外装饰性符号，保持文本整洁;
+     5. 回答内容不能少于400字;
+   - 风格要求：专业、简洁、易懂，根据问题领域适配语气（气象与科学问题偏严谨）；
+"""
 
-    # 构建AI请求
+    # 【优化2】调整模型参数，提升规范性
     payload = {
         "model": model_name,
         "messages": [
-            {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
-                "role": "user",
-                "content": question
-            }
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question}
         ],
         "stream": False,
-        "temperature": 0.7,
-        "max_tokens": 500
+        "temperature": 0.8,  # 降低随机性
+        "top_p": 0.95,        # 提升聚焦性
+        "presence_penalty": 0.1,  # 新增：减少重复内容，提升多样性
+        "frequency_penalty": 0.1, # 新增：避免模型过度谨慎
+        "max_tokens": 3000,
+        "stop": None
     }
 
     headers = {
@@ -249,40 +265,70 @@ async def ask_question(request: AskRequest, db: AsyncSession = Depends(get_db)):
             # 未匹配到，调用AI服务生成回答
             from app.core.config import settings
 
-            logger.info(f"开始调用AI服务 - 用户选择模型: {request.model}, 问题: {request.question}")
+            logger.info(f"开始调用AI服务 - 用户选择模型: {request.model}, 深度思考: {request.deep_thinking}, 问题: {request.question}")
 
-            # 模型映射和降级顺序
+            # 根据深度思考模式和用户选择的模型，确定实际使用的模型
+            if request.deep_thinking:
+                # 启用深度思考模式：不管选择什么模型，都使用 DEEPSEEK_MODEL
+                actual_model_name = settings.DEEPSEEK_MODEL
+                actual_model_key = "deepseek"
+                logger.info(f"深度思考模式已启用，强制使用 DeepSeek 深度思考模型: {actual_model_name}")
+            else:
+                # 未启用深度思考模式：根据用户选择的模型决定
+                if request.model == "deepseek":
+                    # 选择 deepseek 且未启用深度思考，使用 DEEPSEEK_NOTHINK_MODEL
+                    actual_model_name = settings.DEEPSEEK_NOTHINK_MODEL
+                    actual_model_key = "deepseek"
+                    logger.info(f"使用 DeepSeek 非深度思考模型: {actual_model_name}")
+                elif request.model == "glm":
+                    actual_model_name = settings.GLM_MODEL
+                    actual_model_key = "glm"
+                elif request.model == "qwen":
+                    actual_model_name = settings.QWEN_TEXT_MODEL
+                    actual_model_key = "qwen"
+                else:
+                    # 默认使用 DEEPSEEK_NOTHINK_MODEL
+                    actual_model_name = settings.DEEPSEEK_NOTHINK_MODEL
+                    actual_model_key = "deepseek"
+
+            # 模型映射（用于降级）
             model_map = {
-                "deepseek": settings.DEEPSEEK_MODEL,
+                "deepseek": settings.DEEPSEEK_NOTHINK_MODEL if not request.deep_thinking else settings.DEEPSEEK_MODEL,
                 "glm": settings.GLM_MODEL,
                 "qwen": settings.QWEN_TEXT_MODEL
             }
 
             # 定义模型降级顺序（当前模型失败时尝试的备选模型）
-            fallback_order = {
-                "deepseek": ["glm", "qwen"],
-                "glm": ["deepseek", "qwen"],
-                "qwen": ["deepseek", "glm"]
-            }
+            # 如果启用了深度思考模式，不进行降级
+            if request.deep_thinking:
+                fallback_order = {
+                    "deepseek": [],  # 深度思考模式不降级
+                    "glm": [],
+                    "qwen": []
+                }
+            else:
+                fallback_order = {
+                    "deepseek": ["glm", "qwen"],
+                    "glm": ["deepseek", "qwen"],
+                    "qwen": ["deepseek", "glm"]
+                }
 
-            # 首先尝试用户选择的模型
-            selected_model_key = request.model
-            selected_model_name = model_map.get(selected_model_key, settings.DEEPSEEK_MODEL)
-
+            # 首先尝试实际选择的模型
             answer, success = await call_ai_service_with_retry(
-                selected_model_key,
-                selected_model_name,
+                actual_model_key,
+                actual_model_name,
                 request.question,
                 max_retries=2
             )
 
-            used_model = selected_model_key
+            used_model = actual_model_key
+            selected_model_key = request.model  # 保留用户原始选择的模型键名，用于后续提示
 
-            # 如果失败，尝试降级到其他模型
-            if not success:
-                logger.warning(f"模型 {selected_model_key} 调用失败，开始尝试降级到备选模型")
+            # 如果失败，尝试降级到其他模型（仅在非深度思考模式下）
+            if not success and not request.deep_thinking:
+                logger.warning(f"模型 {actual_model_key} 调用失败，开始尝试降级到备选模型")
 
-                fallback_models = fallback_order.get(selected_model_key, ["deepseek", "glm"])
+                fallback_models = fallback_order.get(actual_model_key, ["deepseek", "glm"])
 
                 for fallback_key in fallback_models:
                     fallback_name = model_map.get(fallback_key)
@@ -335,15 +381,24 @@ async def ask_question(request: AskRequest, db: AsyncSession = Depends(get_db)):
                 matched = False
                 is_ai_generated = False
 
-        # 保存对话历史，标记是否由AI生成
+        # 获取当前北京时间
+        current_time = get_beijing_time()
+
+        # 保存对话历史，标记是否由AI生成，使用北京时间
         history = AskHistory(
             session_id=request.session_id,
             question=request.question,
             answer=answer,
-            is_ai_generated=is_ai_generated
+            is_ai_generated=is_ai_generated,
+            created_at=current_time
         )
         db.add(history)
         await db.commit()
+
+        # 打印AI回答时间
+        answer_time = get_beijing_time()
+        answer_time_str = answer_time.strftime("%Y-%m-%d %H:%M:%S")
+        logger.info(f"[AI回答] 时间: {answer_time_str}, 回答长度: {len(answer)}")
 
         return AskResponse(answer=answer, matched=matched)
     except Exception as e:

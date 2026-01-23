@@ -35,6 +35,14 @@ function TyphoonQuery() {
     typhoonId: "",
   });
 
+  // 下拉选择器状态
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [dropdownTyphoons, setDropdownTyphoons] = useState([]);
+  const [dropdownLoading, setDropdownLoading] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [availableYears, setAvailableYears] = useState([]);
+  const [displayText, setDisplayText] = useState(""); // 用于输入框显示的文本
+
   // 处理台风列表查询
   const handleListQuery = async () => {
     try {
@@ -141,12 +149,102 @@ function TyphoonQuery() {
       }
 
       setResult({ type: "detail", data: detailData });
+      setDropdownOpen(false); // 查询成功后关闭下拉框
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
+
+  // 加载下拉选择器的台风列表
+  const loadDropdownTyphoons = async (year) => {
+    try {
+      setDropdownLoading(true);
+      const params = year ? { year: parseInt(year) } : {};
+      const data = await getTyphoonList(params);
+      const typhoons = data.items || data || [];
+      setDropdownTyphoons(typhoons);
+    } catch (err) {
+      console.error("加载台风列表失败:", err);
+      setDropdownTyphoons([]);
+    } finally {
+      setDropdownLoading(false);
+    }
+  };
+
+  // 加载可用年份列表
+  const loadAvailableYears = async () => {
+    try {
+      const data = await getTyphoonList();
+      const typhoons = data.items || data || [];
+      const years = new Set();
+      typhoons.forEach((t) => {
+        if (t.year) years.add(t.year);
+      });
+      // 添加年份范围：2000 到 2026
+      for (let year = 2000; year <= 2026; year++) {
+        years.add(year);
+      }
+      setAvailableYears(Array.from(years).sort((a, b) => b - a));
+    } catch (err) {
+      console.error("加载年份列表失败:", err);
+    }
+  };
+
+  // 初始化：加载年份列表
+  React.useEffect(() => {
+    loadAvailableYears();
+  }, []);
+
+  // 当选择年份改变时，加载对应年份的台风列表
+  React.useEffect(() => {
+    if (dropdownOpen) {
+      loadDropdownTyphoons(selectedYear);
+    }
+  }, [selectedYear, dropdownOpen]);
+
+  // 处理输入框点击，打开下拉选择器
+  const handleInputFocus = () => {
+    setDropdownOpen(true);
+    if (dropdownTyphoons.length === 0) {
+      loadDropdownTyphoons(selectedYear);
+    }
+  };
+
+  // 处理台风卡片点击
+  const handleTyphoonCardClick = (typhoon) => {
+    // 只存储台风ID用于查询
+    setDetailForm({ ...detailForm, typhoonId: typhoon.typhoon_id });
+
+    // 构建显示文本：台风ID - 英文名 - 中文名
+    const displayName = `${typhoon.typhoon_id} - ${typhoon.typhoon_name}${
+      typhoon.typhoon_name_cn ? ` - ${typhoon.typhoon_name_cn}` : ""
+    }`;
+    setDisplayText(displayName);
+
+    setDropdownOpen(false);
+    // 可选：自动触发查询
+    // handleDetailQuery();
+  };
+
+  // 处理点击外部区域关闭下拉框
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      const dropdown = document.querySelector(".typhoon-dropdown-container");
+      if (dropdown && !dropdown.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownOpen]);
 
   // 处理台风路径查询
   const handlePathQuery = async () => {
@@ -229,20 +327,88 @@ function TyphoonQuery() {
     </div>
   );
 
-  // 渲染台风详情表单
+  // 渲染台风详情表单 - 带下拉选择器
   const renderDetailForm = () => (
     <div>
-      <div className="form-group">
+      <div className="form-group typhoon-dropdown-container">
         <label>台风ID</label>
         <input
           type="text"
-          placeholder="例如: 2501"
-          value={detailForm.typhoonId}
-          onChange={(e) =>
-            setDetailForm({ ...detailForm, typhoonId: e.target.value })
-          }
+          placeholder="点击选择台风或输入台风ID"
+          value={displayText || detailForm.typhoonId}
+          onChange={(e) => {
+            const value = e.target.value;
+            // 用户手动输入时，清空displayText，只保留typhoonId
+            setDisplayText("");
+            setDetailForm({ ...detailForm, typhoonId: value });
+          }}
+          onFocus={handleInputFocus}
+          style={{ cursor: "pointer" }}
         />
+
+        {/* 下拉选择面板 */}
+        {dropdownOpen && (
+          <div className="typhoon-dropdown-panel">
+            <div className="dropdown-content">
+              {/* 左侧：年份选择列表 */}
+              <div className="dropdown-years">
+                <h4>选择年份</h4>
+                <div className="year-list">
+                  {availableYears.map((year) => (
+                    <div
+                      key={year}
+                      className={`year-item ${
+                        selectedYear === year ? "active" : ""
+                      }`}
+                      onClick={() => setSelectedYear(year)}
+                    >
+                      {year}年
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 右侧：台风卡片列表 */}
+              <div className="dropdown-typhoons">
+                <h4>{selectedYear}年台风列表</h4>
+                {dropdownLoading ? (
+                  <div className="dropdown-loading">加载中...</div>
+                ) : dropdownTyphoons.length === 0 ? (
+                  <div className="dropdown-empty">暂无台风数据</div>
+                ) : (
+                  <div className="typhoon-cards">
+                    {dropdownTyphoons.map((typhoon) => (
+                      <div
+                        key={typhoon.typhoon_id}
+                        className="typhoon-card"
+                        onClick={() => handleTyphoonCardClick(typhoon)}
+                      >
+                        <div className="card-header">
+                          <div className="card-title">
+                            {typhoon.typhoon_name_cn || typhoon.typhoon_name}
+                          </div>
+                          <div className="card-id">{typhoon.typhoon_id}</div>
+                        </div>
+                        <div className="card-info">
+                          <span>🌊 {typhoon.typhoon_name}</span>
+                          <span
+                            className={`status-badge ${
+                              typhoon.status === 1 ? "active" : "inactive"
+                            }`}
+                          >
+                            {typhoon.status === 1 ? "活跃" : "已停止"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
       <div style={{ display: "flex", gap: "10px" }}>
         <button className="btn" onClick={handleDetailQuery} disabled={loading}>
           🔍 查询台风详情
@@ -403,6 +569,40 @@ function TyphoonQuery() {
                     : data.updated_at
                     ? new Date(data.updated_at).toLocaleString("zh-CN")
                     : "暂无数据"}
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>起始位置</strong>
+                </td>
+                <td>
+                  {data.start_location ? (
+                    <div>
+                      <div>
+                        经度: {data.start_location.longitude?.toFixed(2)}°,
+                        纬度: {data.start_location.latitude?.toFixed(2)}°
+                      </div>
+                    </div>
+                  ) : (
+                    "暂无数据"
+                  )}
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>结束位置</strong>
+                </td>
+                <td>
+                  {data.end_location ? (
+                    <div>
+                      <div>
+                        经度: {data.end_location.longitude?.toFixed(2)}°, 纬度:{" "}
+                        {data.end_location.latitude?.toFixed(2)}°
+                      </div>
+                    </div>
+                  ) : (
+                    "暂无数据"
+                  )}
                 </td>
               </tr>
             </tbody>
@@ -778,7 +978,7 @@ function TyphoonQuery() {
           </table>
         </div>
         <p style={{ marginTop: "10px", color: "#6b7280", fontSize: "14px" }}>
-          ✓ 显示全部 {data.length} 个路径点（支持滚动查看）
+          ✓ 显示全部 {data.length} 个路径点
         </p>
       </div>
     );

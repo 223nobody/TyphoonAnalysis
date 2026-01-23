@@ -5,7 +5,9 @@ import React, { useState, useRef } from "react";
 import axios from "axios";
 import { marked } from "marked";
 import html2pdf from "html2pdf.js";
+import { getTyphoonList } from "../services/api";
 import "../styles/ReportGeneration.css";
+import "../styles/TyphoonQuery.css"; // 导入下拉选择器样式
 import "../styles/common.css";
 
 function ReportGeneration() {
@@ -22,6 +24,101 @@ function ReportGeneration() {
     reportType: "comprehensive", // 修改默认值为comprehensive
     aiProvider: "glm",
   });
+
+  // 下拉选择器状态
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [dropdownTyphoons, setDropdownTyphoons] = useState([]);
+  const [dropdownLoading, setDropdownLoading] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [availableYears, setAvailableYears] = useState([]);
+  const [displayText, setDisplayText] = useState(""); // 用于输入框显示的文本
+
+  // 加载下拉选择器的台风列表
+  const loadDropdownTyphoons = async (year) => {
+    try {
+      setDropdownLoading(true);
+      const params = year ? { year: parseInt(year) } : {};
+      const data = await getTyphoonList(params);
+      const typhoons = data.items || data || [];
+      setDropdownTyphoons(typhoons);
+    } catch (err) {
+      console.error("加载台风列表失败:", err);
+      setDropdownTyphoons([]);
+    } finally {
+      setDropdownLoading(false);
+    }
+  };
+
+  // 加载可用年份列表
+  const loadAvailableYears = async () => {
+    try {
+      const data = await getTyphoonList();
+      const typhoons = data.items || data || [];
+      const years = new Set();
+      typhoons.forEach((t) => {
+        if (t.year) years.add(t.year);
+      });
+      // 添加年份范围：2000 到 2026
+      for (let year = 2000; year <= 2026; year++) {
+        years.add(year);
+      }
+      setAvailableYears(Array.from(years).sort((a, b) => b - a));
+    } catch (err) {
+      console.error("加载年份列表失败:", err);
+    }
+  };
+
+  // 初始化：加载年份列表
+  React.useEffect(() => {
+    loadAvailableYears();
+  }, []);
+
+  // 当选择年份改变时，加载对应年份的台风列表
+  React.useEffect(() => {
+    if (dropdownOpen) {
+      loadDropdownTyphoons(selectedYear);
+    }
+  }, [selectedYear, dropdownOpen]);
+
+  // 处理输入框点击，打开下拉选择器
+  const handleInputFocus = () => {
+    setDropdownOpen(true);
+    if (dropdownTyphoons.length === 0) {
+      loadDropdownTyphoons(selectedYear);
+    }
+  };
+
+  // 处理台风卡片点击
+  const handleTyphoonCardClick = (typhoon) => {
+    // 只存储台风ID用于查询
+    setReportForm({ ...reportForm, typhoonId: typhoon.typhoon_id });
+
+    // 构建显示文本：台风ID - 英文名 - 中文名
+    const displayName = `${typhoon.typhoon_id} - ${typhoon.typhoon_name}${
+      typhoon.typhoon_name_cn ? ` - ${typhoon.typhoon_name_cn}` : ""
+    }`;
+    setDisplayText(displayName);
+
+    setDropdownOpen(false);
+  };
+
+  // 处理点击外部区域关闭下拉框
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      const dropdown = document.querySelector(".typhoon-dropdown-container");
+      if (dropdown && !dropdown.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownOpen]);
 
   // 处理报告生成
   const handleGenerateReport = async () => {
@@ -406,16 +503,83 @@ function ReportGeneration() {
     <div>
       <h2>📊 报告生成</h2>
 
-      <div className="form-group">
+      <div className="form-group typhoon-dropdown-container">
         <label>台风ID</label>
         <input
           type="text"
-          placeholder="例如: 2501"
-          value={reportForm.typhoonId}
-          onChange={(e) =>
-            setReportForm({ ...reportForm, typhoonId: e.target.value })
-          }
+          placeholder="点击选择台风或输入台风ID"
+          value={displayText || reportForm.typhoonId}
+          onChange={(e) => {
+            const value = e.target.value;
+            // 用户手动输入时，清空displayText，只保留typhoonId
+            setDisplayText("");
+            setReportForm({ ...reportForm, typhoonId: value });
+          }}
+          onFocus={handleInputFocus}
+          style={{ cursor: "pointer" }}
         />
+
+        {/* 下拉选择面板 */}
+        {dropdownOpen && (
+          <div className="typhoon-dropdown-panel">
+            <div className="dropdown-content">
+              {/* 左侧：年份选择列表 */}
+              <div className="dropdown-years">
+                <h4>选择年份</h4>
+                <div className="year-list">
+                  {availableYears.map((year) => (
+                    <div
+                      key={year}
+                      className={`year-item ${
+                        selectedYear === year ? "active" : ""
+                      }`}
+                      onClick={() => setSelectedYear(year)}
+                    >
+                      {year}年
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 右侧：台风卡片列表 */}
+              <div className="dropdown-typhoons">
+                <h4>{selectedYear}年台风列表</h4>
+                {dropdownLoading ? (
+                  <div className="dropdown-loading">加载中...</div>
+                ) : dropdownTyphoons.length === 0 ? (
+                  <div className="dropdown-empty">暂无台风数据</div>
+                ) : (
+                  <div className="typhoon-cards">
+                    {dropdownTyphoons.map((typhoon) => (
+                      <div
+                        key={typhoon.typhoon_id}
+                        className="typhoon-card"
+                        onClick={() => handleTyphoonCardClick(typhoon)}
+                      >
+                        <div className="card-header">
+                          <div className="card-title">
+                            {typhoon.typhoon_name_cn || typhoon.typhoon_name}
+                          </div>
+                          <div className="card-id">{typhoon.typhoon_id}</div>
+                        </div>
+                        <div className="card-info">
+                          <span>🌊 {typhoon.typhoon_name}</span>
+                          <span
+                            className={`status-badge ${
+                              typhoon.status === 1 ? "active" : "inactive"
+                            }`}
+                          >
+                            {typhoon.status === 1 ? "活跃" : "已停止"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="form-group">
@@ -428,7 +592,7 @@ function ReportGeneration() {
         >
           <option value="comprehensive">综合分析报告</option>
           <option value="impact">影响评估报告</option>
-          <option value="prediction">预测报告</option>
+          <option value="prediction">预测分析报告</option>
         </select>
       </div>
 
@@ -440,9 +604,9 @@ function ReportGeneration() {
             setReportForm({ ...reportForm, aiProvider: e.target.value })
           }
         >
+          <option value="deepseek">DeepSeek</option>
           <option value="glm">智谱GLM (GLM-4.7)</option>
           <option value="qwen">通义千问 (Qwen)</option>
-          <option value="deepseek">DeepSeek</option>
         </select>
         <small style={{ color: "#6b7280", display: "block", marginTop: "5px" }}>
           💡 提示：通义千问、DeepSeek和GLM均支持中文报告生成
@@ -454,17 +618,14 @@ function ReportGeneration() {
       </button>
 
       <div className="info-card" style={{ marginTop: "15px" }}>
-        <p style={{ margin: 0, fontSize: "13px", color: "#1e40af" }}>
+        <p style={{ margin: 0, fontSize: "15px", color: "#1e40af" }}>
           💡 <strong>报告类型说明：</strong>
         </p>
         <ul
-          style={{ margin: "8px 0 0 20px", fontSize: "12px", color: "#1e40af" }}
+          style={{ margin: "8px 0 0 20px", fontSize: "14px", color: "#1e40af" }}
         >
           <li>
-            <strong>台风概况报告：</strong>包含台风基本信息和路径概况
-          </li>
-          <li>
-            <strong>详细分析报告：</strong>深入分析台风特征和发展过程
+            <strong>综合分析报告：</strong>深入分析台风特征和发展过程
           </li>
           <li>
             <strong>影响评估报告：</strong>评估台风可能造成的影响

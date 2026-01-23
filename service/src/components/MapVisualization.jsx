@@ -25,6 +25,20 @@ import "../styles/MapVisualization.css";
 import "../styles/common.css";
 import taifengIcon from "../pictures/taifeng.gif";
 
+/**
+ * 经度归一化工具函数（仅用于显示）
+ * 将任意经度值归一化到 [-180°, 180°] 范围，用于 Tooltip 显示
+ * 注意：地图坐标不使用此函数，直接使用原始经度值
+ *
+ * @param {number} lng - 原始经度值
+ * @returns {number} 归一化后的经度值（-180 到 180 之间）
+ */
+const normalizeLongitudeForDisplay = (lng) => {
+  if (typeof lng !== "number" || isNaN(lng)) return lng;
+  const normalized = ((lng + 180) % 360) - 180;
+  return normalized === 180 ? -180 : normalized;
+};
+
 // 创建台风眼图标
 const createTyphoonIcon = () => {
   return L.icon({
@@ -97,8 +111,8 @@ const generateIrregularWindCircle = (center, baseRadius, windLevel) => {
   return points;
 };
 
-// 地图控制器组件 - 用于处理地图定位和缩放监听
-function MapController({ center, zoom, onZoomChange }) {
+// 地图控制器组件 - 用于处理地图定位、缩放监听和鼠标位置追踪
+function MapController({ center, zoom, onZoomChange, onMouseMove }) {
   const map = useMap();
 
   useEffect(() => {
@@ -137,6 +151,32 @@ function MapController({ center, zoom, onZoomChange }) {
       map.off("zoomend", handleZoomEnd);
     };
   }, [map, onZoomChange]);
+
+  // 监听鼠标移动事件
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (onMouseMove) {
+        onMouseMove({
+          lat: e.latlng.lat,
+          lng: e.latlng.lng,
+        });
+      }
+    };
+
+    const handleMouseOut = () => {
+      if (onMouseMove) {
+        onMouseMove(null);
+      }
+    };
+
+    map.on("mousemove", handleMouseMove);
+    map.on("mouseout", handleMouseOut);
+
+    return () => {
+      map.off("mousemove", handleMouseMove);
+      map.off("mouseout", handleMouseOut);
+    };
+  }, [map, onMouseMove]);
 
   return null;
 }
@@ -189,6 +229,9 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
   const [videoError, setVideoError] = useState(null);
   const [currentTyphoonId, setCurrentTyphoonId] = useState(null);
   const videoRef = useRef(null);
+
+  // 鼠标位置经纬度状态
+  const [mousePosition, setMousePosition] = useState(null);
 
   // 加载台风列表
   useEffect(() => {
@@ -273,7 +316,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
     }
   };
 
-  // 应用前端筛选（仅处理搜索关键词，年份和状态已在后端筛选）
+  // 应用前端筛选
   const applyFilters = () => {
     let filtered = [...typhoons];
 
@@ -390,7 +433,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
 
         if (latestPoint && latestPoint.latitude && latestPoint.longitude) {
           const lat = parseFloat(latestPoint.latitude);
-          const lng = parseFloat(latestPoint.longitude);
+          const lng = parseFloat(latestPoint.longitude); // 直接使用原始经度
 
           console.log(
             `✅ 地图定位到台风 ${typhoonId} 的中心位置: [${lat}, ${lng}]`
@@ -452,6 +495,13 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
     const movingSpeed = point.moving_speed;
     const movingDirection = point.moving_direction;
 
+    // 归一化经度值用于显示（仅用于Tooltip显示）
+    const normalizedLng = normalizeLongitudeForDisplay(point.longitude);
+
+    // 判断是东经还是西经
+    const lngDirection = normalizedLng >= 0 ? "东经" : "西经";
+    const lngValue = Math.abs(normalizedLng);
+
     return (
       <div style={{ minWidth: "220px", fontSize: "13px", lineHeight: "1.6" }}>
         <h4
@@ -469,8 +519,8 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
           {timestamp ? new Date(timestamp).toLocaleString("zh-CN") : "暂无数据"}
         </p>
         <p style={{ margin: "5px 0" }}>
-          <strong>位置：</strong>北纬 {point.latitude?.toFixed(2)}°，东经{" "}
-          {point.longitude?.toFixed(2)}°
+          <strong>位置：</strong>北纬 {point.latitude?.toFixed(2)}°，
+          {lngDirection} {lngValue?.toFixed(2)}°
         </p>
         <p style={{ margin: "5px 0" }}>
           <strong>中心气压：</strong>
@@ -758,11 +808,12 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
           style={{ width: "100%", height: "100%", zIndex: 1 }}
           ref={mapRef}
         >
-          {/* 地图控制器 - 用于动态定位和缩放监听 */}
+          {/* 地图控制器 - 用于动态定位、缩放监听和鼠标位置追踪 */}
           <MapController
             center={mapCenter}
             zoom={mapZoom}
             onZoomChange={setMapZoom}
+            onMouseMove={setMousePosition}
           />
 
           {/* 根据选择显示不同的地图图层 */}
@@ -855,7 +906,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
           {Array.from(pathsData.entries()).map(([typhoonId, pathPoints]) => {
             if (!pathPoints || pathPoints.length === 0) return null;
 
-            // 获取路径坐标
+            // 获取路径坐标 - 直接使用原始经度值
             const pathCoordinates = pathPoints.map((point) => [
               point.latitude,
               point.longitude,
@@ -948,20 +999,32 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                             }}
                           />
 
-                          {/* 台风眼中心点 - 使用台风图标 */}
+                          {/* 台风眼中心点 - 使用台风图标，显示完整路径点信息 */}
                           <Marker
                             position={[point.latitude, point.longitude]}
                             icon={createTyphoonIcon()}
                           >
                             <Tooltip
                               direction="top"
-                              offset={[0, -16]}
-                              opacity={0.9}
+                              offset={[0, -30]}
+                              opacity={0.95}
+                              permanent={false}
                             >
-                              <div
-                                style={{ fontSize: "12px", fontWeight: "bold" }}
-                              >
-                                台风眼中心
+                              <div>
+                                {createPopupContent(point)}
+                                <div
+                                  style={{
+                                    marginTop: "10px",
+                                    paddingTop: "10px",
+                                    borderTop: "1px solid #e0e0e0",
+                                    fontSize: "12px",
+                                    fontWeight: "bold",
+                                    color: "#667eea",
+                                    textAlign: "center",
+                                  }}
+                                >
+                                  台风眼中心
+                                </div>
                               </div>
                             </Tooltip>
                           </Marker>
@@ -988,26 +1051,23 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
 
                       if (!points || points.length === 0) return null;
 
-                      // 获取预测路径坐标
-                      const forecastCoordinates = points.map((point) => [
-                        point.latitude,
-                        point.longitude,
-                      ]);
-
-                      // 🔗 关键修复：将历史路径的最后一个点添加到预测路径的开头，实现路径连接
+                      // 🔗 将历史路径的最后一个点添加到预测路径的开头
                       const historicalPath = pathsData.get(typhoonId);
+                      let fullForecastPath = [...points];
                       if (historicalPath && historicalPath.length > 0) {
                         const lastHistoricalPoint =
                           historicalPath[historicalPath.length - 1];
-                        forecastCoordinates.unshift([
-                          lastHistoricalPoint.latitude,
-                          lastHistoricalPoint.longitude,
-                        ]);
+                        fullForecastPath.unshift(lastHistoricalPoint);
                       }
+
+                      // 获取预测路径坐标 - 直接使用原始经度值
+                      const forecastCoordinates = fullForecastPath.map(
+                        (point) => [point.latitude, point.longitude]
+                      );
 
                       return (
                         <React.Fragment key={`forecast-${typhoonId}-${agency}`}>
-                          {/* 预测路径线（虚线） */}
+                          {/* 渲染预测路径（虚线） */}
                           <Polyline
                             positions={forecastCoordinates}
                             color={color}
@@ -1017,72 +1077,79 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                           />
 
                           {/* 预测路径点 */}
-                          {points.map((point, index) => (
-                            <CircleMarker
-                              key={`forecast-${typhoonId}-${agency}-${index}`}
-                              center={[point.latitude, point.longitude]}
-                              radius={4}
-                              fillColor={color}
-                              color="white"
-                              weight={1}
-                              opacity={0.8}
-                              fillOpacity={0.6}
-                            >
-                              <Tooltip
-                                direction="top"
-                                offset={[0, -10]}
-                                opacity={0.9}
+                          {points.map((point, index) => {
+                            // 归一化经度用于显示（仅用于Tooltip显示）
+                            const normalizedLng = normalizeLongitudeForDisplay(
+                              point.longitude
+                            );
+
+                            return (
+                              <CircleMarker
+                                key={`forecast-${typhoonId}-${agency}-${index}`}
+                                center={[point.latitude, point.longitude]}
+                                radius={4}
+                                fillColor={color}
+                                color="white"
+                                weight={1}
+                                opacity={0.8}
+                                fillOpacity={0.6}
                               >
-                                <div
-                                  style={{
-                                    background: color,
-                                    color: "white",
-                                    padding: "2px 8px",
-                                    borderRadius: "4px",
-                                    marginBottom: "5px",
-                                    fontWeight: "bold",
-                                    fontSize: "11px",
-                                    textAlign: "center",
-                                  }}
+                                <Tooltip
+                                  direction="top"
+                                  offset={[0, -10]}
+                                  opacity={0.9}
                                 >
-                                  📊 {agency}预报
-                                </div>
-                                <div
-                                  style={{ fontSize: "12px", color: "#333" }}
-                                >
-                                  <div>
-                                    <strong>预报时间：</strong>
-                                    {new Date(
-                                      point.forecast_time
-                                    ).toLocaleString("zh-CN")}
+                                  <div
+                                    style={{
+                                      background: color,
+                                      color: "white",
+                                      padding: "2px 8px",
+                                      borderRadius: "4px",
+                                      marginBottom: "5px",
+                                      fontWeight: "bold",
+                                      fontSize: "11px",
+                                      textAlign: "center",
+                                    }}
+                                  >
+                                    📊 {agency}预报
                                   </div>
-                                  <div>
-                                    <strong>中心位置：</strong>
-                                    {point.latitude.toFixed(2)}°N,{" "}
-                                    {point.longitude.toFixed(2)}°E
+                                  <div
+                                    style={{ fontSize: "12px", color: "#333" }}
+                                  >
+                                    <div>
+                                      <strong>预报时间：</strong>
+                                      {new Date(
+                                        point.forecast_time
+                                      ).toLocaleString("zh-CN")}
+                                    </div>
+                                    <div>
+                                      <strong>中心位置：</strong>
+                                      {point.latitude.toFixed(2)}°N,{" "}
+                                      {normalizedLng.toFixed(2)}°E
+                                    </div>
+                                    {point.center_pressure && (
+                                      <div>
+                                        <strong>中心气压：</strong>
+                                        {point.center_pressure} hPa
+                                      </div>
+                                    )}
+                                    {point.max_wind_speed && (
+                                      <div>
+                                        <strong>最大风速：</strong>
+                                        {point.max_wind_speed} m/s
+                                      </div>
+                                    )}
+                                    {point.intensity && (
+                                      <div>
+                                        <strong>强度：</strong>
+                                        {point.intensity}
+                                      </div>
+                                    )}
                                   </div>
-                                  {point.center_pressure && (
-                                    <div>
-                                      <strong>中心气压：</strong>
-                                      {point.center_pressure} hPa
-                                    </div>
-                                  )}
-                                  {point.max_wind_speed && (
-                                    <div>
-                                      <strong>最大风速：</strong>
-                                      {point.max_wind_speed} m/s
-                                    </div>
-                                  )}
-                                  {point.intensity && (
-                                    <div>
-                                      <strong>强度：</strong>
-                                      {point.intensity}
-                                    </div>
-                                  )}
-                                </div>
-                              </Tooltip>
-                            </CircleMarker>
-                          ))}
+                                </Tooltip>
+                              </CircleMarker>
+                            );
+                          })}
                         </React.Fragment>
                       );
                     })}
@@ -1235,6 +1302,29 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
             }}
           >
             ❌ {pathError}
+          </div>
+        )}
+
+        {/* 鼠标位置经纬度显示 - 左下角，单行显示 */}
+        {mousePosition && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "10px",
+              left: "10px",
+              background: "rgba(255, 255, 255, 0.95)",
+              padding: "8px 12px",
+              borderRadius: "6px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+              zIndex: 1000,
+              fontSize: "11px",
+              fontFamily: "monospace",
+              color: "#333",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <strong>Latitude:</strong> {mousePosition.lat.toFixed(6)}° |{" "}
+            <strong>Longitude:</strong> {mousePosition.lng.toFixed(6)}°
           </div>
         )}
 

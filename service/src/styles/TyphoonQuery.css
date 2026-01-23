@@ -393,3 +393,188 @@
     opacity: 0.5;
   }
 }
+
+/* 台风下拉选择器样式 */
+.typhoon-dropdown-container {
+  position: relative;
+}
+
+.typhoon-dropdown-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 500px;
+  overflow: hidden;
+}
+
+.dropdown-content {
+  display: flex;
+  height: 100%;
+}
+
+/* 左侧年份选择区域 */
+.dropdown-years {
+  width: 150px;
+  background: #f9fafb;
+  border-right: 1px solid #e5e7eb;
+  padding: 16px 12px;
+  max-height: 450px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 美化滚动条样式 */
+.dropdown-years::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dropdown-years::-webkit-scrollbar-track {
+  background: #e5e7eb;
+  border-radius: 4px;
+}
+
+.dropdown-years::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.dropdown-years::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+.dropdown-years h4 {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.year-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.year-item {
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  color: #374151;
+  background: transparent;
+}
+
+.year-item:hover {
+  background: #e5e7eb;
+}
+
+.year-item.active {
+  background: #667eea;
+  color: white;
+  font-weight: 600;
+}
+
+/* 右侧台风卡片区域 */
+.dropdown-typhoons {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  max-height: 500px;
+}
+
+.dropdown-typhoons h4 {
+  margin: 0 0 16px 0;
+  font-size: 15px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.dropdown-loading,
+.dropdown-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.typhoon-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.typhoon-card {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.typhoon-card:hover {
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.3;
+}
+
+.card-id {
+  font-size: 12px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.status-badge.active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.inactive {
+  background: #f3f4f6;
+  color: #6b7280;
+}

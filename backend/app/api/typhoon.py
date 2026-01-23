@@ -77,6 +77,7 @@ async def get_typhoon(
     db: AsyncSession = Depends(get_db)
 ):
     """获取台风详情"""
+    # 查询台风基本信息
     query = select(Typhoon).where(Typhoon.typhoon_id == typhoon_id)
     result = await db.execute(query)
     typhoon = result.scalar_one_or_none()
@@ -84,7 +85,44 @@ async def get_typhoon(
     if not typhoon:
         raise HTTPException(status_code=404, detail="台风不存在")
 
-    return typhoon
+    # 查询台风路径数据，获取起始和结束位置
+    path_query = select(TyphoonPath).where(
+        TyphoonPath.typhoon_id == typhoon_id
+    ).order_by(TyphoonPath.timestamp.asc())
+
+    path_result = await db.execute(path_query)
+    paths = path_result.scalars().all()
+
+    # 构建响应数据
+    typhoon_dict = {
+        "id": typhoon.id,
+        "typhoon_id": typhoon.typhoon_id,
+        "typhoon_name": typhoon.typhoon_name,
+        "typhoon_name_cn": typhoon.typhoon_name_cn,
+        "year": typhoon.year,
+        "status": typhoon.status,
+        "start_location": None,
+        "end_location": None
+    }
+
+    # 提取起始位置（第一个观测点）
+    if paths and len(paths) > 0:
+        first_path = paths[0]
+        typhoon_dict["start_location"] = {
+            "latitude": first_path.latitude,
+            "longitude": first_path.longitude,
+            "timestamp": first_path.timestamp
+        }
+
+        # 提取结束位置（最后一个观测点）
+        last_path = paths[-1]
+        typhoon_dict["end_location"] = {
+            "latitude": last_path.latitude,
+            "longitude": last_path.longitude,
+            "timestamp": last_path.timestamp
+        }
+
+    return typhoon_dict
 
 
 @router.post("", response_model=TyphoonResponse)
@@ -120,6 +158,7 @@ async def get_typhoon_path(
     获取台风路径数据（按timestamp升序排序）
 
     统一从 typhoon_paths 表查询所有台风路径数据
+    直接返回数据库中的原始经度值，不做任何转换
     """
     query = select(TyphoonPath).where(
         TyphoonPath.typhoon_id == typhoon_id

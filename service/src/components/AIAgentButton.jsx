@@ -10,7 +10,6 @@ function AIAgentButton() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 如果当前在AI客服页面，不显示悬浮按钮
   if (location.pathname === "/AI_agent") {
     return null;
   }

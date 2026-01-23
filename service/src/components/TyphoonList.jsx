@@ -104,7 +104,7 @@ function TyphoonList({ selectedTyphoons, onTyphoonSelect }) {
       years.add(parseInt(filters.year));
     }
 
-    // 添加常见年份（2020-2026）确保用户可以切换
+    // 添加常见年份确保用户可以切换
     for (let year = 2020; year <= 2026; year++) {
       years.add(year);
     }

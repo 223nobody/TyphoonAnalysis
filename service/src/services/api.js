@@ -364,4 +364,56 @@ export const downloadReport = async (reportId, format = "pdf") => {
   window.open(url, "_blank");
 };
 
+// ========== AI客服API ==========
+
+/**
+ * 创建新会话
+ */
+export const createAISession = async () => {
+  return apiClient.post("/ai-agent/sessions");
+};
+
+/**
+ * 获取会话列表
+ */
+export const getAISessions = async () => {
+  return apiClient.get("/ai-agent/sessions");
+};
+
+/**
+ * 获取会话历史记录
+ * @param {string} sessionId - 会话ID
+ */
+export const getAISessionHistory = async (sessionId) => {
+  return apiClient.get(`/ai-agent/sessions/${sessionId}`);
+};
+
+/**
+ * 获取热门问题列表
+ */
+export const getAIQuestions = async () => {
+  return apiClient.get("/ai-agent/questions");
+};
+
+/**
+ * 发送问题并获取回答
+ * @param {string} sessionId - 会话ID
+ * @param {string} question - 问题内容
+ * @param {string} model - 模型类型 (deepseek/glm/qwen)
+ * @param {boolean} deepThinking - 是否启用深度思考模式
+ */
+export const askAIQuestion = async (
+  sessionId,
+  question,
+  model = "deepseek",
+  deepThinking = false
+) => {
+  return apiClient.post("/ai-agent/ask", {
+    session_id: sessionId,
+    question: question,
+    model: model,
+    deep_thinking: deepThinking,
+  });
+};
+
 export default apiClient;

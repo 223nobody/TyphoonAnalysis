@@ -1,7 +1,7 @@
 """
 Pydantic模式 - 台风数据
 """
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -15,6 +15,16 @@ class TyphoonBase(BaseModel):
     status: Optional[int] = 0  # 0=stop, 1=active
 
 
+class LocationInfo(BaseModel):
+    """位置信息模式"""
+    latitude: Optional[float] = Field(None, description="纬度")
+    longitude: Optional[float] = Field(None, description="经度")
+    timestamp: Optional[datetime] = Field(None, description="观测时间")
+
+    class Config:
+        from_attributes = True
+
+
 class TyphoonCreate(TyphoonBase):
     """创建台风"""
     pass
@@ -23,6 +33,8 @@ class TyphoonCreate(TyphoonBase):
 class TyphoonResponse(TyphoonBase):
     """台风响应"""
     id: int
+    start_location: Optional[LocationInfo] = Field(None, description="起始位置")
+    end_location: Optional[LocationInfo] = Field(None, description="结束位置")
 
     class Config:
         from_attributes = True
@@ -33,7 +45,7 @@ class TyphoonPathBase(BaseModel):
     typhoon_id: str
     timestamp: datetime
     latitude: float = Field(..., ge=-90, le=90)
-    longitude: float = Field(..., ge=-180, le=180)
+    longitude: float  # 不限制经度范围，允许任意值（如0-360度）
     center_pressure: Optional[float] = None
     max_wind_speed: Optional[float] = None
     moving_speed: Optional[float] = None
