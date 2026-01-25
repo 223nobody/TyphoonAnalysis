@@ -7,27 +7,21 @@ import axios from "axios";
 const API_BASE_URL = "/api";
 
 /**
- * 获取后端 API 基础 URL（从环境变量或默认值）
- */
-export const getBackendBaseURL = () => {
-  return import.meta.env.VITE_API_BASE_URL || "";
-};
-
-/**
  * Header 导航链接配置
+ * 使用相对路径，开发环境通过Vite代理转发到后端，生产环境由Nginx等反向代理处理
  */
 export const headerLinks = [
   {
     id: "api-docs",
     label: "📖 API文档",
-    path: "/docs",
+    path: "/docs", // 相对路径，会通过代理转发到后端
     target: "_blank",
     rel: "noopener noreferrer",
   },
   {
     id: "health",
     label: "💚 系统状态",
-    path: "/health",
+    path: "/health", // 相对路径，会通过代理转发到后端
     target: "_blank",
     rel: "noopener noreferrer",
   },
