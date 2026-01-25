@@ -14,6 +14,24 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // Swagger文档代理
+      "/docs": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+      // OpenAPI JSON代理
+      "/openapi.json": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+      // 健康检查代理
+      "/health": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+        secure: false,
+      },
       // 阿里云OSS视频代理（解决CORS跨域问题）
       "/oss-video": {
         target: "https://typhoonanalysis.oss-cn-wuhan-lr.aliyuncs.com",

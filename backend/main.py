@@ -67,7 +67,12 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="基于FastAPI + AI大模型的智能台风分析系统",
-    lifespan=lifespan
+    lifespan=lifespan,
+    # 配置 Swagger UI 使用国内可访问的 CDN
+    swagger_ui_parameters={
+        "syntaxHighlight.theme": "monokai",
+        "tryItOutEnabled": True,
+    },
 )
 
 # 配置CORS - 允许所有来源（开发环境）
@@ -87,32 +92,32 @@ app.include_router(prediction.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
 app.include_router(report.router, prefix="/api")
 app.include_router(crawler.router, prefix="/api")
-# 新增路由模块
 app.include_router(statistics.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
 app.include_router(alert.router, prefix="/api")
 app.include_router(ai_agent.router, prefix="/api")
-# 图像分析路由
 app.include_router(images.router)
 
 
 @app.get("/")
 async def root():
-    """根路径"""
     return {
         "message": "台风分析系统API",
         "version": settings.APP_VERSION,
+        "description": "基于FastAPI + AI大模型的智能台风分析系统",
         "docs": "/docs",
-        "redoc": "/redoc"
+        "redoc": "/redoc",
+        "health": "/health"
     }
 
 
 @app.get("/health")
 async def health_check():
-    """健康检查"""
+    """健康检查 - 返回服务状态和版本信息"""
     return {
         "status": "healthy",
-        "version": settings.APP_VERSION
+        "version": settings.APP_VERSION,
+        "service": "台风分析系统API"
     }
 if __name__ == "__main__":
     import uvicorn

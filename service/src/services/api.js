@@ -6,6 +6,33 @@ import axios from "axios";
 // API基础URL
 const API_BASE_URL = "/api";
 
+/**
+ * 获取后端 API 基础 URL（从环境变量或默认值）
+ */
+export const getBackendBaseURL = () => {
+  return import.meta.env.VITE_API_BASE_URL || "";
+};
+
+/**
+ * Header 导航链接配置
+ */
+export const headerLinks = [
+  {
+    id: "api-docs",
+    label: "📖 API文档",
+    path: "/docs",
+    target: "_blank",
+    rel: "noopener noreferrer",
+  },
+  {
+    id: "health",
+    label: "💚 系统状态",
+    path: "/health",
+    target: "_blank",
+    rel: "noopener noreferrer",
+  },
+];
+
 // 创建axios实例
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

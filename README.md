@@ -2,7 +2,7 @@
 
 ## 📋 项目简介
 
-台风分析系统是一个基于 **FastAPI + React + AI** 的智能台风数据分析与可视化平台。系统集成了台风数据爬取、实时监控、路径可视化、统计分析、智能预测、预警管理等功能，为气象研究和防灾减灾提供数据支持。
+台风分析系统是一个基于 **FastAPI + React + AI 大模型** 的智能台风数据分析与可视化平台。系统集成了台风数据爬取、实时监控、路径可视化、统计分析、智能预测、预警管理、AI 客服等功能，为气象研究和防灾减灾提供全方位的数据支持。
 
 ## ✨ 核心特性
 
@@ -10,30 +10,51 @@
 
 - 基于 Leaflet 的交互式地图展示
 - 支持多台风路径叠加显示
-- 根据强度等级动态着色
-- 实时路径点详情查看
+- 根据强度等级动态着色（蓝/绿/黄/橙/红/深红）
+- 实时路径点详情查看（时间、位置、气压、风速）
 - 年份范围：2000-2026 年
+- 支持台风名称/ID 搜索
 
 ### 📊 统计分析
 
-- 多维度数据统计（年度/月度/强度）
-- ECharts 图表可视化
+- 多维度数据统计（年度/月度/强度分布）
+- ECharts 图表可视化（折线图、柱状图、饼图）
 - 趋势分析与对比
-- 数据导出（JSON/CSV）
+- 数据导出（JSON/CSV 格式）
+- 支持单个/批量导出
 
-### 🤖 智能预测
+### 🤖 AI 智能客服
 
-- 基于 AI 模型的路径预测
+- 集成 DeepSeek、GLM、Qwen 等多个 AI 模型
+- 支持深度思考模式（DeepSeek-R1）
+- 台风专业知识问答
+- 对话历史记录管理
+- 热门问题快速回复
+- 模型自动降级和重试机制
+
+### 🖼️ 图像分析
+
+- 卫星云图智能分析
+- 支持红外/可见光图像
+- 多种分析模式（基础/高级/OpenCV/融合）
+- AI 模型提取台风特征
+- 图像上传和管理
+
+### 🔮 智能预测
+
+- 基于 LSTM 模型的路径预测
 - 支持 24/48/72 小时预测
 - 预测置信度评估
 - 预测结果可视化
+- 多机构预报路径对比
 
 ### ⚠️ 预警管理
 
 - 多级别预警系统（蓝/黄/橙/红）
-- 预警信息发布与管理
+- 实时预警信息发布
 - 区域预警覆盖
-- 预警历史记录
+- 预警历史记录查询
+- 自动爬取官方预警数据
 
 ### 🕷️ 自动数据爬取
 
@@ -41,26 +62,39 @@
 - 自动更新活跃台风信息
 - 历史数据补充
 - 失败重试机制
+- 爬虫日志记录
+
+### 📈 报告生成
+
+- AI 自动生成台风分析报告
+- 支持综合报告、预测报告、影响评估
+- 多种 AI 模型可选
+- 报告导出（PDF/Word）
 
 ## 🏗️ 技术架构
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     前端层 (Frontend)                    │
-│  React 18 + Leaflet + ECharts + Axios + Vite           │
-│  端口: 3000                                             │
+│  React 18 + Ant Design X + Leaflet + ECharts + Vite   │
+│  端口: 5173                                             │
 └─────────────────────────────────────────────────────────┘
                             ↓ HTTP/REST API
 ┌─────────────────────────────────────────────────────────┐
 │                     后端层 (Backend)                     │
-│  FastAPI + SQLAlchemy + APScheduler + aiohttp          │
+│  FastAPI + SQLAlchemy + APScheduler + httpx            │
 │  端口: 8000                                             │
 └─────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────┐
 │                   数据层 (Database)                      │
 │  SQLite (开发) / PostgreSQL (生产)                      │
-│  表: typhoons, typhoon_paths, alerts, predictions      │
+│  表: typhoons, paths, alerts, predictions, images      │
+└─────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────┐
+│                   AI 服务层 (AI Services)                │
+│  DeepSeek + GLM + Qwen (通过 aiping.cn 统一接口)       │
 └─────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -81,19 +115,30 @@ TyphoonAnalysis/
 │   │   │   ├── prediction.py  # 预测API
 │   │   │   ├── export.py      # 导出API
 │   │   │   ├── alert.py       # 预警API
-│   │   │   └── crawler.py     # 爬虫API
+│   │   │   ├── crawler.py     # 爬虫API
+│   │   │   ├── analysis.py    # 分析API
+│   │   │   ├── report.py      # 报告API
+│   │   │   ├── ai_agent.py    # AI客服API
+│   │   │   └── v1/
+│   │   │       └── images.py  # 图像分析API
 │   │   ├── core/              # 核心配置
 │   │   │   ├── config.py      # 应用配置
 │   │   │   └── database.py    # 数据库配置
 │   │   ├── models/            # 数据模型
+│   │   │   ├── typhoon.py     # 台风相关模型
+│   │   │   └── image.py       # 图像相关模型
 │   │   ├── schemas/           # Pydantic模式
+│   │   │   └── typhoon.py     # 数据验证模式
 │   │   └── services/          # 业务逻辑
-│   │       ├── crawler.py     # 爬虫服务
-│   │       ├── scheduler.py   # 定时任务
-│   │       └── predictor.py   # 预测服务
+│   │       ├── ai/            # AI服务
+│   │       ├── crawler/       # 爬虫服务
+│   │       ├── image/         # 图像处理
+│   │       ├── lstm/          # LSTM预测
+│   │       └── scheduler/     # 定时任务
 │   ├── main.py                # 应用入口
 │   ├── data.py                # 数据导入脚本
 │   ├── requirements.txt       # Python依赖
+│   ├── .env                   # 环境变量配置
 │   └── README.md              # 后端文档
 │
 ├── service/                    # 前端应用
@@ -102,15 +147,23 @@ TyphoonAnalysis/
 │   │   │   ├── MapVisualization.jsx    # 地图可视化
 │   │   │   ├── StatisticsPanel.jsx     # 统计分析
 │   │   │   ├── PredictionPanel.jsx     # 预测功能
-│   │   │   └── AlertPanel.jsx          # 预警管理
+│   │   │   ├── AlertPanel.jsx          # 预警管理
+│   │   │   ├── AIAgent.jsx             # AI客服
+│   │   │   └── ImageAnalysis.jsx       # 图像分析
 │   │   ├── services/          # API服务
 │   │   │   └── api.js         # API封装
 │   │   ├── styles/            # 样式文件
+│   │   │   ├── AIAgent.css    # AI客服样式
+│   │   │   └── ...
 │   │   ├── App.jsx            # 根组件
 │   │   └── main.jsx           # 入口文件
 │   ├── package.json           # Node依赖
 │   ├── vite.config.js         # Vite配置
 │   └── README.md              # 前端文档
+│
+├── docs/                       # 项目文档
+│   ├── 图像分析功能设计方案.md
+│   └── 图像分析功能重构总结.md
 │
 └── README.md                   # 项目总文档（本文件）
 ```
@@ -138,11 +191,61 @@ git clone <repository-url>
 cd TyphoonAnalysis
 ```
 
-#### 2. 启动后端服务
+#### 2. 配置后端环境变量
+
+在 `backend` 目录下创建 `.env` 文件：
 
 ```bash
-# 进入后端目录
 cd backend
+```
+
+创建 `.env` 文件并添加以下配置：
+
+```env
+# 应用配置
+APP_NAME=台风分析系统
+APP_VERSION=2.0.0
+DEBUG=True
+SECRET_KEY=your-secret-key-min-32-characters-long
+
+# 服务器配置
+HOST=0.0.0.0
+PORT=8000
+
+# 数据库配置
+DATABASE_URL=sqlite+aiosqlite:///./typhoon_analysis.db
+
+# AI 服务配置（统一使用 aiping.cn 接口）
+AI_API_KEY=your-ai-api-key-here
+AI_API_BASE_URL=https://aiping.cn/api/v1
+
+# AI 模型配置
+DEEPSEEK_MODEL=deepseek-reasoner              # 深度思考模型
+DEEPSEEK_NOTHINK_MODEL=DeepSeek-R1-0528       # 非深度思考模型
+GLM_MODEL=glm-4-plus                          # GLM 模型
+QWEN_TEXT_MODEL=qwen-plus                     # Qwen 文本模型
+QWEN_VL_MODEL=qwen-vl-max                     # Qwen 视觉模型
+
+# 爬虫配置
+CRAWLER_ENABLED=True
+CRAWLER_INTERVAL_MINUTES=10
+CRAWLER_START_ON_STARTUP=True
+
+# 日志配置
+LOG_LEVEL=INFO
+LOG_FILE=logs/app.log
+```
+
+**重要提示**：
+
+- 请将 `your-ai-api-key-here` 替换为您的实际 AI API 密钥
+- 请将 `your-secret-key-min-32-characters-long` 替换为至少 32 位的随机字符串
+- 可以从 [aiping.cn](https://aiping.cn) 获取 AI API 密钥
+
+#### 3. 启动后端服务
+
+```bash
+# 确保在 backend 目录下
 
 # 创建虚拟环境（推荐）
 python -m venv venv
@@ -162,7 +265,7 @@ python main.py
 
 后端服务将在 `http://localhost:8000` 启动
 
-#### 3. 启动前端应用
+#### 4. 启动前端应用
 
 ```bash
 # 打开新终端，进入前端目录
@@ -181,10 +284,11 @@ yarn dev
 
 前端应用将在 `http://localhost:5173` 启动
 
-#### 4. 访问应用
+#### 5. 访问应用
 
 - **前端界面**: http://localhost:5173
 - **后端 API 文档**: http://localhost:8000/docs
+- **ReDoc 文档**: http://localhost:8000/redoc
 - **健康检查**: http://localhost:8000/health
 
 ## 📖 使用指南
@@ -196,7 +300,7 @@ yarn dev
 3. 可选择台风状态筛选（活跃/已停止）
 4. 点击台风卡片在地图上显示路径
 5. 勾选"多台风叠加显示"可同时查看多个台风
-6. 鼠标悬停在路径点上查看详细信息
+6. 鼠标悬停在路径点上查看详细信息（时间、位置、气压、风速、强度）
 
 ### 2. 统计分析
 
@@ -206,7 +310,26 @@ yarn dev
 4. 点击"查询"生成图表
 5. 可导出统计数据（JSON/CSV 格式）
 
-### 3. 台风预测
+### 3. AI 智能客服
+
+1. 点击"AI 客服"进入对话界面
+2. 选择 AI 模型（DeepSeek/GLM/Qwen）
+3. 开启/关闭"深度思考"模式
+   - 开启：使用 DeepSeek-R1 深度思考模型（更准确但较慢）
+   - 关闭：使用常规模型（更快）
+4. 输入问题并发送
+5. 查看 AI 回答和对话历史
+6. 可点击热门问题快速提问
+
+### 4. 图像分析
+
+1. 进入"图像分析"面板
+2. 上传卫星云图（支持红外/可见光图像）
+3. 选择分析模式（基础/高级/OpenCV/融合）
+4. 点击"开始分析"
+5. 查看 AI 分析结果和提取的台风特征
+
+### 5. 台风预测
 
 1. 进入"台风预测"面板
 2. 选择要预测的台风
@@ -214,7 +337,7 @@ yarn dev
 4. 点击"开始预测"
 5. 查看预测路径和置信度
 
-### 4. 预警管理
+### 6. 预警管理
 
 1. 进入"预警管理"面板
 2. 查看当前所有预警信息
@@ -222,7 +345,7 @@ yarn dev
 4. 点击"查看详情"了解预警详情
 5. 管理员可创建或删除预警
 
-### 5. 数据导出
+### 7. 数据导出
 
 1. 在统计分析或台风详情页面
 2. 点击"导出数据"按钮
@@ -236,22 +359,37 @@ yarn dev
 
 - **Base URL**: `http://localhost:8000/api`
 - **文档地址**: `http://localhost:8000/docs`
+- **ReDoc 文档**: `http://localhost:8000/redoc`
 - **认证方式**: 暂无（开发环境）
 
 ### 主要端点
 
-| 端点                   | 方法 | 说明         |
-| ---------------------- | ---- | ------------ |
-| `/typhoons`            | GET  | 获取台风列表 |
-| `/typhoons/{id}`       | GET  | 获取台风详情 |
-| `/typhoons/{id}/path`  | GET  | 获取台风路径 |
-| `/statistics`          | GET  | 获取统计数据 |
-| `/export/typhoon/{id}` | GET  | 导出台风数据 |
-| `/export/batch`        | POST | 批量导出     |
-| `/predictions/predict` | POST | 预测台风路径 |
-| `/alerts`              | GET  | 获取预警列表 |
-| `/alerts`              | POST | 创建预警     |
-| `/crawler/trigger`     | POST | 触发爬虫     |
+| 端点                       | 方法 | 说明             |
+| -------------------------- | ---- | ---------------- |
+| `/typhoons`                | GET  | 获取台风列表     |
+| `/typhoons/{id}`           | GET  | 获取台风详情     |
+| `/typhoons/{id}/path`      | GET  | 获取台风路径     |
+| `/typhoons/{id}/forecast`  | GET  | 获取预报路径     |
+| `/statistics/yearly`       | GET  | 获取年度统计     |
+| `/statistics/intensity`    | GET  | 获取强度统计     |
+| `/statistics/comparison`   | POST | 台风对比分析     |
+| `/export/typhoon/{id}`     | GET  | 导出台风数据     |
+| `/export/batch`            | POST | 批量导出         |
+| `/prediction/path`         | POST | 预测台风路径     |
+| `/prediction/intensity`    | POST | 预测台风强度     |
+| `/alert/active`            | GET  | 获取活跃预警     |
+| `/alert/history`           | GET  | 获取预警历史     |
+| `/crawler/trigger`         | POST | 手动触发爬虫     |
+| `/crawler/status`          | GET  | 获取爬虫状态     |
+| `/ai-agent/sessions`       | POST | 创建 AI 对话会话 |
+| `/ai-agent/sessions`       | GET  | 获取会话列表     |
+| `/ai-agent/sessions/{id}`  | GET  | 获取会话历史     |
+| `/ai-agent/questions`      | GET  | 获取热门问题     |
+| `/ai-agent/ask`            | POST | 发送问题获取回答 |
+| `/api/images/upload`       | POST | 上传图像         |
+| `/api/images/analyze/{id}` | POST | 分析图像         |
+| `/api/images/typhoon/{id}` | GET  | 获取台风图像列表 |
+| `/report/generate`         | POST | 生成台风报告     |
 
 详细 API 文档请访问: http://localhost:8000/docs
 
@@ -429,9 +567,31 @@ python data.py
 
 ## 🔄 版本历史
 
+### v2.0.0 (2026-01-13)
+
+**新增功能**:
+
+- ✅ AI 智能客服系统（支持 DeepSeek、GLM、Qwen）
+- ✅ 深度思考模式（DeepSeek-R1）
+- ✅ 图像分析功能（卫星云图分析）
+- ✅ 多种图像分析模式（基础/高级/OpenCV/融合）
+- ✅ AI 报告生成功能
+- ✅ 对话历史管理
+- ✅ 热门问题快速回复
+- ✅ 模型自动降级和重试机制
+
+**优化改进**:
+
+- ✅ 统一 AI 服务接口（aiping.cn）
+- ✅ 优化前后端交互逻辑
+- ✅ 改进错误处理机制
+- ✅ 增强日志记录
+- ✅ 优化数据库查询性能
+
 ### v1.0.0 (2026-01-12)
 
-- ✅ 完成核心功能开发
+**核心功能**:
+
 - ✅ 台风路径可视化
 - ✅ 统计分析功能
 - ✅ 数据导出功能
@@ -443,18 +603,92 @@ python data.py
 
 ### 未来计划
 
-- 🔲 移动端适配
-- 🔲 实时推送通知
-- 🔲 用户权限管理
-- 🔲 更多 AI 预测模型
-- 🔲 国际化支持
-- 🔲 数据可视化增强
+- 🔲 移动端适配（响应式设计）
+- 🔲 实时推送通知（WebSocket）
+- 🔲 用户权限管理系统
+- 🔲 更多 AI 预测模型集成
+- 🔲 国际化支持（多语言）
+- 🔲 数据可视化增强（3D 路径）
+- 🔲 台风影响范围预测
+- 🔲 历史台风相似度分析
+- 🔲 微信小程序版本
+- 🔲 Docker 容器化部署
 
 ### 代码规范
 
 - Python: 遵循 PEP 8
 - JavaScript: 使用 4 空格缩进
 - 提交信息: 使用约定式提交格式
+
+### 数据来源
+
+## 当前台风
+
+- [台风快讯](http://www.nmc.cn/publish/typhoon/typhoon_new.html) -> iframe
+- [SSD 当前台风](http://www.ssd.noaa.gov/PS/TROP/Basin_WestPac.html) -> iframe
+- [tropicaltidbits](https://www.tropicaltidbits.com/storminfo/) -> speedDail
+- [colostate](http://rammb.cira.colostate.edu/products/tc_realtime/) -> speedDail
+- [WISC](http://tropic.ssec.wisc.edu/) -> speedDail
+- [JMA](http://www.jma.go.jp/en/typh/) -> iframe
+- [JTWC](http://www.metoc.navy.mil/jtwc/jtwc.html) -> speedDail
+- [NRL(Blocked)](https://www.nrlmry.navy.mil/tc-bin/tc_home2.cgi) -> speedDail
+- [数字台风网](http://agora.ex.nii.ac.jp/digital-typhoon/) -> speedDail
+
+## 数值/路径
+
+- [机构汇总](http://www.typhoon2000.ph/multi/log.php) -> speedDail
+- [RUC 模式集合预报](https://ruc.noaa.gov/hfip/tceps/) -> speedDail
+- [tropicaltidbits](https://www.tropicaltidbits.com/analysis/models/) -> speedDail
+- [EMC 气旋追踪](http://www.emc.ncep.noaa.gov/gmb/tpm/emchurr/tcgen/) -> speedDail
+- [12121](http://www.gd12121.com:8080/special/typhoonpattern/page/typhoonpattern.asp) -> speedDail
+
+## 报文
+
+[SSD 机构报文集合](http://www.ssd.noaa.gov/PS/TROP/bulletins.html) -> speedDail
+
+[SSD 机构 ADT 分析集合](http://www.ssd.noaa.gov/PS/TROP/adt.html) -> speedDail
+
+[WISC ADT 分析](http://tropic.ssec.wisc.edu/real-time/adt/adt.html) -> speedDail
+
+[北京报文](http://www.nmc.cn/publish/typhoon/message.html) -> speedDail
+
+[信息中心北京报文](http://10.148.8.228/to_pros_typonmessage.action?name=bjtfdwb) -> speedDail
+
+[unisys 报文合集](http://www.weather.unisys.com/hurricane/archive/18040206) -> 根据系统时间动态生成链接
+
+## 卫星
+
+[WISC BD 色阶](http://tropic.ssec.wisc.edu/real-time/westpac/images/irbdgms5kml.GIF) -> image
+
+[WISC NG 色阶](http://tropic.ssec.wisc.edu/real-time/westpac/images/kml/irngmskml.GIF) -> image
+
+[SSD 西太](http://www.ssd.noaa.gov/imagery/twpac.html) -> image-TabGroup
+
+[col-Himawari 圆盘图](http://col.st/t8E3d) -> speedDail
+
+[col 热带](http://rammb.cira.colostate.edu/ramsdis/online/himawari-8.asp) -> speedDail
+
+[NICT 葵花 8 即时](https://himawari8.nict.go.jp/) -> speedDail
+
+[JMA 葵花卫星](http://www.data.jma.go.jp/mscweb/data/himawari/sat_img.php?area=se2) -> speedDail
+
+[风云 4](http://fy4.nsmc.org.cn/nsmc/cn/image/animation.html) -> speedDail
+
+## 相关链接
+
+- [台湾中央气象局](https://www.cwb.gov.tw/)
+- [香港天文台](http://gb.weather.gov.hk/contentc.htm)
+- [澳门地球物理暨氣象局](http://www.smg.gov.mo/smg/c_index.htm)
+- [菲律宾 PAGASA](https://www1.pagasa.dost.gov.ph/)
+- [日本气象厅-风观测](http://www.jma.go.jp/en/amedas/000.html?elementCode=1)
+
+- [德法强度表](http://www.ssd.noaa.gov/PS/TROP/CI-chart.html)
+- [氣象常用表單位換算](http://photino.cwb.gov.tw/rdcweb/lib/comput1.htm#1)
+- [计量单位换算](http://photino.cwb.gov.tw/rdcweb/lib/comput2.htm)
+- [海平面气压订正](http://www.ab126.com/Geography/2204.html)
+
+- [百度台风吧](https://tieba.baidu.com/f?kw=%E5%8F%B0%E9%A3%8E)
+- [台风论坛](http://bbs.typhoon.org.cn/index.php?c=thread&fid=79)
 
 ## 🙏 致谢
 
@@ -469,6 +703,5 @@ python data.py
 - [前端文档](service/README.md)
 - [后端文档](backend/README.md)
 - [API 文档](http://localhost:8000/docs)
-- [问题反馈](https://github.com/your-repo/issues)
 
 **🌟 如果这个项目对您有帮助，请给我们一个 Star！**
