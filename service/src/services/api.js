@@ -30,7 +30,7 @@ export const headerLinks = [
 // 创建axios实例
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 120000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -60,7 +60,10 @@ apiClient.interceptors.response.use(
     // 改进错误信息提取逻辑
     let message = "请求失败";
 
-    if (error.response) {
+    if (error.code === "ECONNABORTED" && error.message.includes("timeout")) {
+      // 请求超时
+      message = "请求超时，AI 服务响应时间过长，请稍后重试";
+    } else if (error.response) {
       // 服务器返回了错误响应
       const data = error.response.data;
       if (typeof data === "string") {
@@ -429,12 +432,18 @@ export const askAIQuestion = async (
   model = "deepseek",
   deepThinking = false
 ) => {
-  return apiClient.post("/ai-agent/ask", {
-    session_id: sessionId,
-    question: question,
-    model: model,
-    deep_thinking: deepThinking,
-  });
+  return apiClient.post(
+    "/ai-agent/ask",
+    {
+      session_id: sessionId,
+      question: question,
+      model: model,
+      deep_thinking: deepThinking,
+    },
+    {
+      timeout: 120000,
+    }
+  );
 };
 
 export default apiClient;

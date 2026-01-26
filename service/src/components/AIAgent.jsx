@@ -115,25 +115,62 @@ function AIAgent() {
     setInputText("");
 
     try {
+      console.log("📤 开始发送问题到后端...", {
+        sessionId: currentSessionId,
+        question: content,
+        model: selectedModel,
+        deepThinking: deepThinking,
+      });
+
       const data = await askAIQuestion(
         currentSessionId,
         content,
         selectedModel,
         deepThinking
       );
+
+      console.log("📥 收到后端响应:", data);
+
+      // 验证响应数据格式
+      if (!data || typeof data.answer !== "string") {
+        console.error("❌ 后端返回数据格式错误:", data);
+        throw new Error("后端返回数据格式错误");
+      }
+
       const botMessage = {
         key: `ai_${Date.now()}`,
         role: "ai",
         content: data.answer,
         timestamp: new Date().toISOString(),
       };
+
+      console.log("✅ 准备添加 AI 消息到界面:", botMessage);
       setMessages((prev) => [...prev, botMessage]);
 
       // 刷新会话列表
       loadSessions();
+
+      console.log("✅ 消息发送成功");
     } catch (error) {
-      console.error("发送消息失败:", error);
-      message.error("发送消息失败，请稍后重试");
+      console.error("❌ 发送消息失败:", error);
+      console.error("❌ 错误详情:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
+
+      // 根据错误类型显示不同的提示
+      if (error.message.includes("timeout") || error.message.includes("超时")) {
+        message.error(
+          `请求超时：${
+            deepThinking ? "深度思考模式" : "AI 服务"
+          }响应时间过长，请稍后重试`
+        );
+      } else if (error.message.includes("数据格式错误")) {
+        message.error("AI 回答格式异常，请重试或联系管理员");
+      } else {
+        message.error(`发送消息失败：${error.message}`);
+      }
     } finally {
       setSending(false);
     }
@@ -248,7 +285,9 @@ function AIAgent() {
     variant: msg.role === "user" ? "filled" : "shadow",
     content: (
       <div className="message-with-time">
-        <div className="message-content">{msg.content}</div>
+        <div className="message-content" style={{ whiteSpace: "pre-wrap" }}>
+          {msg.content}
+        </div>
         <div className="message-timestamp">
           {formatTimestamp(msg.timestamp)}
         </div>

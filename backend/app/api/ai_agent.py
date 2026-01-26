@@ -1,4 +1,4 @@
-"""
+﻿"""
 AI客服API接口
 """
 from fastapi import APIRouter, Depends, HTTPException
@@ -126,7 +126,8 @@ async def call_ai_service_with_retry(
     model_key: str,
     model_name: str,
     question: str,
-    max_retries: int = 2
+    max_retries: int = 2,
+    use_thinking_config: bool = False
 ) -> Tuple[str, bool]:
     """
     调用AI服务并支持重试机制
@@ -136,6 +137,7 @@ async def call_ai_service_with_retry(
         model_name: 实际的模型名称
         question: 用户问题
         max_retries: 最大重试次数
+        use_thinking_config: 是否使用深度思考模式的专用配置
 
     Returns:
         (answer, success): 回答内容和是否成功的标志
@@ -147,24 +149,46 @@ async def call_ai_service_with_retry(
     # 优化的系统提示词
     system_prompt = """你是一个通用型智能助手，具备多领域的知识解答能力，需严格遵循以下规则：
 
-1. 核心能力：
-   - 通用知识解答：回答生活、科技、文化、教育、气象、职场等多领域的常见问题；
-   - 逻辑分析：针对用户的问题提供清晰、有条理的分析和解决方案；
-   - 信息解读：用通俗易懂的语言解释专业概念、数据和规则；
-   - 建议给出：基于客观事实为用户提供合理、可落地的建议；
-   - 多轮对话：结合历史上下文保持回答的连贯性和一致性。
+【核心能力】
+- 通用知识解答：回答生活、科技、文化、教育、气象、职场等多领域的常见问题
+- 逻辑分析：针对用户的问题提供清晰、有条理的分析和解决方案
+- 信息解读：用通俗易懂的语言解释专业概念、数据和规则
+- 建议给出：基于客观事实为用户提供合理、可落地的建议
+- 多轮对话：结合历史上下文保持回答的连贯性和一致性
 
-2. 回答准则（强制遵守）：
-   - 格式要求：
-     1. 仅使用纯文本回答,禁止使用任何markdown标记(包括**、###、---、` `、🔍、📱等符号/表情);
-     2. 复杂问题优先用数字序号分点说明,层级用“1.1/1.2”或“-”区分，避免杂乱排版;
-     3. 使用数字序号分点说明时每个分点回答完需要换行;
-     4. 关键信息直接陈述，无需额外装饰性符号，保持文本整洁;
-     5. 回答内容不能少于400字;
-   - 风格要求：专业、简洁、易懂，根据问题领域适配语气（气象与科学问题偏严谨）；
+【回答格式要求（必须严格遵守）】
+1. 禁止使用任何Markdown标记
+   - 不使用：**粗体**、###标题、---分隔线、`代码`、表情符号等
+   - 只使用纯文本格式
+
+2. 必须使用数字序号分点回答
+   - 主要观点使用：1. 2. 3. 等数字序号
+   - 次级内容使用：1.1 1.2 或 - 符号作为子项
+   - 每个分点回答完毕后必须换行
+3. 格式示例
+   正确格式：
+   1. 第一个要点的标题
+   这里是第一个要点的详细说明内容，可以多行描述。
+   
+   1.1 第一个要点的子项
+   子项的详细说明。
+   
+   2. 第二个要点的标题
+   这里是第二个要点的详细说明内容。
+
+4. 内容要求
+   - 回答内容不少于200字
+   - 层级清晰，使用适当缩进
+   - 关键信息直接陈述，保持文本整洁
+   - 避免杂乱排版，确保易读性
+
+【风格要求】
+- 专业、简洁、易懂
+- 根据问题领域适配语气（气象与科学问题偏严谨，生活问题偏亲和）
+- 保持客观中立，基于事实回答
+
 """
 
-    # 【优化2】调整模型参数，提升规范性
     payload = {
         "model": model_name,
         "messages": [
@@ -180,8 +204,19 @@ async def call_ai_service_with_retry(
         "stop": None
     }
 
+    # 根据是否使用深度思考模式选择不同的API配置
+    if use_thinking_config:
+        # 深度思考模式：使用专用的API配置
+        api_key = settings.AI_API_KEY_THINKING if settings.AI_API_KEY_THINKING else settings.AI_API_KEY
+        api_base_url = settings.AI_API_BASE_URL_THINKING if settings.AI_API_BASE_URL_THINKING else settings.AI_API_BASE_URL
+        logger.info(f"使用深度思考模式配置 - API Base URL: {api_base_url}")
+    else:
+        # 普通模式：使用默认的API配置
+        api_key = settings.AI_API_KEY
+        api_base_url = settings.AI_API_BASE_URL
+
     headers = {
-        "Authorization": f"Bearer {settings.AI_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
 
@@ -190,9 +225,11 @@ async def call_ai_service_with_retry(
         try:
             logger.info(f"尝试调用AI服务 - 模型: {model_key} ({model_name}), 尝试次数: {attempt + 1}/{max_retries}")
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            # 根据是否使用深度思考模式设置不同的超时时间
+            timeout_seconds = 120.0 if use_thinking_config else 60.0
+            async with httpx.AsyncClient(timeout=timeout_seconds) as client:
                 response = await client.post(
-                    f"{settings.AI_API_BASE_URL}/chat/completions",
+                    f"{api_base_url}/chat/completions",
                     json=payload,
                     headers=headers
                 )
@@ -208,14 +245,14 @@ async def call_ai_service_with_retry(
                 else:
                     logger.warning(f"AI服务返回空回答 - 模型: {model_key}")
                     if attempt < max_retries - 1:
-                        await asyncio.sleep(1)  # 等待1秒后重试
+                        await asyncio.sleep(2)  # 等待2秒后重试
                         continue
                     return "", False
 
         except httpx.TimeoutException:
             logger.warning(f"AI服务请求超时 - 模型: {model_key}, 尝试次数: {attempt + 1}/{max_retries}")
             if attempt < max_retries - 1:
-                await asyncio.sleep(1)  # 等待1秒后重试
+                await asyncio.sleep(3)  # 等待3秒后重试
                 continue
             return "", False
 
@@ -225,14 +262,14 @@ async def call_ai_service_with_retry(
 
             # 对于503等临时错误，进行重试
             if status_code in [503, 502, 504] and attempt < max_retries - 1:
-                await asyncio.sleep(2)  # 等待2秒后重试
+                await asyncio.sleep(3)  # 等待3秒后重试
                 continue
             return "", False
 
         except Exception as e:
             logger.warning(f"调用AI服务异常 - 模型: {model_key}, 错误: {str(e)}, 尝试次数: {attempt + 1}/{max_retries}")
             if attempt < max_retries - 1:
-                await asyncio.sleep(1)  # 等待1秒后重试
+                await asyncio.sleep(2)  # 等待2秒后重试
                 continue
             return "", False
 
@@ -269,15 +306,15 @@ async def ask_question(request: AskRequest, db: AsyncSession = Depends(get_db)):
 
             # 根据深度思考模式和用户选择的模型，确定实际使用的模型
             if request.deep_thinking:
-                # 启用深度思考模式：不管选择什么模型，都使用 DEEPSEEK_MODEL
-                actual_model_name = settings.DEEPSEEK_MODEL
+                # 启用深度思考模式：不管选择什么模型，都使用 DEEPSEEK_MODEL_THINKING
+                actual_model_name = settings.DEEPSEEK_MODEL_THINKING
                 actual_model_key = "deepseek"
                 logger.info(f"深度思考模式已启用，强制使用 DeepSeek 深度思考模型: {actual_model_name}")
             else:
                 # 未启用深度思考模式：根据用户选择的模型决定
                 if request.model == "deepseek":
                     # 选择 deepseek 且未启用深度思考，使用 DEEPSEEK_NOTHINK_MODEL
-                    actual_model_name = settings.DEEPSEEK_NOTHINK_MODEL
+                    actual_model_name = settings.DEEPSEEK_MODEL
                     actual_model_key = "deepseek"
                     logger.info(f"使用 DeepSeek 非深度思考模型: {actual_model_name}")
                 elif request.model == "glm":
@@ -287,13 +324,12 @@ async def ask_question(request: AskRequest, db: AsyncSession = Depends(get_db)):
                     actual_model_name = settings.QWEN_TEXT_MODEL
                     actual_model_key = "qwen"
                 else:
-                    # 默认使用 DEEPSEEK_NOTHINK_MODEL
-                    actual_model_name = settings.DEEPSEEK_NOTHINK_MODEL
+                    actual_model_name = settings.DEEPSEEK_MODEL
                     actual_model_key = "deepseek"
 
             # 模型映射（用于降级）
             model_map = {
-                "deepseek": settings.DEEPSEEK_NOTHINK_MODEL if not request.deep_thinking else settings.DEEPSEEK_MODEL,
+                "deepseek": settings.DEEPSEEK_MODEL if not request.deep_thinking else settings.DEEPSEEK_MODEL_THINKING,
                 "glm": settings.GLM_MODEL,
                 "qwen": settings.QWEN_TEXT_MODEL
             }
@@ -318,7 +354,8 @@ async def ask_question(request: AskRequest, db: AsyncSession = Depends(get_db)):
                 actual_model_key,
                 actual_model_name,
                 request.question,
-                max_retries=2
+                max_retries=2,
+                use_thinking_config=request.deep_thinking  # 深度思考模式使用专用配置
             )
 
             used_model = actual_model_key
@@ -341,7 +378,8 @@ async def ask_question(request: AskRequest, db: AsyncSession = Depends(get_db)):
                         fallback_key,
                         fallback_name,
                         request.question,
-                        max_retries=1  # 降级模型只重试1次
+                        max_retries=1,  # 降级模型只重试1次
+                        use_thinking_config=False  # 降级模型不使用深度思考配置
                     )
 
                     if success:
@@ -521,4 +559,5 @@ async def create_session():
         return {"session_id": new_session_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"创建会话失败: {str(e)}")
+
 

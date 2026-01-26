@@ -27,11 +27,14 @@ class Settings(BaseSettings):
     AI_API_KEY: str = Field(..., description="统一AI API密钥（用于DeepSeek、Qwen和GLM）")
     AI_API_BASE_URL: str = Field(default="https://aiping.cn/api/v1", description="统一AI API基础URL")
 
+    # 深度思考模式专用配置
+    AI_API_KEY_THINKING: str = Field(default="", description="深度思考模式专用API密钥")
+    AI_API_BASE_URL_THINKING: str = Field(default="", description="深度思考模式专用API基础URL")
+
     # AI模型名称配置
-    DEEPSEEK_MODEL: str = Field(default="", description="DeepSeek模型名称（深度思考模式）")
-    DEEPSEEK_NOTHINK_MODEL: str = Field(default="", description="DeepSeek模型名称（非深度思考模式）")
+    DEEPSEEK_MODEL: str = Field(default="", description="DeepSeek模型名称（非深度思考模式）")
+    DEEPSEEK_MODEL_THINKING: str = Field(default="", description="DeepSeek模型名称（深度思考模式）")
     QWEN_TEXT_MODEL: str = Field(default="", description="Qwen文本生成模型")
-    QWEN_VL_MODEL: str = Field(default="", description="Qwen视觉理解模型")
     GLM_MODEL: str = Field(default="", description="GLM模型名称")
 
 

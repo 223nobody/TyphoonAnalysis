@@ -25,7 +25,6 @@ class QwenService:
         self.timeout = 120  # 使用配置的超时时间
         self.max_tokens = 2000  # 使用配置的最大token数
         self.qwen_text_model = settings.QWEN_TEXT_MODEL  # 文本生成模型
-        self.qwen_vl_model = settings.QWEN_VL_MODEL  # 视觉理解模型
         self.max_retries = 3  # 最大重试次数
         self.retry_delay = 2  # 重试间隔（秒）
 
