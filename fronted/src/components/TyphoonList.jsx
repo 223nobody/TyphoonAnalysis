@@ -42,23 +42,13 @@ function TyphoonList({ selectedTyphoons, onTyphoonSelect }) {
       // 修复：后端返回的是 data.items，不是 data.typhoons
       if (data && data.items && Array.isArray(data.items)) {
         setTyphoons(data.items);
-        console.log(
-          `加载了 ${data.items.length} 个台风数据（年份：${
-            filters.year || "全部"
-          }）`
-        );
       } else if (data && Array.isArray(data)) {
         // 兼容直接返回数组的情况
         setTyphoons(data);
-        console.log(
-          `加载了 ${data.length} 个台风数据（年份：${filters.year || "全部"}）`
-        );
       } else {
-        console.error("API返回数据格式错误:", data);
         setError("加载台风列表失败：数据格式错误");
       }
     } catch (err) {
-      console.error("加载台风列表失败:", err);
       setError(err.message || "加载失败，请检查后端服务是否正常运行");
     } finally {
       setLoading(false);

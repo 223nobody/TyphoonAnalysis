@@ -118,7 +118,7 @@ function MapController({ center, zoom, onZoomChange, onMouseMove }) {
   useEffect(() => {
     if (center && center.length === 2 && zoom) {
       console.log(
-        `🗺️ 地图定位到: [${center[0]}, ${center[1]}], 缩放级别: ${zoom}`
+        `🗺️ 地图定位到: [${center[0]}, ${center[1]}], 缩放级别: ${zoom}`,
       );
       map.setView(center, zoom, {
         animate: true,
@@ -252,7 +252,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
 
       // 检测新选中的台风并定位地图
       const newlySelected = Array.from(selectedTyphoons).find(
-        (id) => !prevSelectedTyphoons.has(id)
+        (id) => !prevSelectedTyphoons.has(id),
       );
 
       if (newlySelected) {
@@ -327,7 +327,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
         (t) =>
           t.typhoon_id.toLowerCase().includes(searchLower) ||
           t.typhoon_name.toLowerCase().includes(searchLower) ||
-          (t.typhoon_name_cn && t.typhoon_name_cn.includes(filters.search))
+          (t.typhoon_name_cn && t.typhoon_name_cn.includes(filters.search)),
       );
     }
 
@@ -381,7 +381,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
           // 只对活跃台风（status=1）请求预报数据
           if (!typhoonInfo || typhoonInfo.status !== 1) {
             console.log(
-              `台风 ${typhoonId} 不是活跃台风（status=${typhoonInfo?.status}），跳过预报数据请求`
+              `台风 ${typhoonId} 不是活跃台风（status=${typhoonInfo?.status}），跳过预报数据请求`,
             );
             continue;
           }
@@ -402,7 +402,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
 
       setForecastData(newForecastData);
       console.log(
-        `✅ 预测路径数据已更新，当前包含 ${newForecastData.size} 个台风的预测数据`
+        `✅ 预测路径数据已更新，当前包含 ${newForecastData.size} 个台风的预测数据`,
       );
     } catch (err) {
       console.error("加载预测路径失败:", err);
@@ -436,7 +436,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
           const lng = parseFloat(latestPoint.longitude); // 直接使用原始经度
 
           console.log(
-            `✅ 地图定位到台风 ${typhoonId} 的中心位置: [${lat}, ${lng}]`
+            `✅ 地图定位到台风 ${typhoonId} 的中心位置: [${lat}, ${lng}]`,
           );
 
           // 更新地图中心和缩放级别
@@ -453,7 +453,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
     }
   };
 
-  // 获取年份列表（从当前年份到2000年）- 修复年份范围
+  // 获取年份列表（从当前年份到2000年）
   const getYears = () => {
     const currentYear = new Date().getFullYear();
     const years = [];
@@ -495,7 +495,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
     const movingSpeed = point.moving_speed;
     const movingDirection = point.moving_direction;
 
-    // 归一化经度值用于显示（仅用于Tooltip显示）
+    // 归一化经度值用于显示
     const normalizedLng = normalizeLongitudeForDisplay(point.longitude);
 
     // 判断是东经还是西经
@@ -959,7 +959,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                             positions={generateIrregularWindCircle(
                               [point.latitude, point.longitude],
                               120,
-                              7
+                              7,
                             )}
                             pathOptions={{
                               fillColor: "rgba(200, 200, 200, 0.45)",
@@ -974,7 +974,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                             positions={generateIrregularWindCircle(
                               [point.latitude, point.longitude],
                               65,
-                              10
+                              10,
                             )}
                             pathOptions={{
                               fillColor: "rgba(255, 165, 0, 0.35)",
@@ -989,7 +989,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                             positions={generateIrregularWindCircle(
                               [point.latitude, point.longitude],
                               30,
-                              12
+                              12,
                             )}
                             pathOptions={{
                               fillColor: "rgba(255, 255, 0, 0.4)",
@@ -1062,7 +1062,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
 
                       // 获取预测路径坐标 - 直接使用原始经度值
                       const forecastCoordinates = fullForecastPath.map(
-                        (point) => [point.latitude, point.longitude]
+                        (point) => [point.latitude, point.longitude],
                       );
 
                       return (
@@ -1080,7 +1080,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                           {points.map((point, index) => {
                             // 归一化经度用于显示（仅用于Tooltip显示）
                             const normalizedLng = normalizeLongitudeForDisplay(
-                              point.longitude
+                              point.longitude,
                             );
 
                             return (
@@ -1119,7 +1119,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                                     <div>
                                       <strong>预报时间：</strong>
                                       {new Date(
-                                        point.forecast_time
+                                        point.forecast_time,
                                       ).toLocaleString("zh-CN")}
                                     </div>
                                     <div>
@@ -1155,7 +1155,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                     })}
                   </React.Fragment>
                 );
-              }
+              },
             )}
         </MapContainer>
 

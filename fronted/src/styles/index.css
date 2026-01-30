@@ -78,6 +78,50 @@ body {
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
 }
 
+.header-user {
+  position: absolute;
+  top: 30px;
+  right: 30px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 8px 16px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.user-info:hover {
+  background: #e5e7eb;
+}
+
+.user-info .username {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.header-user .login-link {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.header-user .login-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+}
+
 /* ========== 标签导航样式 ========== */
 .tabs {
   display: flex;

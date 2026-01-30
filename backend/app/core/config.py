@@ -63,6 +63,13 @@ class Settings(BaseSettings):
     IMAGES_DIR: str = "./data/images"
     MODELS_DIR: str = "./data/models"
 
+    # 阿里云OSS配置
+    OSS_ACCESS_KEY_ID: str = Field(default="", description="阿里云OSS AccessKey ID")
+    OSS_ACCESS_KEY_SECRET: str = Field(default="", description="阿里云OSS AccessKey Secret")
+    OSS_BUCKET_NAME: str = Field(default="", description="阿里云OSS Bucket名称")
+    OSS_REGION: str = Field(default="", description="阿里云OSS Region（如：oss-cn-wuhan）")
+    OSS_ENDPOINT: str = Field(default="", description="阿里云OSS Endpoint（如：oss-cn-wuhan-lr.aliyuncs.com）")
+
     class Config:
         env_file = ".env"
         case_sensitive = True

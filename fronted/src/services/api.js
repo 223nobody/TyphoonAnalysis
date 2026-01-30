@@ -7,56 +7,42 @@ import axios from "axios";
 const API_BASE_URL = "/api";
 
 /**
- * Header 导航链接配置
- * 使用相对路径，开发环境通过Vite代理转发到后端，生产环境由Nginx等反向代理处理
+ * Header 导航接口路由配置
+ * 仅配置接口路由路径，不包含样式和显示逻辑
  */
-export const headerLinks = [
-  {
-    id: "api-docs",
-    label: "📖 API文档",
-    path: "/docs", // 相对路径，会通过代理转发到后端
-    target: "_blank",
-    rel: "noopener noreferrer",
-  },
-  {
-    id: "health",
-    label: "💚 系统状态",
-    path: "/health", // 相对路径，会通过代理转发到后端
-    target: "_blank",
-    rel: "noopener noreferrer",
-  },
-];
+export const headerRoutes = {
+  apiDocs: "/docs",
+  apiHealth: "/health",
+};
 
 // 创建axios实例
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 120000,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
-// 请求拦截器
+//请求拦截器
 apiClient.interceptors.request.use(
   (config) => {
-    console.log(`🚀 API请求: ${config.method?.toUpperCase()} ${config.url}`);
+    // 添加认证令牌到请求头
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
     return config;
   },
   (error) => {
-    console.error("❌ 请求错误:", error);
     return Promise.reject(error);
-  }
+  },
 );
 
 // 响应拦截器
 apiClient.interceptors.response.use(
   (response) => {
-    console.log(`✅ API响应: ${response.config.url}`, response.data);
     return response.data;
   },
   (error) => {
-    console.error("❌ 响应错误:", error);
-
     // 改进错误信息提取逻辑
     let message = "请求失败";
 
@@ -83,9 +69,8 @@ apiClient.interceptors.response.use(
       message = error.message;
     }
 
-    console.error("❌ 错误信息:", message);
     return Promise.reject(new Error(message));
-  }
+  },
 );
 
 // ========== 台风数据API ==========
@@ -186,7 +171,7 @@ export const getTyphoonForecast = async (typhoonId) => {
 export const exportTyphoon = async (
   typhoonId,
   format = "csv",
-  includePath = true
+  includePath = true,
 ) => {
   const url = `${API_BASE_URL}/export/typhoon/${typhoonId}?format=${format}&include_path=${includePath}`;
   window.open(url, "_blank");
@@ -198,7 +183,7 @@ export const exportTyphoon = async (
 export const exportBatchTyphoons = async (
   typhoonIds,
   format = "csv",
-  includePath = true
+  includePath = true,
 ) => {
   try {
     const response = await fetch(`${API_BASE_URL}/export/batch`, {
@@ -318,10 +303,10 @@ export const uploadImage = async (file, typhoonId = null) => {
 export const analyzeImage = async (
   imageId,
   analysisType = "fusion",
-  imageType = "infrared"
+  imageType = "infrared",
 ) => {
   return apiClient.post(
-    `/images/analyze/${imageId}?analysis_type=${analysisType}&image_type=${imageType}`
+    `/images/analyze/${imageId}?analysis_type=${analysisType}&image_type=${imageType}`,
   );
 };
 
@@ -331,7 +316,7 @@ export const analyzeImage = async (
 export const getTyphoonImages = async (
   typhoonId,
   imageType = null,
-  limit = 20
+  limit = 20,
 ) => {
   const params = { limit };
   if (imageType) params.image_type = imageType;
@@ -371,7 +356,7 @@ export const analyzeSatelliteImage = async (typhoonId, imageUrl) => {
 export const generateReport = async (
   typhoonId,
   reportType,
-  aiProvider = "glm"
+  aiProvider = "glm",
 ) => {
   return apiClient.post("/report/generate", {
     typhoon_id: typhoonId,
@@ -430,7 +415,7 @@ export const askAIQuestion = async (
   sessionId,
   question,
   model = "deepseek",
-  deepThinking = false
+  deepThinking = false,
 ) => {
   return apiClient.post(
     "/ai-agent/ask",
@@ -442,8 +427,144 @@ export const askAIQuestion = async (
     },
     {
       timeout: 120000,
-    }
+    },
   );
+};
+
+/**
+ * 发送问题并获取回答（流式传输）
+ * @param {string} sessionId - 会话ID
+ * @param {string} question - 问题内容
+ * @param {string} model - 模型类型 (deepseek/glm/qwen)
+ * @param {boolean} deepThinking - 是否启用深度思考模式
+ * @param {Function} onChunk - 接收数据块的回调函数
+ * @param {Function} onComplete - 完成时的回调函数
+ * @param {Function} onError - 错误时的回调函数
+ */
+export const askAIQuestionStream = async (
+  sessionId,
+  question,
+  model = "deepseek",
+  deepThinking = false,
+  onChunk = null,
+  onComplete = null,
+  onError = null,
+) => {
+  const token = localStorage.getItem("token");
+  const response = await fetch(`${API_BASE_URL}/ai-agent/ask-stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      session_id: sessionId,
+      question: question,
+      model: model,
+      deep_thinking: deepThinking,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || "请求失败");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      // 持续读取流式响应数据
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const dataStr = line.slice(6).trim();
+          if (dataStr === "[DONE]") {
+            if (onComplete) onComplete();
+            return;
+          }
+
+          try {
+            const data = JSON.parse(dataStr);
+            if (onChunk) onChunk(data);
+          } catch (e) {
+            console.error("解析SSE数据失败:", e);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    if (onError) onError(error);
+    throw error;
+  }
+};
+
+// ========== 认证API ==========
+
+/**
+ * 用户登录
+ * @param {string} username - 用户名
+ * @param {string} password - 密码
+ */
+export const login = async (username, password) => {
+  const formData = new FormData();
+  formData.append("username", username);
+  formData.append("password", password);
+
+  return apiClient.post("/auth/login", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+};
+
+/**
+ * 用户注册
+ * @param {Object} userData - 用户数据
+ * @param {string} userData.username - 用户名
+ * @param {string} userData.email - 邮箱
+ * @param {string} userData.phone - 手机号（可选）
+ * @param {string} userData.password - 密码
+ */
+export const register = async (userData) => {
+  return apiClient.post("/auth/register", userData);
+};
+
+/**
+ * 获取当前用户信息
+ */
+export const getCurrentUser = async () => {
+  return apiClient.get("/auth/me");
+};
+
+/**
+ * 更新用户信息
+ * @param {Object} userData - 用户数据
+ * @param {string} userData.email - 邮箱
+ * @param {string} userData.phone - 手机号
+ */
+export const updateUser = async (userData) => {
+  return apiClient.put("/auth/me", userData);
+};
+
+/**
+ * 上传用户头像
+ * @param {File} file - 头像文件
+ */
+export const uploadAvatar = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  // 注意：上传文件时不要手动设置 Content-Type，让浏览器自动设置
+  return apiClient.post("/auth/upload-avatar", formData);
 };
 
 export default apiClient;

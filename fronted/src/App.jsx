@@ -21,13 +21,20 @@ import StatisticsPanel from "./components/StatisticsPanel";
 import AlertCenter from "./components/AlertCenter";
 import AIAgentX from "./components/AIAgent";
 import AIAgentButton from "./components/AIAgentButton";
+import Login from "./components/Login";
+import Register from "./components/Register";
+import UserCenter from "./components/UserCenter";
 
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedTyphoons, setSelectedTyphoons] = useState(new Set());
 
-  // 根据当前路径确定活跃标签
+  const isUserCenter = location.pathname === "/user-center";
+  const isAIAgent = location.pathname === "/AI_agent";
+  const isAuthPage =
+    location.pathname === "/login" || location.pathname === "/register";
+
   const getActiveTab = () => {
     const path = location.pathname;
     if (path === "/" || path === "/visualization") return "visualization";
@@ -75,57 +82,68 @@ function AppContent() {
 
   return (
     <div className="container">
-      <Header />
-
-      <TabNavigation
-        tabs={tabs}
-        activeTab={getActiveTab()}
-        onTabChange={handleTabChange}
-      />
-
-      {/* 预警通知横幅 - 在所有页面顶部显示 */}
-      <AlertBanner />
-
-      <div className="content-card">
+      {isUserCenter || isAIAgent ? (
         <Routes>
-          <Route
-            path="/"
-            element={
-              <MapVisualization
-                selectedTyphoons={selectedTyphoons}
-                onTyphoonSelect={handleTyphoonSelect}
-              />
-            }
-          />
-          <Route
-            path="/visualization"
-            element={
-              <MapVisualization
-                selectedTyphoons={selectedTyphoons}
-                onTyphoonSelect={handleTyphoonSelect}
-              />
-            }
-          />
-          <Route path="/typhoon" element={<TyphoonQuery />} />
-          <Route path="/prediction" element={<Prediction />} />
-          <Route path="/analysis" element={<ImageAnalysis />} />
-          <Route path="/report" element={<ReportGeneration />} />
-          <Route
-            path="/statistics"
-            element={
-              <StatisticsPanel
-                selectedTyphoons={selectedTyphoons}
-                onTyphoonSelect={handleTyphoonSelect}
-              />
-            }
-          />
-          <Route path="/alert" element={<AlertCenter />} />
+          <Route path="/user-center" element={<UserCenter />} />
           <Route path="/AI_agent" element={<AIAgentX />} />
         </Routes>
-      </div>
+      ) : isAuthPage ? (
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+        </Routes>
+      ) : (
+        <>
+          <Header />
 
-      {/* AI客服悬浮按钮 */}
-      <AIAgentButton />
+          <TabNavigation
+            tabs={tabs}
+            activeTab={getActiveTab()}
+            onTabChange={handleTabChange}
+          />
+
+          <AlertBanner />
+
+          <div className="content-card">
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <MapVisualization
+                    selectedTyphoons={selectedTyphoons}
+                    onTyphoonSelect={handleTyphoonSelect}
+                  />
+                }
+              />
+              <Route
+                path="/visualization"
+                element={
+                  <MapVisualization
+                    selectedTyphoons={selectedTyphoons}
+                    onTyphoonSelect={handleTyphoonSelect}
+                  />
+                }
+              />
+              <Route path="/typhoon" element={<TyphoonQuery />} />
+              <Route path="/prediction" element={<Prediction />} />
+              <Route path="/analysis" element={<ImageAnalysis />} />
+              <Route path="/report" element={<ReportGeneration />} />
+              <Route
+                path="/statistics"
+                element={
+                  <StatisticsPanel
+                    selectedTyphoons={selectedTyphoons}
+                    onTyphoonSelect={handleTyphoonSelect}
+                  />
+                }
+              />
+              <Route path="/alert" element={<AlertCenter />} />
+            </Routes>
+          </div>
+
+          <AIAgentButton />
+        </>
+      )}
     </div>
   );
 }

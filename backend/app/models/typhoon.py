@@ -1,7 +1,8 @@
 """
 数据库模型 - 台风数据
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, JSON, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, JSON, Boolean, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -165,9 +166,13 @@ class AskHistory(Base):
     __tablename__ = "askhistory"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE", onupdate="CASCADE"), index=True, nullable=True, comment="用户ID（关联user表）")
     session_id = Column(String(100), index=True, nullable=False, comment="对话会话ID")
     question = Column(Text, nullable=False, comment="用户提问内容")
     answer = Column(Text, nullable=False, comment="AI回答内容")
+    reasoning_content = Column(Text, nullable=True, comment="AI推理内容（深度思考模式）")
     is_ai_generated = Column(Boolean, default=False, nullable=False, comment="是否由AI生成（True=AI生成，False=预设问题匹配）")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
+    
+    user = relationship("User", backref="ask_histories")
 
