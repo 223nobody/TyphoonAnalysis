@@ -50,12 +50,11 @@ class ActiveTyphoonCrawler:
                 logger.info(f"正在尝试爬取活跃台风数据: {url}")
 
                 response = requests.get(url, headers=self.headers, timeout=10)
-                logger.info(f"响应状态码: {response.status_code}")
 
                 if response.status_code == 200:
                     try:
                         data = response.json()
-                        logger.info(f"成功获取活跃台风数据，数据类型: {type(data)}")
+                        logger.info(f"成功获取活跃台风数据")
 
                         # 打印数据结构用于调试
                         if isinstance(data, dict):
@@ -103,12 +102,6 @@ class ActiveTyphoonCrawler:
             if not raw_data:
                 logger.warning("原始数据为空")
                 return path_points
-
-            # 打印原始数据结构用于调试
-            logger.info(f"原始数据类型: {type(raw_data)}")
-            if isinstance(raw_data, dict):
-                logger.info(f"原始数据键: {list(raw_data.keys())}")
-
             # 尝试多种可能的数据结构
             typhoons = []
 
@@ -123,7 +116,7 @@ class ActiveTyphoonCrawler:
             # 如果raw_data本身就是列表
             if not typhoons and isinstance(raw_data, list):
                 typhoons = raw_data
-                logger.info(f"原始数据本身是列表，数量: {len(typhoons)}")
+                logger.info(f"原始数据本身是列表")
 
             # 如果raw_data是单个台风对象
             if not typhoons and isinstance(raw_data, dict):
@@ -132,7 +125,6 @@ class ActiveTyphoonCrawler:
                 for key in possible_point_keys:
                     if key in raw_data:
                         typhoons = [raw_data]  # 包装成列表
-                        logger.info(f"原始数据是单个台风对象")
                         break
 
             if not typhoons:

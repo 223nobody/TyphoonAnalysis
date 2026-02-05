@@ -38,7 +38,14 @@ import {
   ReloadOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUser, updateUser } from "../services/api";
+import {
+  getCurrentUser,
+  updateUser,
+  getUserStats,
+  getCollectTyphoons,
+  getUserReports,
+  getQueryHistoryByCount,
+} from "../services/api";
 import ossUploadService from "../services/ossUploadService";
 import {
   validateFile,
@@ -68,6 +75,16 @@ const UserCenter = () => {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
 
+  // 用户统计数据
+  const [stats, setStats] = useState({
+    query_count: 0,
+    collect_count: 0,
+    report_count: 0,
+  });
+  const [collectTyphoons, setCollectTyphoons] = useState([]);
+  const [userReports, setUserReports] = useState([]);
+  const [queryHistory, setQueryHistory] = useState([]);
+
   useEffect(() => {
     if (!token) {
       message.error("请先登录");
@@ -76,6 +93,10 @@ const UserCenter = () => {
     }
 
     fetchUserInfo();
+    fetchUserStats();
+    fetchCollectTyphoons();
+    fetchUserReports();
+    fetchQueryHistory();
   }, []);
 
   const fetchUserInfo = async () => {
@@ -92,6 +113,44 @@ const UserCenter = () => {
       navigate("/login");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserStats = async () => {
+    try {
+      const data = await getUserStats();
+      setStats(data);
+    } catch (error) {
+      console.error("获取统计信息失败:", error);
+      message.error(error.message || "获取统计信息失败");
+    }
+  };
+
+  const fetchCollectTyphoons = async () => {
+    try {
+      const data = await getCollectTyphoons();
+      setCollectTyphoons(data);
+    } catch (error) {
+      console.error("获取收藏列表失败:", error);
+      message.error(error.message || "获取收藏列表失败");
+    }
+  };
+
+  const fetchUserReports = async () => {
+    try {
+      const data = await getUserReports();
+      setUserReports(data.items || []);
+    } catch (error) {
+      console.error("获取报告列表失败:", error);
+    }
+  };
+
+  const fetchQueryHistory = async () => {
+    try {
+      const data = await getQueryHistoryByCount(10);
+      setQueryHistory(data || []);
+    } catch (error) {
+      console.error("获取查询历史失败:", error);
     }
   };
 
@@ -132,6 +191,10 @@ const UserCenter = () => {
 
   const handleBack = () => {
     navigate("/");
+  };
+
+  const handleStatClick = (statType) => {
+    navigate(`/history?type=${statType}`);
   };
 
   const handlePreview = useCallback(async () => {
@@ -226,12 +289,6 @@ const UserCenter = () => {
   );
 
   const handleButtonClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleRetry = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
@@ -439,30 +496,43 @@ const UserCenter = () => {
                 </div>
                 <p className="user-email">{user?.email}</p>
                 <div className="user-stats">
-                  <div className="user-stat">
+                  <div
+                    className="user-stat clickable-stat"
+                    onClick={() => handleStatClick("query_count")}
+                  >
                     <div className="user-stat-icon">
                       <HistoryOutlined />
                     </div>
                     <div className="user-stat-info">
-                      <div className="user-stat-value">0</div>
+                      <div className="user-stat-value">{stats.query_count}</div>
                       <div className="user-stat-label">查询次数</div>
                     </div>
                   </div>
-                  <div className="user-stat">
+                  <div
+                    className="user-stat clickable-stat"
+                    onClick={() => handleStatClick("collect_count")}
+                  >
                     <div className="user-stat-icon">
                       <StarOutlined />
                     </div>
                     <div className="user-stat-info">
-                      <div className="user-stat-value">0</div>
+                      <div className="user-stat-value">
+                        {stats.collect_count}
+                      </div>
                       <div className="user-stat-label">收藏台风</div>
                     </div>
                   </div>
-                  <div className="user-stat">
+                  <div
+                    className="user-stat clickable-stat"
+                    onClick={() => handleStatClick("report_count")}
+                  >
                     <div className="user-stat-icon">
                       <FileTextOutlined />
                     </div>
                     <div className="user-stat-info">
-                      <div className="user-stat-value">0</div>
+                      <div className="user-stat-value">
+                        {stats.report_count}
+                      </div>
                       <div className="user-stat-label">生成报告</div>
                     </div>
                   </div>

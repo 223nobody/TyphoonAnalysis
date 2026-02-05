@@ -1,12 +1,13 @@
 /**
  * 台风数据查询组件
  */
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
+import { message } from "antd";
 import {
   getTyphoonList,
   getTyphoonById,
-  searchTyphoons,
   getCrawlerStatus,
   getCrawlerLogs,
   getTyphoonPath,
@@ -15,7 +16,12 @@ import "../styles/TyphoonQuery.css";
 import "../styles/common.css";
 
 function TyphoonQuery() {
-  const [queryType, setQueryType] = useState("list");
+  const [searchParams] = useSearchParams();
+  const urlTyphoonId = searchParams.get("typhoon_id");
+
+  // 使用ref跟踪是否已经处理过URL参数，避免重复处理
+  const hasProcessedUrlTyphoonId = useRef(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -54,12 +60,12 @@ function TyphoonQuery() {
       let filteredData = data.items || [];
       if (listForm.year) {
         filteredData = filteredData.filter(
-          (t) => t.year === parseInt(listForm.year)
+          (t) => t.year === parseInt(listForm.year),
         );
       }
       if (listForm.status !== "") {
         filteredData = filteredData.filter(
-          (t) => t.status === parseInt(listForm.status)
+          (t) => t.status === parseInt(listForm.status),
         );
       }
 
@@ -72,11 +78,15 @@ function TyphoonQuery() {
   };
 
   // 处理台风详情查询 - 同时获取路径数据以计算统计信息
-  const handleDetailQuery = async () => {
-    if (!detailForm.typhoonId) {
+  const handleDetailQuery = async (specificTyphoonId = null) => {
+    const typhoonIdToQuery = specificTyphoonId || detailForm.typhoonId;
+
+    if (!typhoonIdToQuery) {
       alert("请输入台风ID");
       return;
     }
+
+    console.log(`🔍 开始查询台风详情: ${typhoonIdToQuery}`);
 
     try {
       setLoading(true);
@@ -84,9 +94,15 @@ function TyphoonQuery() {
 
       // 同时获取台风详情和路径数据
       const [detailData, pathData] = await Promise.all([
-        getTyphoonById(detailForm.typhoonId),
-        getTyphoonPath(detailForm.typhoonId).catch(() => ({ items: [] })),
+        getTyphoonById(typhoonIdToQuery),
+        getTyphoonPath(typhoonIdToQuery).catch(() => ({ items: [] })),
       ]);
+
+      console.log(`✅ 台风详情数据加载成功:`, detailData);
+      console.log(
+        `✅ 台风路径数据加载成功，路径点数量:`,
+        (pathData.items || pathData || []).length,
+      );
 
       // 从路径数据中计算统计信息
       const pathPoints = pathData.items || pathData || [];
@@ -142,11 +158,14 @@ function TyphoonQuery() {
           }
           if (!detailData.end_time) {
             detailData.end_time = new Date(
-              timestamps[timestamps.length - 1]
+              timestamps[timestamps.length - 1],
             ).toISOString();
           }
         }
       }
+
+      // 注意:查询台风详情不会记录查询历史
+      // 查询历史仅在地图可视化页面查询台风路径时记录(MapVisualization.jsx)
 
       setResult({ type: "detail", data: detailData });
       setDropdownOpen(false); // 查询成功后关闭下拉框
@@ -197,12 +216,141 @@ function TyphoonQuery() {
     loadAvailableYears();
   }, []);
 
+  // 处理URL参数中的typhoon_id - 自动填充表单并触发查询
+  React.useEffect(() => {
+    if (urlTyphoonId && !hasProcessedUrlTyphoonId.current) {
+      // 验证typhoon_id格式
+      if (!urlTyphoonId || urlTyphoonId.trim() === "") {
+        message.error("台风ID格式错误");
+        hasProcessedUrlTyphoonId.current = true;
+        return;
+      }
+
+      // 从typhoon_id中提取年份（假设格式为YYNNNN，如2501表示2025年01号台风）
+      const typhoonIdStr = String(urlTyphoonId);
+      if (typhoonIdStr.length >= 2) {
+        const yearPrefix = typhoonIdStr.substring(0, 2);
+        const targetYear = parseInt("20" + yearPrefix);
+
+        if (!isNaN(targetYear) && targetYear >= 2000 && targetYear <= 2099) {
+          console.log(`📅 从typhoon_id提取年份: ${targetYear}`);
+          setSelectedYear(targetYear);
+        }
+      }
+
+      // 先获取台风详情和路径数据，构建组合格式的displayText
+      const loadTyphoonAndDisplay = async () => {
+        try {
+          // 同时获取台风详情和路径数据
+          const [detailData, pathData] = await Promise.all([
+            getTyphoonById(urlTyphoonId),
+            getTyphoonPath(urlTyphoonId).catch(() => ({ items: [] })),
+          ]);
+
+          console.log(`✅ 台风详情数据加载成功:`, detailData);
+          console.log(
+            `✅ 台风路径数据加载成功，路径点数量:`,
+            (pathData.items || pathData || []).length,
+          );
+
+          // 从路径数据中计算统计信息
+          const pathPoints = pathData.items || pathData || [];
+          if (pathPoints.length > 0) {
+            // 计算最大风速
+            const windSpeeds = pathPoints
+              .map((p) => p.max_wind_speed || p.wind_speed)
+              .filter((v) => v != null);
+            if (windSpeeds.length > 0 && !detailData.max_wind_speed) {
+              detailData.max_wind_speed = Math.max(...windSpeeds);
+            }
+
+            // 计算最低气压
+            const pressures = pathPoints
+              .map((p) => p.center_pressure || p.pressure)
+              .filter((v) => v != null);
+            if (pressures.length > 0 && !detailData.min_pressure) {
+              detailData.min_pressure = Math.min(...pressures);
+            }
+
+            // 计算最大强度（取最强的强度等级）
+            const intensities = pathPoints
+              .map((p) => p.intensity)
+              .filter((v) => v != null);
+            if (intensities.length > 0 && !detailData.max_intensity) {
+              const intensityOrder = [
+                "超强台风",
+                "强台风",
+                "台风",
+                "强热带风暴",
+                "热带风暴",
+                "热带低压",
+              ];
+              for (const level of intensityOrder) {
+                if (intensities.includes(level)) {
+                  detailData.max_intensity = level;
+                  break;
+                }
+              }
+            }
+
+            // 计算起始时间和结束时间
+            const timestamps = pathPoints
+              .map((p) => p.timestamp || p.record_time || p.time)
+              .filter((v) => v != null)
+              .map((v) => new Date(v).getTime())
+              .sort((a, b) => a - b);
+
+            if (timestamps.length > 0) {
+              if (!detailData.start_time) {
+                detailData.start_time = new Date(timestamps[0]).toISOString();
+              }
+              if (!detailData.end_time) {
+                detailData.end_time = new Date(
+                  timestamps[timestamps.length - 1],
+                ).toISOString();
+              }
+            }
+          }
+
+          // 填充表单
+          setDetailForm({ typhoonId: urlTyphoonId });
+
+          // 构建组合格式的显示文本：台风ID - 英文名 - 中文名
+          const displayName = `${urlTyphoonId} - ${detailData.typhoon_name || "暂无"}${
+            detailData.typhoon_name_cn ? ` - ${detailData.typhoon_name_cn}` : ""
+          }`;
+          setDisplayText(displayName);
+
+          // 设置查询结果
+          setResult({ type: "detail", data: detailData });
+
+          hasProcessedUrlTyphoonId.current = true;
+        } catch (err) {
+          console.error(`❌ 获取台风详情失败:`, err);
+          // 如果获取详情失败，只显示台风ID
+          setDetailForm({ typhoonId: urlTyphoonId });
+          setDisplayText(urlTyphoonId);
+          // 仍然触发查询
+          handleDetailQuery(urlTyphoonId);
+          hasProcessedUrlTyphoonId.current = true;
+        }
+      };
+
+      loadTyphoonAndDisplay();
+    }
+  }, [urlTyphoonId]);
+
   // 当选择年份改变时，加载对应年份的台风列表
   React.useEffect(() => {
     if (dropdownOpen) {
       loadDropdownTyphoons(selectedYear);
     }
   }, [selectedYear, dropdownOpen]);
+
+  // 当URL参数变化时，重置处理标志
+  React.useEffect(() => {
+    hasProcessedUrlTyphoonId.current = false;
+  }, [urlTyphoonId]);
 
   // 处理输入框点击，打开下拉选择器
   const handleInputFocus = () => {
@@ -214,18 +362,19 @@ function TyphoonQuery() {
 
   // 处理台风卡片点击
   const handleTyphoonCardClick = (typhoon) => {
+    // 确保typhoonId是字符串
+    const typhoonId = String(typhoon.typhoon_id);
+
     // 只存储台风ID用于查询
-    setDetailForm({ ...detailForm, typhoonId: typhoon.typhoon_id });
+    setDetailForm({ typhoonId: typhoonId });
 
     // 构建显示文本：台风ID - 英文名 - 中文名
-    const displayName = `${typhoon.typhoon_id} - ${typhoon.typhoon_name}${
+    const displayName = `${typhoonId} - ${typhoon.typhoon_name}${
       typhoon.typhoon_name_cn ? ` - ${typhoon.typhoon_name_cn}` : ""
     }`;
     setDisplayText(displayName);
 
     setDropdownOpen(false);
-    // 可选：自动触发查询
-    // handleDetailQuery();
   };
 
   // 处理点击外部区域关闭下拉框
@@ -256,6 +405,7 @@ function TyphoonQuery() {
     try {
       setLoading(true);
       setError(null);
+      console.log(`🔍 开始查询台风路径: ${detailForm.typhoonId}`);
       const data = await getTyphoonPath(detailForm.typhoonId);
       const pathData = data.items || data || [];
       setResult({ type: "path", data: pathData });
@@ -410,10 +560,18 @@ function TyphoonQuery() {
       </div>
 
       <div style={{ display: "flex", gap: "10px" }}>
-        <button className="btn" onClick={handleDetailQuery} disabled={loading}>
+        <button
+          className="btn"
+          onClick={() => handleDetailQuery()}
+          disabled={loading}
+        >
           🔍 查询台风详情
         </button>
-        <button className="btn" onClick={handlePathQuery} disabled={loading}>
+        <button
+          className="btn"
+          onClick={() => handlePathQuery()}
+          disabled={loading}
+        >
           🗺️ 查询台风路径
         </button>
       </div>
@@ -555,8 +713,8 @@ function TyphoonQuery() {
                   {data.start_time
                     ? new Date(data.start_time).toLocaleString("zh-CN")
                     : data.created_at
-                    ? new Date(data.created_at).toLocaleString("zh-CN")
-                    : "暂无数据"}
+                      ? new Date(data.created_at).toLocaleString("zh-CN")
+                      : "暂无数据"}
                 </td>
               </tr>
               <tr>
@@ -567,8 +725,8 @@ function TyphoonQuery() {
                   {data.end_time
                     ? new Date(data.end_time).toLocaleString("zh-CN")
                     : data.updated_at
-                    ? new Date(data.updated_at).toLocaleString("zh-CN")
-                    : "暂无数据"}
+                      ? new Date(data.updated_at).toLocaleString("zh-CN")
+                      : "暂无数据"}
                 </td>
               </tr>
               <tr>

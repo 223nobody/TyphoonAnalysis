@@ -29,6 +29,29 @@ def get_beijing_time():
     return datetime.now(BEIJING_TZ)
 
 
+def get_model_display_name(model_key: str, deep_thinking: bool = False) -> str:
+    """
+    获取模型的显示名称
+    
+    Args:
+        model_key: 模型键名（deepseek, glm, qwen）
+        deep_thinking: 是否启用深度思考模式
+    
+    Returns:
+        模型显示名称
+    """
+    if deep_thinking:
+        return "DeepSeek-R1(深度思考)"
+    
+    model_names = {
+        "deepseek": "DeepSeek-V3.2(DeepSeek)",
+        "glm": "GLM-4.7(智谱清言)",
+        "qwen": "Qwen3-235B-A22B(通义千问)"
+    }
+    
+    return model_names.get(model_key, model_key)
+
+
 class QuestionResponse(BaseModel):
     """问题响应模型"""
     id: int
@@ -493,6 +516,9 @@ async def ask_question(
         # 获取当前北京时间
         current_time = get_beijing_time()
 
+        # 获取模型显示名称
+        ai_mode = get_model_display_name(used_model, request.deep_thinking) if is_ai_generated else None
+
         # 保存对话历史，标记是否由AI生成，使用北京时间，并关联用户ID
         history = AskHistory(
             session_id=request.session_id,
@@ -500,6 +526,7 @@ async def ask_question(
             answer=answer,
             reasoning_content=reasoning_content if request.deep_thinking else None,
             is_ai_generated=is_ai_generated,
+            ai_mode=ai_mode,
             created_at=current_time,
             user_id=current_user.id
         )
@@ -509,7 +536,7 @@ async def ask_question(
         # 打印AI回答时间
         answer_time = get_beijing_time()
         answer_time_str = answer_time.strftime("%Y-%m-%d %H:%M:%S")
-        logger.info(f"[AI回答] 用户ID: {current_user.id}, 会话ID: {request.session_id}, 时间: {answer_time_str}, 回答长度: {len(answer)}, 推理内容长度: {len(reasoning_content)}, AI生成: {is_ai_generated}")
+        logger.info(f"[AI回答] 用户ID: {current_user.id}, 会话ID: {request.session_id}, 时间: {answer_time_str}, 回答长度: {len(answer)}, 推理内容长度: {len(reasoning_content)}, AI生成: {is_ai_generated}, AI模型: {ai_mode}")
 
         return AskResponse(answer=answer, matched=matched, reasoning_content=reasoning_content)
     except Exception as e:
@@ -814,12 +841,16 @@ async def ask_question_stream(
 
             current_time = get_beijing_time()
 
+            # 获取模型显示名称
+            ai_mode = get_model_display_name(used_model, request.deep_thinking) if is_ai_generated else None
+
             history = AskHistory(
                 session_id=request.session_id,
                 question=request.question,
                 answer=full_answer,
                 reasoning_content=reasoning_content if request.deep_thinking else None,
                 is_ai_generated=is_ai_generated,
+                ai_mode=ai_mode,
                 created_at=current_time,
                 user_id=current_user.id
             )
@@ -828,7 +859,7 @@ async def ask_question_stream(
 
             answer_time = get_beijing_time()
             answer_time_str = answer_time.strftime("%Y-%m-%d %H:%M:%S")
-            logger.info(f"[AI回答（流式）] 用户ID: {current_user.id}, 会话ID: {request.session_id}, 时间: {answer_time_str}, 回答长度: {len(full_answer)}, 推理内容长度: {len(reasoning_content)}, AI生成: {is_ai_generated}")
+            logger.info(f"[AI回答（流式）] 用户ID: {current_user.id}, 会话ID: {request.session_id}, 时间: {answer_time_str}, 回答长度: {len(full_answer)}, 推理内容长度: {len(reasoning_content)}, AI生成: {is_ai_generated}, AI模型: {ai_mode}")
 
             yield "data: [DONE]\n\n"
 

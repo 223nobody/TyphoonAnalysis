@@ -94,6 +94,13 @@ export const getTyphoonById = async (typhoonId) => {
 };
 
 /**
+ * 根据ID获取报告详情
+ */
+export const getReportById = async (reportId) => {
+  return apiClient.get(`/report/${reportId}`);
+};
+
+/**
  * 获取台风路径数据
  */
 export const getTyphoonPath = async (typhoonId) => {
@@ -565,6 +572,75 @@ export const uploadAvatar = async (file) => {
 
   // 注意：上传文件时不要手动设置 Content-Type，让浏览器自动设置
   return apiClient.post("/auth/upload-avatar", formData);
+};
+
+// ========== 用户统计API ==========
+
+/**
+ * 获取用户统计概览
+ */
+export const getUserStats = async () => {
+  return apiClient.get("/user-stats/overview");
+};
+
+/**
+ * 记录查询历史
+ * @param {string} typhoonId - 台风编号
+ * @param {string} typhoonName - 台风名称
+ */
+export const addQueryHistory = async (typhoonId, typhoonName) => {
+  return apiClient.post("/user-stats/query-history", {
+    typhoon_id: typhoonId,
+    typhoon_name: typhoonName,
+  });
+};
+
+/**
+ * 获取查询历史列表（按查询次数降序）
+ * @param {number} limit - 返回记录数
+ */
+export const getQueryHistoryByCount = async (limit = 10) => {
+  return apiClient.get("/user-stats/query-history/by-count", {
+    params: { limit },
+  });
+};
+
+/**
+ * 获取收藏台风列表
+ */
+export const getCollectTyphoons = async () => {
+  return apiClient.get("/user-stats/collect-typhoons");
+};
+
+/**
+ * 收藏台风
+ * @param {string} typhoonId - 台风编号
+ * @param {string} typhoonName - 台风名称
+ */
+export const addCollectTyphoon = async (typhoonId, typhoonName) => {
+  return apiClient.post("/user-stats/collect-typhoons", {
+    typhoon_id: typhoonId,
+    typhoon_name: typhoonName,
+  });
+};
+
+/**
+ * 取消收藏台风
+ * @param {string} typhoonId - 台风编号
+ */
+export const removeCollectTyphoon = async (typhoonId) => {
+  return apiClient.delete(`/user-stats/collect-typhoons/${typhoonId}`);
+};
+
+/**
+ * 获取用户报告列表
+ * @param {number} skip - 跳过记录数
+ * @param {number} limit - 返回记录数
+ */
+export const getUserReports = async (skip = 0, limit = 50) => {
+  return apiClient.get("/user-stats/reports", {
+    params: { skip, limit },
+  });
 };
 
 export default apiClient;

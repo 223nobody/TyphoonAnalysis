@@ -5,18 +5,26 @@ import React, { useState, useRef } from "react";
 import axios from "axios";
 import { marked } from "marked";
 import html2pdf from "html2pdf.js";
-import { getTyphoonList } from "../services/api";
+import { useSearchParams } from "react-router-dom";
+import { message } from "antd";
+import { getTyphoonList, getReportById, getTyphoonById } from "../services/api";
 import "../styles/ReportGeneration.css";
 import "../styles/TyphoonQuery.css"; // 导入下拉选择器样式
 import "../styles/common.css";
 
 function ReportGeneration() {
+  const [searchParams] = useSearchParams();
+  const urlReportId = searchParams.get("report_id");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
 
   // PDF导出引用
   const reportContentRef = useRef(null);
+
+  // 使用ref跟踪是否已经处理过URL参数，避免重复处理
+  const hasProcessedUrlReportId = useRef(false);
 
   // 报告生成表单
   const [reportForm, setReportForm] = useState({
@@ -73,12 +81,111 @@ function ReportGeneration() {
     loadAvailableYears();
   }, []);
 
+  // 处理URL参数中的report_id - 自动加载报告详情
+  React.useEffect(() => {
+    if (urlReportId && !hasProcessedUrlReportId.current) {
+      console.log(`📌 检测到URL参数中的report_id: ${urlReportId}`);
+
+      // 验证report_id格式
+      if (!urlReportId || urlReportId.trim() === "") {
+        message.error("报告ID格式错误");
+        hasProcessedUrlReportId.current = true;
+        return;
+      }
+
+      // 获取报告详情
+      const loadReportAndDisplay = async () => {
+        try {
+          console.log(`📡 获取报告详情: ${urlReportId}`);
+          const reportData = await getReportById(urlReportId);
+
+          console.log(`✅ 报告详情数据加载成功:`, reportData);
+
+          // 填充表单
+          const typhoonId = reportData.typhoon_id || "";
+          const reportType = reportData.report_type || "comprehensive";
+          const aiProvider =
+            reportData.ai_provider || reportData.model_used || "glm";
+
+          setReportForm({
+            typhoonId: typhoonId,
+            reportType: reportType,
+            aiProvider: aiProvider,
+          });
+
+          // 获取台风详情以获取英文名和中文名
+          let typhoonNameEn = "暂无";
+          let typhoonNameCn = "";
+
+          if (typhoonId) {
+            try {
+              console.log(`📡 获取台风详情: ${typhoonId}`);
+              const typhoonData = await getTyphoonById(typhoonId);
+              console.log(`✅ 台风详情数据加载成功:`, typhoonData);
+
+              typhoonNameEn = typhoonData.typhoon_name || "暂无";
+              typhoonNameCn = typhoonData.typhoon_name_cn || "";
+            } catch (err) {
+              console.error(`❌ 获取台风详情失败:`, err);
+              // 如果获取台风详情失败，使用报告中的名称
+              typhoonNameEn = reportData.typhoon_name || "暂无";
+              typhoonNameCn = reportData.typhoon_name_cn || "";
+            }
+          }
+
+          // 构建组合格式的显示文本：台风ID - 英文名 - 中文名
+          const displayName = `${typhoonId} - ${typhoonNameEn}${
+            typhoonNameCn ? ` - ${typhoonNameCn}` : ""
+          }`;
+          setDisplayText(displayName);
+          console.log(`✅ 构建显示文本: ${displayName}`);
+
+          // 设置查询结果
+          setResult(reportData);
+
+          // 从typhoon_id中提取年份并切换
+          if (typhoonId) {
+            const typhoonIdStr = String(typhoonId);
+            if (typhoonIdStr.length >= 2) {
+              const yearPrefix = typhoonIdStr.substring(0, 2);
+              const targetYear = parseInt("20" + yearPrefix);
+
+              if (
+                !isNaN(targetYear) &&
+                targetYear >= 2000 &&
+                targetYear <= 2099
+              ) {
+                console.log(`📅 从typhoon_id提取年份: ${targetYear}`);
+                setSelectedYear(targetYear);
+              }
+            }
+          }
+
+          hasProcessedUrlReportId.current = true;
+        } catch (err) {
+          console.error(`❌ 获取报告详情失败:`, err);
+          setError(
+            err.response?.data?.detail || err.message || "获取报告详情失败",
+          );
+          hasProcessedUrlReportId.current = true;
+        }
+      };
+
+      loadReportAndDisplay();
+    }
+  }, [urlReportId]);
+
   // 当选择年份改变时，加载对应年份的台风列表
   React.useEffect(() => {
     if (dropdownOpen) {
       loadDropdownTyphoons(selectedYear);
     }
   }, [selectedYear, dropdownOpen]);
+
+  // 当URL参数变化时，重置处理标志
+  React.useEffect(() => {
+    hasProcessedUrlReportId.current = false;
+  }, [urlReportId]);
 
   // 处理输入框点击，打开下拉选择器
   const handleInputFocus = () => {

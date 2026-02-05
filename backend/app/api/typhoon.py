@@ -10,7 +10,9 @@ from datetime import datetime
 import logging
 
 from app.core.database import get_db
-from app.models.typhoon import Typhoon, TyphoonPath, ActiveTyphoonForecast
+from app.core.auth import get_current_active_user
+from app.models.user import User
+from app.models.typhoon import Typhoon, TyphoonPath, ActiveTyphoonForecast, QueryHistory
 from app.schemas.typhoon import (
     TyphoonCreate, TyphoonResponse, TyphoonListResponse,
     TyphoonPathCreate, TyphoonPathResponse, TyphoonPathListResponse
@@ -76,7 +78,7 @@ async def get_typhoon(
     typhoon_id: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """获取台风详情"""
+    """获取台风详情(不记录查询历史)"""
     # 查询台风基本信息
     query = select(Typhoon).where(Typhoon.typhoon_id == typhoon_id)
     result = await db.execute(query)
@@ -84,6 +86,8 @@ async def get_typhoon(
 
     if not typhoon:
         raise HTTPException(status_code=404, detail="台风不存在")
+
+    # 注意:查询详情不记录查询历史,只在查询路径时记录(MapVisualization.jsx)
 
     # 查询台风路径数据，获取起始和结束位置
     path_query = select(TyphoonPath).where(
@@ -152,6 +156,7 @@ async def get_typhoon_path(
     typhoon_id: str,
     skip: int = Query(0, ge=0),
     limit: int = Query(1000, ge=1, le=5000),
+    current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -159,7 +164,51 @@ async def get_typhoon_path(
 
     统一从 typhoon_paths 表查询所有台风路径数据
     直接返回数据库中的原始经度值，不做任何转换
+
+    注意:此接口会记录查询历史(用于MapVisualization.jsx)
     """
+    # 查询台风基本信息,用于记录查询历史
+    typhoon_query = select(Typhoon).where(Typhoon.typhoon_id == typhoon_id)
+    typhoon_result = await db.execute(typhoon_query)
+    typhoon = typhoon_result.scalar_one_or_none()
+
+    if not typhoon:
+        raise HTTPException(status_code=404, detail="台风不存在")
+
+    # 记录查询历史(用户在地图可视化页面查询台风路径)
+    # 优化: 添加时间窗口去重机制,避免短时间内重复插入
+    try:
+        from datetime import timedelta
+
+        # 检查最近3分钟内是否已有查询记录
+        time_threshold = datetime.now() - timedelta(minutes=5)
+        recent_query = await db.execute(
+            select(QueryHistory).where(
+                QueryHistory.user_id == current_user.id,
+                QueryHistory.typhoon_id == typhoon_id,
+                QueryHistory.query_date >= time_threshold
+            ).order_by(QueryHistory.query_date.desc()).limit(1)
+        )
+        existing_record = recent_query.scalar_one_or_none()
+
+        if existing_record:
+            logger.info(f"")
+        else:
+            query_history = QueryHistory(
+                user_id=current_user.id,
+                typhoon_id=typhoon_id,
+                typhoon_name=typhoon.typhoon_name_cn or typhoon.typhoon_name,
+                query_date=datetime.now()
+            )
+            db.add(query_history)
+            await db.commit()
+            logger.info(f"路径查询历史记录成功: user_id={current_user.id}, typhoon_id={typhoon_id}")
+    except Exception as e:
+        await db.rollback()
+        logger.warning(f"记录路径查询历史失败: user_id={current_user.id}, typhoon_id={typhoon_id}, error={str(e)}")
+        # 不影响主流程,继续执行
+
+    # 查询路径数据
     query = select(TyphoonPath).where(
         TyphoonPath.typhoon_id == typhoon_id
     ).order_by(TyphoonPath.timestamp.asc()).offset(skip).limit(limit)

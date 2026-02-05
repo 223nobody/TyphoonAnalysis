@@ -26,56 +26,56 @@ function Header() {
   const imageRef = useRef(null);
   const navigate = useNavigate();
 
-  const getProxyImageUrl = (url) => {
+  const getAvatarUrlWithProcessing = (url) => {
     if (!url) return null;
     if (url.includes("typhoonanalysis.oss-cn-wuhan-lr.aliyuncs.com")) {
-      const baseUrl = url.replace(
-        "https://typhoonanalysis.oss-cn-wuhan-lr.aliyuncs.com",
-        "/oss-image",
-      );
-      return `${baseUrl}?x-oss-process=image/resize,w_128,h_128/quality,q_80`;
+      return `${url}?x-oss-process=image/resize,w_128,h_128/quality,q_80`;
     }
     return url;
+  };
+
+  const loadAvatarImage = (avatarUrl) => {
+    if (!avatarUrl) {
+      setAvatarLoading(false);
+      setAvatarError(false);
+      return;
+    }
+
+    const processedUrl = getAvatarUrlWithProcessing(avatarUrl);
+    console.log("Header - 开始加载头像:", avatarUrl);
+    console.log("Header - 处理后的URL:", processedUrl);
+    setAvatarLoading(true);
+    setAvatarError(false);
+
+    const img = new Image();
+    imageRef.current = img;
+
+    img.onload = () => {
+      console.log("Header - 头像加载成功");
+      setAvatarLoading(false);
+      setAvatarError(false);
+    };
+
+    img.onerror = (error) => {
+      console.error("Header - 头像加载失败:", error);
+      setAvatarLoading(false);
+      setAvatarError(true);
+    };
+
+    img.src = processedUrl;
   };
 
   const refreshUserInfo = useCallback(async () => {
     try {
       const userData = await getCurrentUser();
-      console.log("Header - 刷新用户信息:", userData);
+      console.log("Header - 从数据库获取用户信息:", userData);
       setUser(userData);
       localStorage.setItem("user", JSON.stringify(userData));
-
-      if (userData.avatar_url) {
-        const proxyUrl = getProxyImageUrl(userData.avatar_url);
-        console.log("Header - 开始加载头像:", userData.avatar_url);
-        console.log("Header - 代理URL:", proxyUrl);
-        setAvatarLoading(true);
-        setAvatarError(false);
-
-        const img = new Image();
-        imageRef.current = img;
-        img.crossOrigin = "anonymous";
-
-        img.onload = () => {
-          console.log("Header - 头像加载成功");
-          setAvatarLoading(false);
-          setAvatarError(false);
-        };
-
-        img.onerror = (error) => {
-          console.error("Header - 头像加载失败:", error);
-          setAvatarLoading(false);
-          setAvatarError(true);
-        };
-
-        img.src = proxyUrl;
-      } else {
-        console.log("Header - 用户没有头像URL");
-        setAvatarLoading(false);
-        setAvatarError(false);
-      }
+      loadAvatarImage(userData?.avatar_url);
     } catch (error) {
-      console.error("Header - 刷新用户信息失败:", error);
+      console.error("Header - 从数据库获取用户信息失败:", error);
+      setAvatarLoading(false);
+      setAvatarError(true);
     }
   }, []);
 
@@ -84,35 +84,13 @@ function Header() {
     if (userStr) {
       try {
         const userData = JSON.parse(userStr);
-        console.log("Header - 解析用户数据:", userData);
+        console.log("Header - 从localStorage解析用户数据:", userData);
         setUser(userData);
 
-        if (userData.avatar_url) {
-          const proxyUrl = getProxyImageUrl(userData.avatar_url);
-          console.log("Header - 开始加载头像:", userData.avatar_url);
-          console.log("Header - 代理URL:", proxyUrl);
-          setAvatarLoading(true);
-          setAvatarError(false);
-
-          const img = new Image();
-          imageRef.current = img;
-          img.crossOrigin = "anonymous";
-
-          img.onload = () => {
-            console.log("Header - 头像加载成功");
-            setAvatarLoading(false);
-            setAvatarError(false);
-          };
-
-          img.onerror = (error) => {
-            console.error("Header - 头像加载失败:", error);
-            setAvatarLoading(false);
-            setAvatarError(true);
-          };
-
-          img.src = proxyUrl;
+        if (userData?.avatar_url) {
+          loadAvatarImage(userData.avatar_url);
         } else {
-          console.log("Header - 用户没有头像URL，尝试从服务器获取");
+          console.log("Header - 用户没有头像URL，从数据库刷新");
           refreshUserInfo();
         }
       } catch (error) {
@@ -212,8 +190,8 @@ function Header() {
           >
             <Avatar
               src={
-                user.avatar_url && !avatarError && !avatarLoading
-                  ? getProxyImageUrl(user.avatar_url)
+                user?.avatar_url && !avatarError && !avatarLoading
+                  ? getAvatarUrlWithProcessing(user.avatar_url)
                   : undefined
               }
               icon={<UserOutlined />}

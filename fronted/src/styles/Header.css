@@ -111,8 +111,10 @@
 }
 
 .header-user .login-link {
-  padding: 8px 20px;
-  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  padding: 6px 20px;
+  height: 40px;
+  margin-top: 11px;
+  background: linear-gradient(135deg, hsl(226, 71%, 40%) 0%, #3b82f6 100%);
   color: white;
   text-decoration: none;
   border-radius: 8px;

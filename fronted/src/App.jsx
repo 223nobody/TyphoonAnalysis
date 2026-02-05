@@ -1,7 +1,7 @@
 /**
  * 主应用组件
  */
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -24,13 +24,47 @@ import AIAgentButton from "./components/AIAgentButton";
 import Login from "./components/Login";
 import Register from "./components/Register";
 import UserCenter from "./components/UserCenter";
+import History from "./components/History";
 
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedTyphoons, setSelectedTyphoons] = useState(new Set());
+  // 多台风叠加显示选项（默认为true）
+  const [allowMultipleTyphoons, setAllowMultipleTyphoons] = useState(true);
 
-  const isUserCenter = location.pathname === "/user-center";
+  // 跟踪上一次的路径，用于检测是否从 history 页面跳转
+  const prevLocationRef = useRef(location.pathname);
+
+  // 当从 history 页面跳转到 visualization 页面且带有 typhoon_id 参数时，关闭多台风叠加显示
+  useEffect(() => {
+    const currentPath = location.pathname;
+    const searchParams = new URLSearchParams(location.search);
+    const hasTyphoonId = searchParams.has("typhoon_id");
+
+    // 检测是否从 history 页面跳转到 visualization 页面
+    if (
+      prevLocationRef.current === "/history" &&
+      currentPath === "/visualization" &&
+      hasTyphoonId
+    ) {
+      console.log(
+        "从 history 页面跳转到 visualization 页面，关闭多台风叠加显示",
+      );
+      // 如果地图上存在多个台风，先清空所有选中的台风
+      if (selectedTyphoons.size > 1) {
+        console.log("地图上存在多个台风，清空所有选中的台风");
+        clearAllSelectedTyphoons();
+      }
+      setAllowMultipleTyphoons(false);
+    }
+
+    // 更新上一次的路径
+    prevLocationRef.current = currentPath;
+  }, [location, selectedTyphoons]);
+
+  const isUserCenter =
+    location.pathname === "/user-center" || location.pathname === "/history";
   const isAIAgent = location.pathname === "/AI_agent";
   const isAuthPage =
     location.pathname === "/login" || location.pathname === "/register";
@@ -64,13 +98,34 @@ function AppContent() {
   const handleTyphoonSelect = (typhoonId) => {
     setSelectedTyphoons((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(typhoonId)) {
-        newSet.delete(typhoonId);
+
+      if (allowMultipleTyphoons) {
+        // 多台风叠加模式：切换选中状态
+        if (newSet.has(typhoonId)) {
+          newSet.delete(typhoonId);
+        } else {
+          newSet.add(typhoonId);
+        }
       } else {
-        newSet.add(typhoonId);
+        // 单台风模式：清除之前的选择，只保留当前选中的台风
+        if (newSet.has(typhoonId)) {
+          // 如果点击的是已选中的台风，则取消选中
+          newSet.delete(typhoonId);
+        } else {
+          // 清除所有之前的选择，只选中当前台风
+          newSet.clear();
+          newSet.add(typhoonId);
+        }
       }
+
       return newSet;
     });
+  };
+
+  // 清空所有选中的台风
+  const clearAllSelectedTyphoons = () => {
+    console.log("清空所有选中的台风");
+    setSelectedTyphoons(new Set());
   };
 
   const handleTabChange = (tabId) => {
@@ -85,6 +140,7 @@ function AppContent() {
       {isUserCenter || isAIAgent ? (
         <Routes>
           <Route path="/user-center" element={<UserCenter />} />
+          <Route path="/history" element={<History />} />
           <Route path="/AI_agent" element={<AIAgentX />} />
         </Routes>
       ) : isAuthPage ? (
@@ -112,6 +168,9 @@ function AppContent() {
                   <MapVisualization
                     selectedTyphoons={selectedTyphoons}
                     onTyphoonSelect={handleTyphoonSelect}
+                    allowMultipleTyphoons={allowMultipleTyphoons}
+                    setAllowMultipleTyphoons={setAllowMultipleTyphoons}
+                    clearAllSelectedTyphoons={clearAllSelectedTyphoons}
                   />
                 }
               />
@@ -121,6 +180,9 @@ function AppContent() {
                   <MapVisualization
                     selectedTyphoons={selectedTyphoons}
                     onTyphoonSelect={handleTyphoonSelect}
+                    allowMultipleTyphoons={allowMultipleTyphoons}
+                    setAllowMultipleTyphoons={setAllowMultipleTyphoons}
+                    clearAllSelectedTyphoons={clearAllSelectedTyphoons}
                   />
                 }
               />

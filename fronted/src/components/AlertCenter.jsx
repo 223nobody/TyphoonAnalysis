@@ -40,7 +40,7 @@ function AlertCenter() {
       const data = await getAlertHistory(
         historyForm.typhoonId,
         null,
-        historyForm.limit
+        historyForm.limit,
       );
       const alerts =
         data.items || data.alerts || (Array.isArray(data) ? data : []);
@@ -216,7 +216,7 @@ function AlertCenter() {
         {/* 台风基本信息 */}
         <div
           style={{
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            background: "linear-gradient(135deg, #ea66c5ff 0%, #764ba2 100%)",
             color: "white",
             padding: "15px",
             borderRadius: "8px",

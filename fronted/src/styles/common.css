@@ -444,3 +444,69 @@
 .gap-3 {
   gap: 24px;
 }
+
+/* 收藏按钮样式 */
+.collect-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: 2px solid #d1d5db;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s;
+  z-index: 10;
+  padding: 0;
+}
+
+.collect-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+  pointer-events: none;
+  transition: transform 0.2s ease;
+}
+
+.collect-btn:hover .collect-icon {
+  transform: scale(1.1);
+}
+
+.collect-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  transform: scale(1.1);
+}
+
+.collect-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.collect-btn:disabled .collect-icon {
+  transform: none;
+}
+
+.collect-btn.collected {
+  background: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.collect-btn.collected .collect-icon {
+  filter: brightness(0) invert(1);
+}
+
+.collect-btn.collected:hover {
+  background: #d97706;
+  border-color: #d97706;
+}
+
+.typhoon-item {
+  position: relative;
+}

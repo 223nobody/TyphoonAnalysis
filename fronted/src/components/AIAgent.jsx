@@ -201,7 +201,7 @@ const InputArea = ({
       { value: "glm", label: "GLM (智谱清言)" },
       { value: "qwen", label: "Qwen (通义千问)" },
     ],
-    []
+    [],
   );
 
   const handleKeyDown = useCallback(
@@ -211,7 +211,7 @@ const InputArea = ({
         onSendMessage();
       }
     },
-    [onSendMessage]
+    [onSendMessage],
   );
 
   return (
@@ -390,27 +390,29 @@ function AIAgent() {
   const chatEndRef = useRef(null);
   const isUserScrollingRef = useRef(false);
   const scrollIntervalRef = useRef(null);
-  // 标记是否处于流式加载状态
+  const scrollRafRef = useRef(null);
+  const lastScrollHeightRef = useRef(0);
   const isStreamingRef = useRef(false);
-  // 缓存聊天区域 DOM 引用，避免重复查询 DOM
   const chatSectionRef = useRef(null);
+
+  const SCROLL_THRESHOLD = 100;
+  const SCROLL_DEBOUNCE_TIME = 150;
+  const STREAMING_SCROLL_INTERVAL = 16;
 
   // 强制滚动到最新消息（立即执行，无动画）
   const scrollToBottomImmediate = useCallback(() => {
-    // 优先使用缓存的 DOM 引用，避免重复查询
     if (!chatSectionRef.current) {
       chatSectionRef.current = document.querySelector(".ai-agent-chat");
     }
 
     if (chatSectionRef.current) {
-      chatSectionRef.current.scrollTop = chatSectionRef.current.scrollHeight;
-      // 手动触发 scroll 事件，确保 autoScroll 状态与实际滚动位置保持同步
-      chatSectionRef.current.dispatchEvent(new Event("scroll"));
-    }
+      const { scrollHeight } = chatSectionRef.current;
+      const currentScrollTop = chatSectionRef.current.scrollTop;
 
-    // 同时触发 chatEndRef 的 scrollIntoView（双重保障）
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "instant", block: "end" });
+      if (scrollHeight !== lastScrollHeightRef.current) {
+        chatSectionRef.current.scrollTop = scrollHeight;
+        lastScrollHeightRef.current = scrollHeight;
+      }
     }
   }, []);
 
@@ -421,12 +423,11 @@ function AIAgent() {
         chatEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
       }
     },
-    [autoScroll]
+    [autoScroll],
   );
 
   // 用户滚动检测逻辑 - 流式加载期间完全屏蔽
   useEffect(() => {
-    // 初始化时缓存 DOM 引用
     if (!chatSectionRef.current) {
       chatSectionRef.current = document.querySelector(".ai-agent-chat");
     }
@@ -434,37 +435,46 @@ function AIAgent() {
     if (!chatSection) return;
 
     let scrollTimeout;
+    let lastScrollTop = chatSection.scrollTop;
+    let lastScrollTime = Date.now();
+
     const handleScroll = () => {
-      // 流式加载/发送中，完全跳过用户滚动检测
+      const now = Date.now();
+      const currentScrollTop = chatSection.scrollTop;
+
       if (isStreamingRef.current || sending) {
         return;
       }
 
       if (isUserScrollingRef.current) return;
 
-      // 标记用户正在滚动
-      isUserScrollingRef.current = true;
-      clearTimeout(scrollTimeout);
+      const timeDiff = now - lastScrollTime;
+      const scrollDiff = Math.abs(currentScrollTop - lastScrollTop);
 
-      // 检查是否滚动到底部（允许 50px 误差）
-      const { scrollTop, scrollHeight, clientHeight } = chatSection;
-      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+      if (timeDiff > SCROLL_DEBOUNCE_TIME && scrollDiff > 5) {
+        isUserScrollingRef.current = true;
+        clearTimeout(scrollTimeout);
 
-      if (isAtBottom) {
-        // 用户滚动到底部，启用自动滚动
-        setAutoScroll(true);
-      } else {
-        // 用户滚动到其他位置，禁用自动滚动
-        setAutoScroll(false);
+        const { scrollTop, scrollHeight, clientHeight } = chatSection;
+        const isAtBottom =
+          scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
+
+        if (isAtBottom) {
+          setAutoScroll(true);
+        } else {
+          setAutoScroll(false);
+        }
+
+        scrollTimeout = setTimeout(() => {
+          isUserScrollingRef.current = false;
+        }, SCROLL_DEBOUNCE_TIME);
+
+        lastScrollTop = currentScrollTop;
+        lastScrollTime = now;
       }
-
-      // 500ms 后重置滚动标记
-      scrollTimeout = setTimeout(() => {
-        isUserScrollingRef.current = false;
-      }, 500);
     };
 
-    chatSection.addEventListener("scroll", handleScroll);
+    chatSection.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       chatSection.removeEventListener("scroll", handleScroll);
       clearTimeout(scrollTimeout);
@@ -473,29 +483,51 @@ function AIAgent() {
 
   // 流式加载期间的滚动定时器 - 严谨启停
   useEffect(() => {
-    // 流式加载中（sending 或 streamingMessageKey 存在）
     const isInStreaming = sending || !!streamingMessageKey;
     isStreamingRef.current = isInStreaming;
 
     if (isInStreaming) {
-      // 强制锁定 autoScroll 为 true
       setAutoScroll(true);
-      // 启动定时器：每 50ms 强制滚动（频率提高，更流畅）
-      scrollIntervalRef.current = setInterval(() => {
-        scrollToBottomImmediate();
-      }, 50);
+
+      const scrollLoop = () => {
+        if (!isStreamingRef.current) return;
+
+        if (!chatSectionRef.current) {
+          chatSectionRef.current = document.querySelector(".ai-agent-chat");
+        }
+
+        if (chatSectionRef.current) {
+          const { scrollHeight } = chatSectionRef.current;
+          if (scrollHeight !== lastScrollHeightRef.current) {
+            chatSectionRef.current.scrollTop = scrollHeight;
+            lastScrollHeightRef.current = scrollHeight;
+          }
+        }
+
+        scrollRafRef.current = requestAnimationFrame(scrollLoop);
+      };
+
+      scrollRafRef.current = requestAnimationFrame(scrollLoop);
     } else {
-      // 流式加载结束，清除定时器
+      if (scrollRafRef.current) {
+        cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = null;
+      }
+
       if (scrollIntervalRef.current) {
         clearInterval(scrollIntervalRef.current);
         scrollIntervalRef.current = null;
       }
-      // 流式加载完成后，再次执行一次强制滚动，确保最终滚动位置正确
+
       scrollToBottomImmediate();
     }
 
-    // 组件卸载时清理定时器
     return () => {
+      if (scrollRafRef.current) {
+        cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = null;
+      }
+
       if (scrollIntervalRef.current) {
         clearInterval(scrollIntervalRef.current);
         scrollIntervalRef.current = null;
@@ -637,16 +669,16 @@ function AIAgent() {
                         reasoningContent:
                           (msg.reasoningContent || "") + data.content,
                       }
-                    : msg
-                )
+                    : msg,
+                ),
               );
             } else if (data.type === "content") {
               setMessages((prev) =>
                 prev.map((msg) =>
                   msg.key === aiMessageKey
                     ? { ...msg, content: (msg.content || "") + data.content }
-                    : msg
-                )
+                    : msg,
+                ),
               );
             } else if (data.type === "error") {
               console.error("❌ 流式传输错误:", data.message);
@@ -659,8 +691,8 @@ function AIAgent() {
               prev.map((msg) =>
                 msg.key === aiMessageKey
                   ? { ...msg, timestamp: new Date().toISOString() }
-                  : msg
-              )
+                  : msg,
+              ),
             );
             setStreamingMessageKey(null);
             loadSessions();
@@ -670,7 +702,7 @@ function AIAgent() {
             message.error(`发送消息失败：${error.message}`);
             setStreamingMessageKey(null);
             setAutoScroll(true);
-          }
+          },
         );
 
         console.log("✅ 消息发送成功");
@@ -697,7 +729,7 @@ function AIAgent() {
           message.error(
             `请求超时：${
               deepThinking ? "深度思考模式" : "AI 服务"
-            }响应时间过长，请稍后重试`
+            }响应时间过长，请稍后重试`,
           );
         } else if (error.message.includes("数据格式错误")) {
           message.error("AI 回答格式异常，请重试或联系管理员");
@@ -718,7 +750,7 @@ function AIAgent() {
       loadSessions,
       navigate,
       scrollToBottomImmediate,
-    ]
+    ],
   );
 
   const handleSendMessage = useCallback(async () => {
@@ -810,7 +842,7 @@ function AIAgent() {
         setLoading(false);
       }
     },
-    [navigate]
+    [navigate],
   );
 
   const toggleSidebar = useCallback(() => {

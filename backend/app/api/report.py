@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
 from app.core.database import get_db
+from app.core.auth import get_current_active_user
+from app.models.user import User
 from app.models.typhoon import Report, Prediction, TyphoonPath, Typhoon
 from app.schemas.typhoon import ReportCreate, ReportResponse
 from app.services.ai.ai_factory import AIServiceFactory
@@ -23,6 +25,7 @@ async def generate_report(
     typhoon_name: str = Body("", description="台风名称"),
     report_type: str = Body("comprehensive", description="报告类型：comprehensive/prediction/impact"),
     ai_provider: Optional[str] = Body(None, description="AI服务提供商（qwen、deepseek或glm）"),
+    current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -38,6 +41,7 @@ async def generate_report(
         typhoon_name: 台风名称
         report_type: 报告类型
         ai_provider: AI服务提供商（qwen、deepseek或glm）
+        current_user: 当前登录用户
 
     Returns:
         ReportResponse: 生成的报告
@@ -136,14 +140,15 @@ async def generate_report(
             detail=f"报告生成失败: {result.get('error', '未知错误')}"
         )
 
-    # 5. 保存报告
+    # 5. 保存报告（关联用户）
     db_report = Report(
         typhoon_id=typhoon_id,
         typhoon_name=final_typhoon_name,
         report_type=report_type,
         report_content=result["report_content"],
         model_used=result.get("model_used", "未知"),
-        related_prediction_id=prediction_id
+        related_prediction_id=prediction_id,
+        user_id=current_user.id
     )
 
     db.add(db_report)

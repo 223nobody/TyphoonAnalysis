@@ -1,7 +1,7 @@
 """
 数据库模型 - 台风数据
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, JSON, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, JSON, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -82,7 +82,10 @@ class Report(Base):
     model_used = Column(String(100), comment="使用的AI模型")
     related_prediction_id = Column(Integer, comment="关联的预测ID")
     related_analysis_id = Column(Integer, comment="关联的分析ID")
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), index=True, comment="生成报告的用户ID")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", backref="reports")
 
 
 class AlertRecord(Base):
@@ -172,7 +175,37 @@ class AskHistory(Base):
     answer = Column(Text, nullable=False, comment="AI回答内容")
     reasoning_content = Column(Text, nullable=True, comment="AI推理内容（深度思考模式）")
     is_ai_generated = Column(Boolean, default=False, nullable=False, comment="是否由AI生成（True=AI生成，False=预设问题匹配）")
+    ai_mode = Column(String(100), nullable=True, comment="AI生成回答使用的模型名称")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
-    
+
     user = relationship("User", backref="ask_histories")
+
+
+class QueryHistory(Base):
+    """用户查询历史记录表"""
+    __tablename__ = "queryhistory"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False, comment="用户ID")
+    typhoon_id = Column(String(50), index=True, nullable=False, comment="台风编号")
+    typhoon_name = Column(String(100), comment="台风名称")
+    query_date = Column(DateTime, index=True, comment="查询时间")
+
+    user = relationship("User", backref="query_histories")
+
+
+class CollectTyphoon(Base):
+    """用户收藏台风表"""
+    __tablename__ = "collect_typhoons"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False, comment="用户ID")
+    typhoon_id = Column(String(50), index=True, nullable=False, comment="台风编号")
+    typhoon_name = Column(String(100), comment="台风名称")
+
+    user = relationship("User", backref="collect_typhoons")
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'typhoon_id', name='uq_user_typhoon'),
+    )
 

@@ -91,7 +91,7 @@ class BulletinCrawler:
                 # 更新缓存
                 self._cached_bulletin = parsed_bulletin
                 self._cache_time = time.time()
-                logger.info(f"成功获取台风公报: {parsed_bulletin.get('typhoon_name')}")
+                logger.info(f"成功获取台风公报")
             
             return parsed_bulletin
             

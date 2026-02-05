@@ -11,8 +11,9 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
   color: #1f2937;
@@ -276,6 +277,7 @@ body {
   cursor: pointer;
   transition: all 0.3s ease;
   background: white;
+  position: relative;
 }
 
 .typhoon-item:hover {

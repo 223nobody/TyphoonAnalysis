@@ -73,8 +73,8 @@ function AlertBanner() {
         padding: "15px 20px",
         marginBottom: "20px",
         background: !hasBulletin
-          ? "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)"
-          : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          ? "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)"
+          : "linear-gradient(135deg, #f87171 0%, #dc2626 100%)",
         borderRadius: "8px",
         display: "flex",
         alignItems: "center",
@@ -93,7 +93,7 @@ function AlertBanner() {
             animation: "pulse 2s infinite",
           }}
         >
-          🌀
+          {hasBulletin ? "🌀" : "🌊"}
         </div>
         <div style={{ flex: 1 }}>
           <div
@@ -110,42 +110,52 @@ function AlertBanner() {
                 fontSize: "16px",
               }}
             >
-              台风预警
+              {hasBulletin ? "台风预警" : "台风监测"}
             </span>
-            <span style={{ fontSize: "14px", opacity: 0.9 }}>
-              {bulletin.typhoon_name}
-            </span>
+            {hasBulletin && bulletin.typhoon_name && (
+              <span style={{ fontSize: "14px", opacity: 0.9 }}>
+                {bulletin.typhoon_name}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: "14px", opacity: 0.95, lineHeight: "1.5" }}>
-            <strong>强度等级：</strong>
-            {bulletin.intensity} | <strong>摘要：</strong>
-            {bulletin.summary}
+            {hasBulletin ? (
+              <>
+                <strong>强度等级：</strong>
+                {bulletin.intensity || "未知"} | <strong>摘要：</strong>
+                {bulletin.summary || bulletin.message || "暂无信息"}
+              </>
+            ) : (
+              <>{bulletin.message || "当前没有活跃台风，系统正在持续监测中"}</>
+            )}
           </div>
         </div>
       </div>
       <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-        <button
-          onClick={handleViewDetails}
-          style={{
-            padding: "8px 16px",
-            background: "rgba(255, 255, 255, 0.2)",
-            color: "white",
-            border: "1px solid rgba(255, 255, 255, 0.3)",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontSize: "14px",
-            fontWeight: "500",
-            transition: "all 0.2s",
-          }}
-          onMouseEnter={(e) => {
-            e.target.style.background = "rgba(255, 255, 255, 0.3)";
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.background = "rgba(255, 255, 255, 0.2)";
-          }}
-        >
-          查看详情
-        </button>
+        {hasBulletin && (
+          <button
+            onClick={handleViewDetails}
+            style={{
+              padding: "8px 16px",
+              background: "rgba(255, 255, 255, 0.2)",
+              color: "white",
+              border: "1px solid rgba(255, 255, 255, 0.3)",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontSize: "14px",
+              fontWeight: "500",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = "rgba(255, 255, 255, 0.3)";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = "rgba(255, 255, 255, 0.2)";
+            }}
+          >
+            查看详情
+          </button>
+        )}
         <button
           onClick={handleClose}
           style={{

@@ -65,20 +65,27 @@ class CMACrawler:
         获取当前活跃的台风列表（使用list_default接口）
 
         Returns:
-            List[Dict]: 台风列表
+            List[Dict]: 活跃台风列表（仅包含status=1的台风）
         """
         try:
             logger.info("开始获取活跃台风列表（使用default接口）")
 
             # 使用default接口获取当前活跃台风
-            typhoons = await self._get_default_typhoons()
+            all_typhoons = await self._get_default_typhoons()
 
-            if not typhoons:
+            if not all_typhoons:
                 logger.warning("没有活跃台风")
                 return []
 
-            logger.info(f"成功获取 {len(typhoons)} 个活跃台风")
-            return typhoons
+            # 过滤出活跃台风（status=1）
+            active_typhoons = [t for t in all_typhoons if t.get('status') == 1]
+
+            if not active_typhoons:
+                logger.info("当前没有活跃台风")
+                return []
+
+            logger.info(f"成功获取 {len(active_typhoons)} 个活跃台风")
+            return active_typhoons
 
         except Exception as e:
             logger.error(f"获取活跃台风列表失败: {e}")

@@ -8,22 +8,28 @@ import {
   TileLayer,
   Polyline,
   CircleMarker,
-  Circle,
   Tooltip,
   useMap,
   Polygon,
   Marker,
 } from "react-leaflet";
+import { useSearchParams } from "react-router-dom";
 import L from "leaflet";
+import { message } from "antd";
 import {
   getTyphoonList,
   getTyphoonPath,
   getTyphoonForecast,
+  getCollectTyphoons,
+  addCollectTyphoon,
+  removeCollectTyphoon,
 } from "../services/api";
 import "leaflet/dist/leaflet.css";
 import "../styles/MapVisualization.css";
 import "../styles/common.css";
 import taifengIcon from "../pictures/taifeng.gif";
+import nocollectIcon from "../pictures/nocollect.svg";
+import iscollectIcon from "../pictures/iscollect.svg";
 
 /**
  * 经度归一化工具函数（仅用于显示）
@@ -78,6 +84,7 @@ const createWarningLineLabel = (text, color) => {
   });
 };
 
+// 生成不规则风圈 - 西北象限半径放大
 const generateIrregularWindCircle = (center, baseRadius, windLevel) => {
   const [lat, lng] = center;
   const points = [];
@@ -181,7 +188,16 @@ function MapController({ center, zoom, onZoomChange, onMouseMove }) {
   return null;
 }
 
-function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
+function MapVisualization({
+  selectedTyphoons,
+  onTyphoonSelect,
+  allowMultipleTyphoons,
+  setAllowMultipleTyphoons,
+  clearAllSelectedTyphoons,
+}) {
+  const [searchParams] = useSearchParams();
+  const urlTyphoonId = searchParams.get("typhoon_id");
+
   // 台风列表相关状态
   const [typhoons, setTyphoons] = useState([]);
   const [filteredTyphoons, setFilteredTyphoons] = useState([]);
@@ -200,9 +216,6 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
   const [pathLoading, setPathLoading] = useState(false);
   const [pathError, setPathError] = useState(null);
   const mapRef = useRef(null);
-
-  // 多台风叠加显示选项（默认为true）
-  const [allowMultipleTyphoons, setAllowMultipleTyphoons] = useState(true);
 
   // 预测路径数据状态
   const [forecastData, setForecastData] = useState(new Map());
@@ -233,9 +246,111 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
   // 鼠标位置经纬度状态
   const [mousePosition, setMousePosition] = useState(null);
 
+  // 收藏相关状态
+  const [collectTyphoons, setCollectTyphoons] = useState([]);
+  const [isCollecting, setIsCollecting] = useState(false);
+
+  // 使用ref跟踪是否已经处理过URL参数，避免重复处理
+  const hasProcessedUrlTyphoonId = useRef(false);
+  const hasTriedYearSwitch = useRef(false);
+
+  // 处理URL参数中的typhoon_id - 第一阶段：提取年份并切换
+  useEffect(() => {
+    if (urlTyphoonId && !hasProcessedUrlTyphoonId.current) {
+      console.log(`📌 检测到URL参数中的typhoon_id: ${urlTyphoonId}`);
+
+      // 验证typhoon_id格式
+      if (!urlTyphoonId || urlTyphoonId.trim() === "") {
+        message.error("台风ID格式错误");
+        hasProcessedUrlTyphoonId.current = true;
+        return;
+      }
+
+      // 从typhoon_id中提取年份（假设格式为YYNNNN，如2501表示2025年01号台风）
+      const typhoonIdStr = String(urlTyphoonId);
+      let targetYear = null;
+
+      if (typhoonIdStr.length >= 2) {
+        const yearPrefix = typhoonIdStr.substring(0, 2);
+        targetYear = parseInt("20" + yearPrefix);
+
+        if (!isNaN(targetYear) && targetYear >= 2000 && targetYear <= 2099) {
+          console.log(`📅 从typhoon_id提取年份: ${targetYear}`);
+
+          // 如果当前年份与目标年份不同，切换年份
+          if (filters.year !== targetYear.toString()) {
+            console.log(`🔄 切换年份从 ${filters.year} 到 ${targetYear}`);
+            setFilters((prev) => ({ ...prev, year: targetYear.toString() }));
+            hasTriedYearSwitch.current = true;
+          }
+        }
+      }
+    }
+  }, [urlTyphoonId, filters.year]);
+
+  // 处理URL参数中的typhoon_id - 第二阶段：在数据加载完成后选中台风
+  useEffect(() => {
+    // 只在以下条件下执行：
+    // 1. 有URL参数
+    // 2. 没有处理过
+    // 3. 数据加载完成（listLoading为false）
+    // 4. 台风列表有数据
+    if (
+      urlTyphoonId &&
+      !hasProcessedUrlTyphoonId.current &&
+      !listLoading &&
+      typhoons.length > 0
+    ) {
+      const typhoonExists = typhoons.some((t) => t.typhoon_id === urlTyphoonId);
+
+      if (typhoonExists) {
+        // 台风存在，自动选中
+        console.log(`✅ 台风 ${urlTyphoonId} 存在于列表中，自动选中`);
+        if (onTyphoonSelect) {
+          // 检查是否已经选中了这个台风
+          if (!selectedTyphoons.has(urlTyphoonId)) {
+            console.log(`🎯 调用 onTyphoonSelect 选中台风 ${urlTyphoonId}`);
+            onTyphoonSelect(urlTyphoonId);
+          } else {
+            console.log(`ℹ️ 台风 ${urlTyphoonId} 已经被选中，跳过`);
+          }
+          // 无论是否调用onTyphoonSelect，都标记为已处理
+          hasProcessedUrlTyphoonId.current = true;
+        }
+      } else {
+        // 台风不在列表中
+        if (hasTriedYearSwitch.current) {
+          // 如果已经尝试过切换年份但还是找不到，显示警告
+          console.warn(
+            `⚠️ 台风 ${urlTyphoonId} 在列表中未找到（已尝试切换年份）`,
+          );
+          message.warning(`台风 ${urlTyphoonId} 在当前年份列表中未找到`);
+          hasProcessedUrlTyphoonId.current = true;
+        } else {
+          // 如果还没尝试过切换年份，说明还在默认年份，等待年份切换完成
+          console.log(`⏳ 等待年份切换完成以查找台风 ${urlTyphoonId}`);
+        }
+      }
+    }
+  }, [
+    urlTyphoonId,
+    typhoons,
+    listLoading,
+    onTyphoonSelect,
+    selectedTyphoons,
+    filters.year,
+  ]);
+
+  // 当URL参数变化时，重置处理标志
+  useEffect(() => {
+    hasProcessedUrlTyphoonId.current = false;
+    hasTriedYearSwitch.current = false;
+  }, [urlTyphoonId]);
+
   // 加载台风列表
   useEffect(() => {
     loadTyphoons();
+    loadCollectTyphoons();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.year, filters.status]); // 当年份或状态筛选条件变化时重新加载
 
@@ -247,7 +362,10 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
 
   // 当选中的台风变化时，加载路径数据并定位地图
   useEffect(() => {
+    console.log(`🔄 selectedTyphoons 变化:`, Array.from(selectedTyphoons));
+
     if (selectedTyphoons && selectedTyphoons.size > 0) {
+      console.log(`📥 开始加载台风路径数据...`);
       loadTyphoonPaths();
 
       // 检测新选中的台风并定位地图
@@ -256,6 +374,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
       );
 
       if (newlySelected) {
+        console.log(`🆕 新选中的台风: ${newlySelected}`);
         // 找到新选中的台风数据
         const typhoon = typhoons.find((t) => t.typhoon_id === newlySelected);
         if (typhoon) {
@@ -268,20 +387,22 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
       // 更新上一次选中的台风集合
       setPrevSelectedTyphoons(new Set(selectedTyphoons));
     } else {
+      console.log(`🗑️ 清空所有路径数据`);
       // 当没有选中任何台风时，清空所有路径数据
       setPathsData(new Map());
       setForecastData(new Map()); // 同时清空预测路径数据
       setPrevSelectedTyphoons(new Set());
       setLatestVisualizedTyphoon(null); // 清空最近可视化的台风ID
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTyphoons]);
+  }, [selectedTyphoons, typhoons]);
 
   // 加载台风列表 - 修复：传递年份参数到后端API
   const loadTyphoons = async () => {
     try {
       setListLoading(true);
       setListError(null);
+
+      console.log(`📡 开始加载台风列表，年份: ${filters.year}`);
 
       // 构建查询参数
       const params = {
@@ -301,8 +422,10 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
       const data = await getTyphoonList(params);
 
       if (data && data.items && Array.isArray(data.items)) {
+        console.log(`✅ 台风列表加载成功，数量: ${data.items.length}`);
         setTyphoons(data.items);
       } else if (data && Array.isArray(data)) {
+        console.log(`✅ 台风列表加载成功，数量: ${data.length}`);
         setTyphoons(data);
       } else {
         console.error("API返回数据格式错误:", data);
@@ -316,9 +439,47 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
     }
   };
 
+  // 加载收藏列表
+  const loadCollectTyphoons = async () => {
+    try {
+      const data = await getCollectTyphoons();
+      const collectIds = data.map((t) => t.typhoon_id);
+      setCollectTyphoons(collectIds);
+    } catch (err) {
+      console.error("加载收藏列表失败:", err);
+    }
+  };
+
+  // 处理收藏/取消收藏
+  const handleToggleCollect = async (typhoonId, typhoonName, event) => {
+    event.stopPropagation();
+
+    try {
+      setIsCollecting(true);
+      const isCollected = collectTyphoons.includes(typhoonId);
+
+      if (isCollected) {
+        await removeCollectTyphoon(typhoonId);
+        setCollectTyphoons(collectTyphoons.filter((id) => id !== typhoonId));
+        message.success("已取消收藏");
+      } else {
+        await addCollectTyphoon(typhoonId, typhoonName);
+        setCollectTyphoons([...collectTyphoons, typhoonId]);
+        message.success("收藏成功");
+      }
+    } catch (err) {
+      console.error("收藏操作失败:", err);
+      message.error(err.message || "操作失败");
+    } finally {
+      setIsCollecting(false);
+    }
+  };
+
   // 应用前端筛选
   const applyFilters = () => {
     let filtered = [...typhoons];
+
+    console.log(`🔄 应用筛选，原始台风数量: ${filtered.length}`);
 
     // 搜索筛选（在前端处理，因为需要模糊匹配）
     if (filters.search) {
@@ -331,6 +492,11 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
       );
     }
 
+    console.log(`✅ 筛选后台风数量: ${filtered.length}`);
+    console.log(
+      `📋 筛选后的台风列表:`,
+      filtered.map((t) => t.typhoon_id),
+    );
     setFilteredTyphoons(filtered);
   };
 
@@ -416,6 +582,20 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
     if (onTyphoonSelect) {
       onTyphoonSelect(typhoonId);
     }
+  };
+
+  // 处理多台风叠加显示切换
+  const handleAllowMultipleChange = (e) => {
+    const newValue = e.target.checked;
+    console.log(`多台风叠加显示切换: ${allowMultipleTyphoons} -> ${newValue}`);
+
+    // 当从 true 切换到 false 时，清空所有选中的台风
+    if (allowMultipleTyphoons && !newValue && selectedTyphoons.size > 0) {
+      console.log("关闭多台风叠加显示，清空所有选中的台风");
+      clearAllSelectedTyphoons();
+    }
+
+    setAllowMultipleTyphoons(newValue);
   };
 
   // 将地图中心定位到指定台风
@@ -680,7 +860,7 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
               <input
                 type="checkbox"
                 checked={allowMultipleTyphoons}
-                onChange={(e) => setAllowMultipleTyphoons(e.target.checked)}
+                onChange={handleAllowMultipleChange}
                 style={{
                   marginRight: "8px",
                   width: "16px",
@@ -695,11 +875,45 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
                 margin: "5px 0 0 24px",
                 fontSize: "12px",
                 color: "#6b7280",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
               }}
             >
-              {allowMultipleTyphoons
-                ? "✓ 可同时显示多个台风路径"
-                : "✗ 选择新台风时清除之前的路径"}
+              {allowMultipleTyphoons ? (
+                <>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  <span>可同时显示多个台风路径</span>
+                </>
+              ) : (
+                <>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#ef4444"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                  <span>选择新台风时清除之前的路径</span>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -735,55 +949,89 @@ function MapVisualization({ selectedTyphoons, onTyphoonSelect }) {
             <div
               style={{ display: "flex", flexDirection: "column", gap: "8px" }}
             >
-              {filteredTyphoons.map((typhoon) => (
-                <div
-                  key={typhoon.typhoon_id}
-                  onClick={() => handleTyphoonClick(typhoon.typhoon_id)}
-                  style={{
-                    padding: "12px",
-                    background:
-                      selectedTyphoons &&
-                      selectedTyphoons.has(typhoon.typhoon_id)
+              {filteredTyphoons.map((typhoon) => {
+                const isCollected = collectTyphoons.includes(
+                  typhoon.typhoon_id,
+                );
+                const isSelected =
+                  selectedTyphoons && selectedTyphoons.has(typhoon.typhoon_id);
+                const typhoonName =
+                  typhoon.typhoon_name_cn || typhoon.typhoon_name;
+                return (
+                  <div
+                    key={typhoon.typhoon_id}
+                    onClick={() => handleTyphoonClick(typhoon.typhoon_id)}
+                    style={{
+                      padding: "12px",
+                      background: isSelected
                         ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
                         : "white",
-                    color:
-                      selectedTyphoons &&
-                      selectedTyphoons.has(typhoon.typhoon_id)
-                        ? "white"
-                        : "#1f2937",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    transition: "all 0.3s ease",
-                    border: "1px solid #e5e7eb",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (
-                      !selectedTyphoons ||
-                      !selectedTyphoons.has(typhoon.typhoon_id)
-                    ) {
-                      e.currentTarget.style.background = "#f3f4f6";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (
-                      !selectedTyphoons ||
-                      !selectedTyphoons.has(typhoon.typhoon_id)
-                    ) {
-                      e.currentTarget.style.background = "white";
-                    }
-                  }}
-                >
-                  <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
-                    {typhoon.typhoon_name_cn ||
-                      typhoon.typhoon_name ||
-                      typhoon.typhoon_id}
+                      color: isSelected ? "white" : "#1f2937",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      transition: "all 0.3s ease",
+                      border: "1px solid #e5e7eb",
+                      position: "relative",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = "#f3f4f6";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = "white";
+                      }
+                    }}
+                  >
+                    <img
+                      src={isCollected ? iscollectIcon : nocollectIcon}
+                      alt={isCollected ? "已收藏" : "收藏"}
+                      onClick={(e) =>
+                        handleToggleCollect(typhoon.typhoon_id, typhoonName, e)
+                      }
+                      style={{
+                        position: "absolute",
+                        top: "10px",
+                        right: "10px",
+                        width: "18px",
+                        height: "18px",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = "scale(1.1)";
+                        if (isCollected) {
+                          e.currentTarget.style.filter =
+                            "drop-shadow(0 0 4px rgba(217, 119, 6, 0.4)";
+                        } else {
+                          e.currentTarget.style.filter =
+                            "drop-shadow(0 0 4px rgba(209, 213, 219, 0.4)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "scale(1)";
+                        e.currentTarget.style.filter = "none";
+                      }}
+                    />
+                    <div
+                      style={{
+                        fontWeight: "bold",
+                        marginBottom: "5px",
+                        paddingRight: "45px",
+                      }}
+                    >
+                      {typhoon.typhoon_name_cn ||
+                        typhoon.typhoon_name ||
+                        typhoon.typhoon_id}
+                    </div>
+                    <div style={{ fontSize: "12px", opacity: 0.9 }}>
+                      ID: {typhoon.typhoon_id} | {typhoon.year}年 |{" "}
+                      {typhoon.status === 1 ? "🟢 活跃" : "⚪ 已停止"}
+                    </div>
                   </div>
-                  <div style={{ fontSize: "12px", opacity: 0.9 }}>
-                    ID: {typhoon.typhoon_id} | {typhoon.year}年 |{" "}
-                    {typhoon.status === 1 ? "🟢 活跃" : "⚪ 已停止"}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
