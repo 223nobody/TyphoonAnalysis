@@ -1,4 +1,4 @@
-﻿"""
+"""
 CMA台风网爬虫服务 - 使用中国气象局真实API
 """
 import logging

@@ -263,21 +263,139 @@ export const triggerCrawler = async () => {
 
 /**
  * 路径预测
+ * @param {string} typhoonId - 台风编号
+ * @param {number} forecastHours - 预报时效（小时）
+ * @param {boolean} useEnsemble - 是否使用集合预测
  */
-export const predictPath = async (typhoonId, hours) => {
-  return apiClient.post("/prediction/path", {
+export const predictPath = async (typhoonId, forecastHours, useEnsemble = false) => {
+  return apiClient.post("/predictions/path", {
     typhoon_id: typhoonId,
-    hours: hours,
+    forecast_hours: forecastHours,
+    use_ensemble: useEnsemble,
   });
 };
 
 /**
  * 强度预测
+ * @param {string} typhoonId - 台风编号
+ * @param {number} forecastHours - 预报时效（小时）
  */
-export const predictIntensity = async (typhoonId, hours) => {
-  return apiClient.post("/prediction/intensity", {
+export const predictIntensity = async (typhoonId, forecastHours) => {
+  return apiClient.post("/predictions/intensity", {
     typhoon_id: typhoonId,
-    hours: hours,
+    forecast_hours: forecastHours,
+  });
+};
+
+/**
+ * 批量预测
+ * @param {string[]} typhoonIds - 台风编号列表
+ * @param {number} forecastHours - 预报时效（小时）
+ */
+export const predictBatch = async (typhoonIds, forecastHours) => {
+  return apiClient.post("/predictions/batch", {
+    typhoon_ids: typhoonIds,
+    forecast_hours: forecastHours,
+  });
+};
+
+/**
+ * 获取台风预测记录
+ * @param {string} typhoonId - 台风编号
+ * @param {string} predictionType - 预测类型筛选(path/intensity)
+ * @param {number} limit - 返回记录数量限制
+ */
+export const getTyphoonPredictions = async (typhoonId, predictionType = null, limit = 100) => {
+  const params = { limit };
+  if (predictionType) params.prediction_type = predictionType;
+  return apiClient.get(`/predictions/${typhoonId}`, { params });
+};
+
+/**
+ * 获取台风预测统计
+ * @param {string} typhoonId - 台风编号
+ */
+export const getPredictionStats = async (typhoonId) => {
+  return apiClient.get(`/predictions/stats/${typhoonId}`);
+};
+
+/**
+ * 清除台风预测记录
+ * @param {string} typhoonId - 台风编号
+ */
+export const clearPredictions = async (typhoonId) => {
+  return apiClient.delete(`/predictions/${typhoonId}`);
+};
+
+/**
+ * 任意起点预测
+ * @param {string} typhoonId - 台风编号
+ * @param {string} startTime - 起点时间（ISO格式）
+ * @param {number} startLatitude - 起点纬度
+ * @param {number} startLongitude - 起点经度
+ * @param {number} startPressure - 起点中心气压（可选）
+ * @param {number} startWindSpeed - 起点最大风速（可选）
+ * @param {number} forecastHours - 预报时效（小时）
+ */
+export const predictFromArbitraryStart = async (
+  typhoonId,
+  startTime,
+  startLatitude,
+  startLongitude,
+  startPressure = null,
+  startWindSpeed = null,
+  forecastHours = 48
+) => {
+  return apiClient.post("/predictions/arbitrary-start", {
+    typhoon_id: typhoonId,
+    start_time: startTime,
+    start_latitude: startLatitude,
+    start_longitude: startLongitude,
+    start_pressure: startPressure,
+    start_wind_speed: startWindSpeed,
+    forecast_hours: forecastHours,
+  });
+};
+
+/**
+ * 滚动预测
+ * @param {string} typhoonId - 台风编号
+ * @param {number} initialForecastHours - 初始预报时效（小时）
+ * @param {number} updateIntervalHours - 更新间隔（小时）
+ * @param {number} maxIterations - 最大滚动次数
+ * @param {number} confidenceThreshold - 置信度阈值
+ */
+export const rollingPrediction = async (
+  typhoonId,
+  initialForecastHours = 48,
+  updateIntervalHours = 6,
+  maxIterations = 5,
+  confidenceThreshold = 0.5
+) => {
+  return apiClient.post("/predictions/rolling", {
+    typhoon_id: typhoonId,
+    initial_forecast_hours: initialForecastHours,
+    update_interval_hours: updateIntervalHours,
+    max_iterations: maxIterations,
+    confidence_threshold: confidenceThreshold,
+  });
+};
+
+/**
+ * 虚拟观测点预测
+ * @param {string} typhoonId - 台风编号
+ * @param {Array} virtualObservations - 虚拟观测点列表
+ * @param {number} forecastHours - 预报时效（小时）
+ */
+export const predictWithVirtualObservations = async (
+  typhoonId,
+  virtualObservations,
+  forecastHours = 48
+) => {
+  return apiClient.post("/predictions/virtual-observations", {
+    typhoon_id: typhoonId,
+    virtual_observations: virtualObservations,
+    forecast_hours: forecastHours,
   });
 };
 

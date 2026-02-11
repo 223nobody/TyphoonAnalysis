@@ -1,446 +1,459 @@
-# 台风分析系统 - 后端文档
+# 台风分析系统 - 后端服务
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.9+-blue.svg" alt="Python 3.9+">
+  <img src="https://img.shields.io/badge/FastAPI-0.109.0-009688.svg" alt="FastAPI">
+  <img src="https://img.shields.io/badge/PyTorch-1.13.1-EE4C2C.svg" alt="PyTorch">
+  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
+</p>
 
 ## 项目简介
 
-台风分析系统后端是一个基于 **FastAPI** 构建的高性能 RESTful API 服务，提供台风数据管理、统计分析、路径预测、AI 智能客服、图像分析等功能。采用现代化的异步编程模型，支持高并发访问。
+台风分析系统后端是一个基于 **FastAPI** 构建的高性能 RESTful API 服务，专注于台风数据的智能分析、预测与可视化。系统采用异步编程模型，支持高并发访问，集成了深度学习模型进行台风路径预测，并提供 AI 智能客服、图像分析等高级功能。
+
+### 核心特性
+
+- **高性能异步架构** - 基于 FastAPI + Uvicorn，支持高并发
+- **深度学习预测** - 基于 LSTM + Attention 的台风路径预测模型
+- **多 AI 模型支持** - 集成 DeepSeek、GLM、Qwen 等主流大模型
+- **智能图像分析** - 卫星云图自动识别与分析
+- **实时数据爬取** - 自动获取中国气象局台风数据
+- **完整用户系统** - JWT 认证 + OSS 头像存储
 
 ## 技术栈
 
-- **Web 框架**: FastAPI 0.109.0
-- **ASGI 服务器**: Uvicorn 0.27.0
-- **数据库**: SQLite (aiosqlite)
-- **ORM**: SQLAlchemy 2.0.0 + Alembic 1.13.0
-- **数据验证**: Pydantic 2.5.0
-- **HTTP 客户端**: httpx 0.26.0, requests 2.31.0
-- **数据处理**: pandas 2.0.0, numpy 1.24.0
-- **机器学习**: torch 1.13.1, scikit-learn 1.3.0
-- **图像处理**: Pillow 10.0.0
-- **AI 模型**: 
-  - DeepSeek (deepseek-api)
-  - 通义千问 (dashscope)
-  - GLM (zhipuai)
-- **认证**: python-jose[cryptography] 3.3.0, passlib[bcrypt] 1.7.4
-- **日志**: loguru 0.7.0
-- **OSS 存储**: oss2 2.18.0, alibabacloud-oss-v2 1.2.3
-- **任务调度**: APScheduler 3.10.0
-- **测试**: pytest 7.4.0, pytest-asyncio 0.21.0
-- **代码质量**: black 23.3.0, flake8 6.0.0
+### 核心框架
+
+| 技术       | 版本    | 用途        |
+| ---------- | ------- | ----------- |
+| FastAPI    | 0.109.0 | Web 框架    |
+| Uvicorn    | 0.27.0  | ASGI 服务器 |
+| SQLAlchemy | 2.0.0   | ORM 框架    |
+| Pydantic   | 2.5.0   | 数据验证    |
+
+### AI/ML 技术
+
+| 技术         | 版本   | 用途         |
+| ------------ | ------ | ------------ |
+| PyTorch      | 1.13.1 | 深度学习框架 |
+| scikit-learn | 1.3.0  | 机器学习工具 |
+| NumPy        | 1.24.0 | 数值计算     |
+| pandas       | 2.0.0  | 数据处理     |
+
+### AI 服务集成
+
+- **DeepSeek** - 深度思考与推理
+- **通义千问 (Qwen)** - 多模态分析
+- **智谱 GLM** - 中文对话与报告生成
 
 ## 项目结构
 
 ```
 backend/
-├── app/
-│   ├── __init__.py
-│   ├── main.py                    # FastAPI 应用入口
-│   ├── config.py                  # 配置管理
-│   ├── database.py                # 数据库连接
-│   ├── dependencies.py            # 依赖注入
-│   ├── models/                    # 数据模型
-│   │   ├── __init__.py
-│   │   ├── typhoon.py            # 台风数据模型
-│   │   ├── typhoon_path.py       # 台风路径模型
-│   │   ├── alert.py              # 预警数据模型
-│   │   ├── image.py              # 图像数据模型
-│   │   ├── report.py             # 报告数据模型
-│   │   └── user.py               # 用户数据模型
-│   ├── schemas/                   # Pydantic 模式
-│   │   ├── __init__.py
-│   │   ├── typhoon.py            # 台风数据模式
-│   │   ├── alert.py              # 预警数据模式
-│   │   ├── image.py              # 图像数据模式
-│   │   ├── report.py             # 报告数据模式
-│   │   └── user.py               # 用户数据模式
-│   ├── routers/                   # API 路由
-│   │   ├── __init__.py
-│   │   ├── typhoons.py           # 台风数据路由
-│   │   ├── alerts.py             # 预警管理路由
-│   │   ├── images.py             # 图像分析路由
-│   │   ├── reports.py            # 报告生成路由
-│   │   ├── predictions.py        # 预测服务路由
-│   │   ├── statistics.py         # 统计分析路由
-│   │   ├── auth.py               # 认证路由
-│   │   └── ai.py                 # AI 客服路由
-│   ├── services/                  # 业务逻辑层
-│   │   ├── __init__.py
-│   │   ├── typhoon_service.py    # 台风数据服务
-│   │   ├── alert_service.py      # 预警服务
-│   │   ├── image_service.py      # 图像分析服务
-│   │   ├── report_service.py     # 报告生成服务
-│   │   ├── prediction_service.py # 预测服务
-│   │   ├── statistics_service.py # 统计分析服务
-│   │   ├── auth_service.py      # 认证服务
-│   │   ├── ai/
-│   │   │   ├── __init__.py
-│   │   │   ├── base.py          # AI 基础服务
-│   │   │   ├── deepseek_service.py  # DeepSeek 服务
-│   │   │   ├── glm_service.py   # GLM 服务
-│   │   │   └── qwen_service.py  # Qwen 服务
-│   │   ├── lstm/
-│   │   │   ├── __init__.py
-│   │   │   ├── lstm_predictor.py    # LSTM 预测器
-│   │   │   └── lstm_trainer.py      # LSTM 训练器
-│   │   └── cv/
-│   │       ├── __init__.py
-│   │       └── image_processor.py  # 图像处理器
-│   ├── utils/                     # 工具函数
-│   │   ├── __init__.py
-│   │   ├── logger.py             # 日志工具
-│   │   ├── data_processor.py     # 数据处理工具
-│   │   └── oss_client.py         # OSS 客户端
-│   └── static/                    # 静态文件
-│       └── uploads/              # 上传文件目录
-├── tests/                         # 测试文件
-│   ├── __init__.py
-│   ├── test_api.py               # API 测试
-│   ├── test_services.py          # 服务测试
-│   └── test_models.py            # 模型测试
-├── alembic/                       # 数据库迁移
-│   ├── versions/
-│   └── env.py
-├── alembic.ini                    # Alembic 配置
-├── data.py                        # 数据导入脚本
-├── main.py                        # 应用启动入口
-├── requirements.txt                # Python 依赖
-├── .env.example                   # 环境变量示例
-└── README.md                      # 后端文档
+├── app/                          # 主应用目录
+│   ├── api/                      # API 路由层
+│   │   ├── v1/                   # API 版本控制
+│   │   ├── ai_agent.py           # AI 智能客服
+│   │   ├── alert.py              # 预警管理
+│   │   ├── analysis.py           # 图像分析
+│   │   ├── auth.py               # 用户认证
+│   │   ├── crawler.py            # 数据爬取
+│   │   ├── export.py             # 数据导出
+│   │   ├── prediction.py         # 台风预测
+│   │   ├── report.py             # 报告生成
+│   │   ├── statistics.py         # 统计分析
+│   │   ├── typhoon.py            # 台风数据
+│   │   └── user_stats.py         # 用户统计
+│   ├── core/                     # 核心配置
+│   │   ├── auth.py               # 认证逻辑
+│   │   ├── config.py             # 全局配置
+│   │   └── database.py           # 数据库连接
+│   ├── models/                   # 数据模型
+│   │   ├── typhoon.py            # 台风模型
+│   │   ├── user.py               # 用户模型
+│   │   └── image.py              # 图像模型
+│   ├── schemas/                  # Pydantic 模式
+│   └── services/                 # 业务服务层
+│       ├── ai/                   # AI 服务
+│       │   ├── deepseek_service.py
+│       │   ├── glm_service.py
+│       │   └── qwen_service.py
+│       ├── crawler/              # 数据爬取
+│       │   ├── cma_crawler.py    # 中国气象局
+│       │   └── bulletin_crawler.py
+│       ├── image/                # 图像分析
+│       ├── lstm/                 # LSTM 预测
+│       ├── prediction/           # 预测服务
+│       │   ├── data/             # 数据处理
+│       │   ├── models/           # 模型定义
+│       │   ├── utils/            # 工具函数
+│       │   ├── predictor.py      # 基础预测器
+│       │   ├── predictor_advanced.py  # 高级预测
+│       │   └── predictor_fallback.py  # 降级预测
+│       └── scheduler/            # 定时任务
+├── data/                         # 数据目录
+│   └── csv/                      # CSV 数据集
+├── models/                       # 预训练模型
+├── training/                     # 模型训练脚本
+│   ├── train_model.py            # 基础训练
+│   ├── train_model_enhanced.py   # 增强训练
+│   ├── evaluate_model.py         # 模型评估
+│   ├── select_best_model.py      # 模型选择
+│   └── test_best_model.py        # 模型测试
+├── main.py                       # 应用入口
+├── data.py                       # 数据导入
+└── requirements.txt              # 依赖列表
 ```
 
-## 核心功能
+## 核心功能模块
 
-### 1. 台风数据管理
+### 1. 台风预测系统
 
-**路由**: `/api/typhoons`
-
-**功能特性**:
-
-- 📊 台风数据 CRUD 操作
-- 🔍 支持年份、状态、名称搜索
-- 📥 数据导出（JSON/CSV）
-- 📈 批量查询和统计
-- 🗺️ 路径数据管理
-
-**主要接口**:
+基于 LSTM + Attention 的深度学习模型，支持未来 24/48/72 小时路径预测。
 
 ```python
-GET    /api/typhoons              # 获取台风列表
-GET    /api/typhoons/{id}         # 获取台风详情
-GET    /api/typhoons/{id}/path   # 获取台风路径
-POST   /api/typhoons/search       # 搜索台风
-GET    /api/typhoons/export       # 导出数据
+from app.services.prediction import TyphoonPredictor
+
+# 初始化预测器
+predictor = TyphoonPredictor(model_path='./models/best_model.pth')
+
+# 执行预测
+result = await predictor.predict_from_csv(
+    typhoon_id='202001',
+    forecast_hours=48
+)
 ```
 
-### 2. 预警管理
+**预测特性**:
 
-**路由**: `/api/alerts`
+- 支持任意起点预测
+- 滚动预测模式
+- 置信度评估
+- 自动降级机制
 
-**功能特性**:
+### 2. AI 智能客服
 
-- ⚠️ 预警信息管理
-- 🔔 预警等级分类（蓝色/黄色/橙色/红色）
-- 📝 预警详情查看
-- 🗑️ 预警删除功能
-- 🔍 按台风 ID 或等级筛选
-- 🔄 自动刷新预警信息
+集成多模型 AI 对话系统，支持深度思考模式。
 
-**主要接口**:
+**API 端点**:
+
+```
+POST   /api/ai/chat              # 对话交互
+GET    /api/ai/sessions          # 会话管理
+GET    /api/ai/questions         # 热门问题
+```
+
+**模型支持**:
+| 模型 | 特点 | 适用场景 |
+|------|------|----------|
+| DeepSeek-R1 | 深度思考 | 复杂推理 |
+| DeepSeek-V3 | 通用对话 | 日常问答 |
+| GLM-4 | 中文优化 | 报告生成 |
+| Qwen-VL | 多模态 | 图像分析 |
+
+### 3. 图像分析服务
+
+卫星云图智能分析，提取台风特征。
+
+**分析模式**:
+
+- **基础模式** - 快速特征提取
+- **高级模式** - 详细结构分析
+- **OpenCV 模式** - 传统图像算法
+- **融合模式** - 多方法综合
+
+### 4. 数据爬取与同步
+
+自动从中国气象局获取最新台风数据。
 
 ```python
-GET    /api/alerts/active        # 获取活跃预警
-GET    /api/alerts/history        # 获取历史预警
-GET    /api/alerts/{id}          # 获取预警详情
-POST   /api/alerts                # 创建预警
-PUT    /api/alerts/{id}          # 更新预警
-DELETE /api/alerts/{id}          # 删除预警
+# 启动定时任务
+from app.services.scheduler import Scheduler
+
+scheduler = Scheduler()
+scheduler.start()
 ```
 
-### 3. 图像分析
+## 快速开始
 
-**路由**: `/api/images`
+### 环境要求
 
-**功能特性**:
+- Python >= 3.9
+- CUDA >= 11.7 (GPU 训练可选)
+- SQLite3
 
-- 🖼️ 卫星云图上传和管理
-- 🔍 多种分析模式（基础/高级/OpenCV/融合）
-- 🤖 AI 模型智能分析（Qwen-VL、GLM-4V）
-- 📊 提取台风特征（中心位置、云系结构、强度估计）
-- 📷 支持红外/可见光图像
-- 📋 图像历史记录查看
+### 安装步骤
 
-**主要接口**:
+1. **创建虚拟环境**
 
-```python
-POST   /api/images/upload         # 上传图像
-POST   /api/images/analyze        # 分析图像
-GET    /api/images                # 获取图像列表
-GET    /api/images/{id}          # 获取图像详情
-GET    /api/images/{id}/history   # 获取分析历史
-DELETE /api/images/{id}          # 删除图像
+```bash
+cd backend
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# Linux/Mac
+source venv/bin/activate
 ```
 
-### 4. 报告生成
+2. **安装依赖**
 
-**路由**: `/api/reports`
-
-**功能特性**:
-
-- 📄 AI 自动生成台风分析报告
-- 📊 支持综合报告、预测报告、影响评估
-- 🤖 多种 AI 模型可选
-- 📥 报告导出（PDF/Word）
-- 📝 Markdown 格式渲染
-- 🎨 支持报告预览
-
-**报告类型**:
-
-- **综合分析报告**：包含台风生命周期、路径特征、强度演变、历史影响
-- **预测报告**：包含当前状态、未来路径预测、强度变化预测、预警建议
-- **影响评估报告**：包含影响区域评估、灾害风险分析、影响程度评估、防灾减灾建议
-
-**主要接口**:
-
-```python
-POST   /api/reports/generate      # 生成报告
-GET    /api/reports/{id}          # 获取报告详情
-GET    /api/reports/{id}/download  # 下载报告
-GET    /api/reports               # 获取报告列表
-DELETE /api/reports/{id}          # 删除报告
+```bash
+pip install -r requirements.txt
 ```
 
-### 5. 智能预测
+3. **配置环境变量**
 
-**路由**: `/api/predictions`
-
-**功能特性**:
-
-- 🤖 基于 AI 模型的路径预测
-- 📍 预测未来 24/48/72 小时路径
-- 🎯 显示预测置信度
-- 📊 预测结果可视化
-- 📈 多机构预报路径对比
-
-**主要接口**:
-
-```python
-POST   /api/predictions/path      # 路径预测
-POST   /api/predictions/intensity # 强度预测
-GET    /api/predictions/{id}      # 获取预测结果
+```bash
+cp .env.example .env
+# 编辑 .env 文件，配置 API 密钥
 ```
 
-### 6. 统计分析
+4. **初始化数据库**
 
-**路由**: `/api/statistics`
-
-**功能特性**:
-
-- 📈 台风数量统计（按年份、月份、强度）
-- 📊 数据可视化支持
-- 📥 统计数据导出
-- 🔢 支持自定义时间范围
-- ✅ 可选包含路径数据
-
-**主要接口**:
-
-```python
-GET    /api/statistics/yearly     # 年度统计
-GET    /api/statistics/monthly    # 月度统计
-GET    /api/statistics/intensity  # 强度统计
-POST   /api/statistics/compare    # 台风对比
+```bash
+python -c "from app.core.database import init_db; init_db()"
 ```
 
-### 7. 用户认证
+5. **导入历史数据**
 
-**路由**: `/api/auth`
-
-**功能特性**:
-
-- 🔐 用户登录/注册
-- 👤 头像上传（支持 OSS）
-- 📝 用户信息管理
-- 🔒 密码加密存储（bcrypt）
-- 📧 表单验证
-- 🔑 JWT 令牌认证
-
-**主要接口**:
-
-```python
-POST   /api/auth/login            # 用户登录
-POST   /api/auth/register         # 用户注册
-GET    /api/auth/me               # 获取当前用户信息
-PUT    /api/auth/me               # 更新用户信息
-POST   /api/auth/upload-avatar    # 上传头像
+```bash
+python data.py
 ```
 
-### 8. AI 智能客服
+6. **启动服务**
 
-**路由**: `/api/ai`
+```bash
+# 开发模式
+python main.py
 
-**功能特性**:
-
-- 🤖 集成多个 AI 模型（DeepSeek、GLM、Qwen）
-- 🧠 支持深度思考模式（DeepSeek-R1）
-- 💬 实时对话交互
-- 📝 对话历史记录管理
-- 🔥 热门问题快速回复
-- 🔄 模型自动降级和重试机制
-- 📋 会话列表管理
-
-**主要接口**:
-
-```python
-POST   /api/ai/sessions           # 创建对话会话
-GET    /api/ai/sessions           # 获取会话列表
-GET    /api/ai/sessions/{id}      # 获取会话历史
-GET    /api/ai/questions          # 获取热门问题
-POST   /api/ai/chat               # 发送问题获取回答
+# 生产模式
+uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-**深度思考模式说明**:
+访问 `http://localhost:8000/docs` 查看 API 文档。
 
-- 当开启深度思考模式时，无论选择哪个模型，都会使用 DeepSeek-R1 深度思考模型
-- 深度思考模式提供更详细的推理过程和更准确的答案
-- 响应时间会比常规模式长
+## 模型训练
 
-## 数据库设计
+### 训练新模型
 
-### 数据表结构
+```bash
+# 基础训练
+cd training
+python train_model.py --epochs 50 --batch-size 32
 
-#### 1. typhoons 表
+# 增强训练（推荐）
+python train_model_enhanced.py --epochs 100 --early-stopping 15
+```
 
-台风基本信息表
+### 评估与选择
 
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| id | Integer | 主键 |
-| ty_id | String | 台风 ID |
-| ty_code | String | 台风编号 |
-| ty_name_ch | String | 中文名称 |
-| ty_name_en | String | 英文名称 |
-| ty_start_time | DateTime | 开始时间 |
-| ty_end_time | DateTime | 结束时间 |
-| ty_max_wind_speed | Float | 最大风速 |
-| ty_min_pressure | Float | 最低气压 |
-| ty_max_intensity | String | 最大强度 |
-| ty_landfall | Boolean | 是否登陆 |
-| ty_status | String | 状态（活跃/已消散） |
-| created_at | DateTime | 创建时间 |
-| updated_at | DateTime | 更新时间 |
+```bash
+# 评估模型
+python evaluate_model.py --model-path ../models/best_model.pth
 
-#### 2. typhoon_paths 表
+# 选择最佳模型
+python select_best_model.py --models-dir ../models
 
-台风路径数据表
+# 测试模型
+python test_best_model.py
+```
 
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| id | Integer | 主键 |
-| typhoon_id | Integer | 外键，关联 typhoons 表 |
-| time | DateTime | 时间 |
-| latitude | Float | 纬度 |
-| longitude | Float | 经度 |
-| pressure | Float | 气压 |
-| wind_speed | Float | 风速 |
-| intensity | String | 强度等级 |
-| moving_direction | String | 移动方向 |
-| moving_speed | Float | 移动速度 |
-| radius_7 | Float | 7级风圈半径 |
-| radius_10 | Float | 10级风圈半径 |
+### 训练参数
 
-#### 3. alerts 表
+| 参数                 | 默认值 | 说明         |
+| -------------------- | ------ | ------------ |
+| `--epochs`           | 50/100 | 训练轮数     |
+| `--batch-size`       | 32/64  | 批次大小     |
+| `--lr`               | 0.001  | 学习率       |
+| `--sequence-length`  | 12     | 输入序列长度 |
+| `--prediction-steps` | 8      | 预测步数     |
+| `--early-stopping`   | 15     | 早停耐心值   |
 
-预警信息表
+## API 文档
 
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| id | Integer | 主键 |
-| typhoon_id | Integer | 外键，关联 typhoons 表 |
-| alert_level | String | 预警等级（蓝色/黄色/橙色/红色） |
-| alert_time | DateTime | 预警时间 |
-| alert_content | Text | 预警内容 |
-| affected_area | String | 影响区域 |
-| is_active | Boolean | 是否活跃 |
-| created_at | DateTime | 创建时间 |
+启动服务后访问：
 
-#### 4. images 表
+- **Swagger UI**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
+- **OpenAPI JSON**: `http://localhost:8000/openapi.json`
 
-图像数据表
+### 主要 API 分组
 
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| id | Integer | 主键 |
-| typhoon_id | Integer | 外键，关联 typhoons 表 |
-| image_url | String | 图像 URL |
-| image_type | String | 图像类型（红外/可见光） |
-| upload_time | DateTime | 上传时间 |
-| file_size | Integer | 文件大小 |
-| width | Integer | 图像宽度 |
-| height | Integer | 图像高度 |
+| 分组     | 路径               | 功能      |
+| -------- | ------------------ | --------- |
+| 台风数据 | `/api/typhoons`    | CRUD 操作 |
+| 预测服务 | `/api/predictions` | 路径预测  |
+| AI 客服  | `/api/ai`          | 智能对话  |
+| 图像分析 | `/api/analysis`    | 云图分析  |
+| 报告生成 | `/api/reports`     | 分析报告  |
+| 用户认证 | `/api/auth`        | 登录注册  |
 
-#### 5. image_analyses 表
+## 配置说明
 
-图像分析历史表
+### 环境变量 (.env)
 
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| id | Integer | 主键 |
-| image_id | Integer | 外键，关联 images 表 |
-| analysis_mode | String | 分析模式 |
-| ai_model | String | AI 模型 |
-| analysis_result | Text | 分析结果（JSON） |
-| extracted_features | Text | 提取的特征（JSON） |
-| analysis_time | DateTime | 分析时间 |
+```bash
+# 应用配置
+APP_NAME=TyphoonAnalysis
+DEBUG=False
 
-#### 6. reports 表
+# 数据库
+DATABASE_URL=sqlite+aiosqlite:///./typhoon.db
+
+# JWT 密钥
+SECRET_KEY=your-secret-key
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# AI API 密钥
+DEEPSEEK_API_KEY=your-key
+QWEN_API_KEY=your-key
+GLM_API_KEY=your-key
+
+# OSS 配置
+OSS_ACCESS_KEY_ID=your-key
+OSS_ACCESS_KEY_SECRET=your-secret
+OSS_BUCKET=your-bucket
+OSS_ENDPOINT=your-endpoint
+```
+
+## 性能优化
+
+### 数据库优化
+
+- 索引加速查询
+- 异步连接池
+- 批量操作
+
+### API 优化
+
+- 响应缓存
+- 分页查询
+- 异步处理
+
+### 模型优化
+
+- 模型量化
+- 批处理预测
+- GPU 加速
+
+## 测试
+
+```bash
+# 运行测试
+pytest
+
+# 覆盖率报告
+pytest --cov=app --cov-report=html
+
+# 特定测试
+pytest tests/test_prediction.py -v
+```
+
+## 部署
+
+### Docker 部署
+
+```dockerfile
+FROM python:3.9-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### 生产环境建议
+
+1. 使用 Gunicorn + Uvicorn Worker
+2. 配置 Nginx 反向代理
+3. 启用 HTTPS
+4. 配置日志轮转
+5. 设置监控告警
+
+## 常见问题
+
+### Q: 模型加载失败？
+
+A: 检查模型文件路径和 PyTorch 版本兼容性。
+
+### Q: AI 接口调用失败？
+
+A: 确认 API Key 配置正确且余额充足。
+
+### Q: 数据库连接错误？
+
+A: 检查数据库文件权限和路径配置。
+
+## 更新日志
+
+### v1.0.0 (2026-02-08)
+
+- 完成 FastAPI 后端架构
+- 实现 LSTM 台风预测模型
+- 集成多 AI 模型服务
+- 添加图像分析功能
+- 完善用户认证系统
+
+## 许可证
+
+MIT License © 2026 TyphoonAnalysis Team
 
 报告数据表
 
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| id | Integer | 主键 |
-| typhoon_id | Integer | 外键，关联 typhoons 表 |
-| report_type | String | 报告类型 |
-| ai_provider | String | AI 提供商 |
-| report_content | Text | 报告内容（Markdown） |
-| generated_at | DateTime | 生成时间 |
+| 字段名         | 类型     | 说明                   |
+| -------------- | -------- | ---------------------- |
+| id             | Integer  | 主键                   |
+| typhoon_id     | Integer  | 外键，关联 typhoons 表 |
+| report_type    | String   | 报告类型               |
+| ai_provider    | String   | AI 提供商              |
+| report_content | Text     | 报告内容（Markdown）   |
+| generated_at   | DateTime | 生成时间               |
 
 #### 7. users 表
 
 用户表
 
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| id | Integer | 主键 |
-| username | String | 用户名（唯一） |
-| email | String | 邮箱（唯一） |
-| hashed_password | String | 加密密码 |
-| avatar_url | String | 头像 URL |
-| created_at | DateTime | 创建时间 |
-| updated_at | DateTime | 更新时间 |
+| 字段名          | 类型     | 说明           |
+| --------------- | -------- | -------------- |
+| id              | Integer  | 主键           |
+| username        | String   | 用户名（唯一） |
+| email           | String   | 邮箱（唯一）   |
+| hashed_password | String   | 加密密码       |
+| avatar_url      | String   | 头像 URL       |
+| created_at      | DateTime | 创建时间       |
+| updated_at      | DateTime | 更新时间       |
 
 #### 8. ai_sessions 表
 
 AI 会话表
 
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| id | Integer | 主键 |
-| session_id | String | 会话 ID（UUID） |
-| user_id | Integer | 外键，关联 users 表 |
-| created_at | DateTime | 创建时间 |
-| updated_at | DateTime | 更新时间 |
+| 字段名     | 类型     | 说明                |
+| ---------- | -------- | ------------------- |
+| id         | Integer  | 主键                |
+| session_id | String   | 会话 ID（UUID）     |
+| user_id    | Integer  | 外键，关联 users 表 |
+| created_at | DateTime | 创建时间            |
+| updated_at | DateTime | 更新时间            |
 
 #### 9. ai_messages 表
 
 AI 消息表
 
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| id | Integer | 主键 |
-| session_id | String | 外键，关联 ai_sessions 表 |
-| role | String | 角色（user/assistant） |
-| content | Text | 消息内容 |
-| model | String | AI 模型 |
-| deep_thinking | Boolean | 是否深度思考 |
-| created_at | DateTime | 创建时间 |
+| 字段名        | 类型     | 说明                      |
+| ------------- | -------- | ------------------------- |
+| id            | Integer  | 主键                      |
+| session_id    | String   | 外键，关联 ai_sessions 表 |
+| role          | String   | 角色（user/assistant）    |
+| content       | Text     | 消息内容                  |
+| model         | String   | AI 模型                   |
+| deep_thinking | Boolean  | 是否深度思考              |
+| created_at    | DateTime | 创建时间                  |
 
 ## 环境配置
 

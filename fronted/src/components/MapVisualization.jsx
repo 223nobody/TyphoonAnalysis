@@ -2,7 +2,7 @@
  * 地图可视化组件 - 包含左侧台风列表和右侧地图
  * 参考原HTML版本的实现逻辑
  */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -23,6 +23,7 @@ import {
   getCollectTyphoons,
   addCollectTyphoon,
   removeCollectTyphoon,
+  searchTyphoons,
 } from "../services/api";
 import "leaflet/dist/leaflet.css";
 import "../styles/MapVisualization.css";
@@ -203,6 +204,7 @@ function MapVisualization({
   const [filteredTyphoons, setFilteredTyphoons] = useState([]);
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   // 筛选条件
   const [filters, setFilters] = useState({
@@ -347,18 +349,94 @@ function MapVisualization({
     hasTriedYearSwitch.current = false;
   }, [urlTyphoonId]);
 
-  // 加载台风列表
+  // 使用 ref 来跟踪最新的 filters 值，避免闭包问题
+  const filtersRef = useRef(filters);
   useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+
+  // 加载台风列表 - 修复：传递年份参数到后端API
+  const loadTyphoons = useCallback(async () => {
+    // 使用 ref 获取最新的 filters 值
+    const currentFilters = filtersRef.current;
+
+    try {
+      setListLoading(true);
+      setListError(null);
+
+      // 构建查询参数
+      const params = {
+        limit: 100,
+      };
+
+      // 如果选择了年份，传递给后端
+      if (currentFilters.year) {
+        params.year = parseInt(currentFilters.year);
+      }
+
+      // 如果选择了状态，传递给后端
+      if (currentFilters.status !== "") {
+        params.status = parseInt(currentFilters.status);
+      }
+
+      console.log(`[MapVisualization] 📡 开始加载台风列表，参数:`, params);
+
+      const data = await getTyphoonList(params);
+      console.log(`[MapVisualization] 📥 API响应数据:`, data);
+
+      if (data && data.items && Array.isArray(data.items)) {
+        console.log(
+          `[MapVisualization] ✅ 台风列表加载成功，数量: ${data.items.length}`,
+        );
+        setTyphoons(data.items);
+        // 如果没有搜索关键词，同时更新 filteredTyphoons
+        if (!currentFilters.search || currentFilters.search.trim() === "") {
+          setFilteredTyphoons(data.items);
+        }
+      } else if (data && Array.isArray(data)) {
+        console.log(
+          `[MapVisualization] ✅ 台风列表加载成功，数量: ${data.length}`,
+        );
+        setTyphoons(data);
+        // 如果没有搜索关键词，同时更新 filteredTyphoons
+        if (!currentFilters.search || currentFilters.search.trim() === "") {
+          setFilteredTyphoons(data);
+        }
+      } else {
+        console.error("[MapVisualization] API返回数据格式错误:", data);
+        setListError("加载台风列表失败：数据格式错误");
+      }
+    } catch (err) {
+      console.error("[MapVisualization] 加载台风列表失败:", err);
+      setListError(err.message || "加载失败，请检查后端服务是否正常运行");
+    } finally {
+      setListLoading(false);
+    }
+  }, []); // 空依赖数组，因为使用 ref 获取最新值
+
+  // 加载台风列表 - 组件挂载和筛选条件变化时都会执行
+  useEffect(() => {
+    console.log(
+      `[MapVisualization] 加载台风列表 - 年份: ${filters.year}, 状态: ${filters.status}`,
+    );
     loadTyphoons();
     loadCollectTyphoons();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.year, filters.status]); // 当年份或状态筛选条件变化时重新加载
+  }, [filters.year, filters.status, loadTyphoons]);
 
-  // 应用前端搜索筛选（仅用于名称搜索）
+  // 搜索功能 - 使用防抖处理
   useEffect(() => {
-    applyFilters();
+    const timer = setTimeout(() => {
+      if (filters.search && filters.search.trim() !== "") {
+        handleSearch();
+      } else {
+        // 如果没有搜索关键词，显示筛选后的台风列表
+        setFilteredTyphoons(typhoons);
+      }
+    }, 300); // 300ms 防抖延迟
+
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typhoons, filters.search]); // 当台风数据或搜索关键词变化时重新筛选
+  }, [filters.search]); // 当搜索关键词变化时触发搜索
 
   // 当选中的台风变化时，加载路径数据并定位地图
   useEffect(() => {
@@ -396,46 +474,41 @@ function MapVisualization({
     }
   }, [selectedTyphoons, typhoons]);
 
-  // 加载台风列表 - 修复：传递年份参数到后端API
-  const loadTyphoons = async () => {
+  // 搜索台风 - 使用专门的搜索API
+  const handleSearch = async () => {
+    const searchTerm = filters.search.trim();
+    if (!searchTerm) {
+      setFilteredTyphoons(typhoons);
+      return;
+    }
+
     try {
-      setListLoading(true);
-      setListError(null);
+      setIsSearching(true);
+      console.log(`� 开始搜索台风: "${searchTerm}"`);
 
-      console.log(`📡 开始加载台风列表，年份: ${filters.year}`);
-
-      // 构建查询参数
       const params = {
+        keyword: searchTerm,
         limit: 100,
       };
 
-      // 如果选择了年份，传递给后端
-      if (filters.year) {
-        params.year = parseInt(filters.year);
-      }
-
-      // 如果选择了状态，传递给后端
-      if (filters.status !== "") {
-        params.status = parseInt(filters.status);
-      }
-
-      const data = await getTyphoonList(params);
+      const data = await searchTyphoons(params);
 
       if (data && data.items && Array.isArray(data.items)) {
-        console.log(`✅ 台风列表加载成功，数量: ${data.items.length}`);
-        setTyphoons(data.items);
+        console.log(`✅ 搜索成功，找到 ${data.items.length} 个台风`);
+        setFilteredTyphoons(data.items);
       } else if (data && Array.isArray(data)) {
-        console.log(`✅ 台风列表加载成功，数量: ${data.length}`);
-        setTyphoons(data);
+        console.log(`✅ 搜索成功，找到 ${data.length} 个台风`);
+        setFilteredTyphoons(data);
       } else {
-        console.error("API返回数据格式错误:", data);
-        setListError("加载台风列表失败：数据格式错误");
+        console.error("搜索API返回数据格式错误:", data);
+        setFilteredTyphoons([]);
       }
     } catch (err) {
-      console.error("加载台风列表失败:", err);
-      setListError(err.message || "加载失败，请检查后端服务是否正常运行");
+      console.error("搜索台风失败:", err);
+      message.error("搜索失败: " + (err.message || "请稍后重试"));
+      setFilteredTyphoons([]);
     } finally {
-      setListLoading(false);
+      setIsSearching(false);
     }
   };
 
@@ -473,31 +546,6 @@ function MapVisualization({
     } finally {
       setIsCollecting(false);
     }
-  };
-
-  // 应用前端筛选
-  const applyFilters = () => {
-    let filtered = [...typhoons];
-
-    console.log(`🔄 应用筛选，原始台风数量: ${filtered.length}`);
-
-    // 搜索筛选（在前端处理，因为需要模糊匹配）
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(
-        (t) =>
-          t.typhoon_id.toLowerCase().includes(searchLower) ||
-          t.typhoon_name.toLowerCase().includes(searchLower) ||
-          (t.typhoon_name_cn && t.typhoon_name_cn.includes(filters.search)),
-      );
-    }
-
-    console.log(`✅ 筛选后台风数量: ${filtered.length}`);
-    console.log(
-      `📋 筛选后的台风列表:`,
-      filtered.map((t) => t.typhoon_id),
-    );
-    setFilteredTyphoons(filtered);
   };
 
   // 加载台风路径
@@ -919,11 +967,11 @@ function MapVisualization({
         </div>
 
         {/* 加载状态 */}
-        {listLoading && (
+        {(listLoading || isSearching) && (
           <div
             style={{ textAlign: "center", padding: "20px", color: "#6b7280" }}
           >
-            正在加载台风数据...
+            {isSearching ? "🔍 正在搜索..." : "正在加载台风数据..."}
           </div>
         )}
 
@@ -935,7 +983,7 @@ function MapVisualization({
         )}
 
         {/* 台风列表 */}
-        {!listLoading && !listError && (
+        {!listLoading && !listError && !isSearching && (
           <div>
             <p
               style={{
@@ -944,7 +992,16 @@ function MapVisualization({
                 marginBottom: "10px",
               }}
             >
-              共 {filteredTyphoons.length} 个台风
+              {filters.search && filters.search.trim() !== "" ? (
+                <>
+                  🔍 搜索结果：共 {filteredTyphoons.length} 个台风
+                  <span style={{ fontSize: "11px", marginLeft: "5px" }}>
+                    （在全部年份和状态中搜索）
+                  </span>
+                </>
+              ) : (
+                <>共 {filteredTyphoons.length} 个台风</>
+              )}
             </p>
             <div
               style={{ display: "flex", flexDirection: "column", gap: "8px" }}
@@ -1914,24 +1971,6 @@ function MapVisualization({
                         {videoLoading ? "加载中..." : "路径动态可视化"}
                       </span>
                     </button>
-
-                    {/* 视频错误提示 */}
-                    {videoError && (
-                      <div
-                        style={{
-                          marginTop: "8px",
-                          padding: "8px",
-                          background: "#fff3cd",
-                          border: "1px solid #ffc107",
-                          borderRadius: "6px",
-                          fontSize: "12px",
-                          color: "#856404",
-                          textAlign: "center",
-                        }}
-                      >
-                        ⚠️ {videoError}
-                      </div>
-                    )}
                   </div>
                 )}
             </div>
@@ -2024,14 +2063,12 @@ function MapVisualization({
                 onError={(e) => {
                   const video = e.target;
 
-                  // 检查是否是source标签的错误
                   if (e.target.tagName === "SOURCE") {
                     console.error("❌ Source标签加载失败");
-                    setVideoError("视频资源加载失败，请检查后端服务是否正常");
+                    setVideoError("视频资源加载失败，请检查服务器资源是否正常");
                     return;
                   }
 
-                  // 获取错误代码
                   let errorCode = "未知";
                   let errorDetail = null;
 
@@ -2040,7 +2077,6 @@ function MapVisualization({
                     errorDetail = video.error.message || null;
                   }
 
-                  // 错误代码映射
                   const errorMessages = {
                     1: "视频加载被中止",
                     2: "网络错误导致视频下载失败",
@@ -2050,7 +2086,6 @@ function MapVisualization({
 
                   const errorMsg = errorMessages[errorCode] || "视频加载失败";
 
-                  // 提供更友好的错误提示
                   let userMessage = errorMsg;
                   if (errorCode === 2) {
                     userMessage += "。请检查网络连接或后端服务是否正常。";
@@ -2067,7 +2102,7 @@ function MapVisualization({
                 style={{
                   width: "100%",
                   height: "100%",
-                  display: "block",
+                  display: videoError ? "none" : "block",
                   objectFit: "contain",
                   backgroundColor: "#000",
                 }}
@@ -2081,6 +2116,77 @@ function MapVisualization({
                 />
                 您的浏览器不支持视频播放
               </video>
+
+              {videoError && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    padding: "20px",
+                    textAlign: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "48px",
+                      marginBottom: "20px",
+                      opacity: 0.8,
+                    }}
+                  >
+                    ⚠️
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: "600",
+                      marginBottom: "10px",
+                      maxWidth: "80%",
+                    }}
+                  >
+                    视频加载失败
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "14px",
+                      opacity: 0.8,
+                      maxWidth: "80%",
+                      lineHeight: "1.6",
+                    }}
+                  >
+                    {videoError}
+                  </div>
+                  <button
+                    onClick={handleCloseVideo}
+                    style={{
+                      marginTop: "20px",
+                      padding: "10px 24px",
+                      background: "rgba(255, 255, 255, 0.2)",
+                      border: "1px solid rgba(255, 255, 255, 0.3)",
+                      borderRadius: "6px",
+                      color: "white",
+                      fontSize: "14px",
+                      cursor: "pointer",
+                      transition: "all 0.3s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = "rgba(255, 255, 255, 0.3)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = "rgba(255, 255, 255, 0.2)";
+                    }}
+                  >
+                    关闭
+                  </button>
+                </div>
+              )}
 
               {/* 视频标题 */}
               <div

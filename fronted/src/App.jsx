@@ -13,6 +13,7 @@ import Header from "./components/Header";
 import TabNavigation from "./components/TabNavigation";
 import AlertBanner from "./components/AlertBanner";
 import MapVisualization from "./components/MapVisualization";
+import PredictionVisualization from "./components/PredictionVisualization";
 import TyphoonQuery from "./components/TyphoonQuery";
 import Prediction from "./components/Prediction";
 import ImageAnalysis from "./components/ImageAnalysis";
@@ -74,6 +75,7 @@ function AppContent() {
     if (path === "/" || path === "/visualization") return "visualization";
     if (path === "/typhoon") return "typhoon";
     if (path === "/prediction") return "prediction";
+    if (path === "/prediction-visualization") return "prediction-viz";
     if (path === "/analysis") return "analysis";
     if (path === "/report") return "report";
     if (path === "/statistics") return "statistics";
@@ -89,6 +91,11 @@ function AppContent() {
     },
     { id: "typhoon", label: "🌊 台风数据查询", path: "/typhoon" },
     { id: "prediction", label: "🎯 智能预测", path: "/prediction" },
+    {
+      id: "prediction-viz",
+      label: "🔮 预测可视化",
+      path: "/prediction-visualization",
+    },
     { id: "analysis", label: "🖼️ 图像分析", path: "/analysis" },
     { id: "report", label: "📊 报告生成", path: "/report" },
     { id: "statistics", label: "📈 统计分析", path: "/statistics" },
@@ -188,6 +195,18 @@ function AppContent() {
               />
               <Route path="/typhoon" element={<TyphoonQuery />} />
               <Route path="/prediction" element={<Prediction />} />
+              <Route
+                path="/prediction-visualization"
+                element={
+                  <PredictionVisualization
+                    selectedTyphoons={selectedTyphoons}
+                    onTyphoonSelect={handleTyphoonSelect}
+                    allowMultipleTyphoons={allowMultipleTyphoons}
+                    setAllowMultipleTyphoons={setAllowMultipleTyphoons}
+                    clearAllSelectedTyphoons={clearAllSelectedTyphoons}
+                  />
+                }
+              />
               <Route path="/analysis" element={<ImageAnalysis />} />
               <Route path="/report" element={<ReportGeneration />} />
               <Route

@@ -2,12 +2,22 @@
  * 报告生成组件
  */
 import React, { useState, useRef } from "react";
-import axios from "axios";
+
 import { marked } from "marked";
+
+// 配置 marked 为同步模式
+marked.setOptions({
+  async: false,
+});
 import html2pdf from "html2pdf.js";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { message } from "antd";
-import { getTyphoonList, getReportById, getTyphoonById } from "../services/api";
+import {
+  getTyphoonList,
+  getReportById,
+  getTyphoonById,
+  generateReport,
+} from "../services/api";
 import "../styles/ReportGeneration.css";
 import "../styles/TyphoonQuery.css"; // 导入下拉选择器样式
 import "../styles/common.css";
@@ -15,10 +25,16 @@ import "../styles/common.css";
 function ReportGeneration() {
   const [searchParams] = useSearchParams();
   const urlReportId = searchParams.get("report_id");
+  const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+
+  // 追踪result变化
+  React.useEffect(() => {
+    console.log("result state changed:", result);
+  }, [result]);
 
   // PDF导出引用
   const reportContentRef = useRef(null);
@@ -86,9 +102,9 @@ function ReportGeneration() {
     if (urlReportId && !hasProcessedUrlReportId.current) {
       console.log(`📌 检测到URL参数中的report_id: ${urlReportId}`);
 
-      // 验证report_id格式
-      if (!urlReportId || urlReportId.trim() === "") {
-        message.error("报告ID格式错误");
+      // 验证report_id格式（必须是数字）
+      if (!urlReportId || urlReportId.trim() === "" || isNaN(parseInt(urlReportId))) {
+        console.warn(`⚠️ 无效的报告ID: ${urlReportId}，跳过自动加载`);
         hasProcessedUrlReportId.current = true;
         return;
       }
@@ -234,15 +250,24 @@ function ReportGeneration() {
       return;
     }
 
+    const token = localStorage.getItem("token");
+    if (!token) {
+      message.warning("请先登录后再生成报告");
+      navigate("/login");
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.post(`api/report/generate`, {
-        typhoon_id: reportForm.typhoonId,
-        report_type: reportForm.reportType,
-        ai_provider: reportForm.aiProvider,
-      });
-      setResult(response.data);
+      const response = await generateReport(
+        reportForm.typhoonId,
+        reportForm.reportType,
+        reportForm.aiProvider,
+      );
+      // apiClient 的响应拦截器已经返回了 response.data
+      console.log("报告生成成功，响应数据:", response);
+      setResult(response);
     } catch (err) {
       setError(err.response?.data?.detail || err.message || "报告生成失败");
     } finally {
@@ -465,6 +490,10 @@ function ReportGeneration() {
   const renderResult = () => {
     if (!result) return null;
 
+    console.log("renderResult - result:", result);
+    console.log("renderResult - report_content:", result.report_content);
+    console.log("renderResult - content:", result.content);
+
     // 参考index.html，使用report_content字段
     const reportContent = result.report_content || result.content || "";
     const typhoonId = result.typhoon_id || reportForm.typhoonId || "未知";
@@ -574,7 +603,16 @@ function ReportGeneration() {
                   overflowY: "auto",
                   lineHeight: "1.6",
                 }}
-                dangerouslySetInnerHTML={{ __html: marked(reportContent) }}
+                dangerouslySetInnerHTML={{
+                  __html: (() => {
+                    try {
+                      return marked.parse(reportContent);
+                    } catch (e) {
+                      console.error("marked.parse error:", e);
+                      return `<pre>${reportContent}</pre>`;
+                    }
+                  })(),
+                }}
               />
             </div>
           ) : (
@@ -761,7 +799,15 @@ function ReportGeneration() {
       )}
 
       {/* 结果显示 */}
-      {result && renderResult()}
+      {console.log(
+        "JSX render - result:",
+        result,
+        "loading:",
+        loading,
+        "error:",
+        error,
+      )}
+      {result && <div key={result.id || Date.now()}>{renderResult()}</div>}
     </div>
   );
 }

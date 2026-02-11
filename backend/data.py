@@ -12,6 +12,7 @@ from sqlalchemy.orm import sessionmaker
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.models.typhoon import Base, Typhoon, TyphoonPath
+from app.models.user import User
 
 
 class TyDetailMidModel:

@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 import uuid
 import logging
 import json
+import asyncio
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
@@ -27,6 +28,55 @@ BEIJING_TZ = timezone(timedelta(hours=8))
 def get_beijing_time():
     """获取当前北京时间"""
     return datetime.now(BEIJING_TZ)
+
+
+async def find_preset_question(question_text: str, db: AsyncSession) -> Question:
+    """
+    根据用户问题查找匹配的预设问题
+    
+    匹配规则：
+    1. 首先尝试精确匹配（不区分大小写）
+    2. 如果没有精确匹配，尝试模糊匹配（包含关系）
+    
+    Args:
+        question_text: 用户输入的问题
+        db: 数据库会话
+        
+    Returns:
+        匹配的 Question 对象，如果没有匹配则返回 None
+    """
+    try:
+        # 1. 首先尝试精确匹配（不区分大小写）
+        stmt = select(Question).where(
+            func.lower(Question.question) == func.lower(question_text.strip())
+        )
+        result = await db.execute(stmt)
+        matched = result.scalar_one_or_none()
+        
+        if matched:
+            logger.info(f"找到精确匹配的预设问题: {matched.question}")
+            return matched
+        
+        # 2. 如果没有精确匹配，尝试模糊匹配（用户问题包含预设问题关键词）
+        # 获取所有预设问题
+        all_stmt = select(Question).order_by(Question.weight.desc())
+        all_result = await db.execute(all_stmt)
+        all_questions = all_result.scalars().all()
+        
+        user_question_lower = question_text.lower().strip()
+        
+        for q in all_questions:
+            # 检查用户问题是否包含预设问题的关键词（长度大于3才进行模糊匹配）
+            preset_question_lower = q.question.lower()
+            if len(preset_question_lower) > 3:
+                if preset_question_lower in user_question_lower or user_question_lower in preset_question_lower:
+                    logger.info(f"找到模糊匹配的预设问题: {q.question}")
+                    return q
+        
+        return None
+    except Exception as e:
+        logger.error(f"查找预设问题失败: {str(e)}")
+        return None
 
 
 def get_model_display_name(model_key: str, deep_thinking: bool = False) -> str:
@@ -378,25 +428,54 @@ async def call_ai_service_with_retry(
 
 @router.post("/ai-agent/ask", response_model=AskResponse)
 async def ask_question(
-    request: AskRequest, 
+    request: AskRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
     用户提问接口
-    1. 直接调用AI服务生成回答（支持多模型切换、重试和自动降级）
-    2. 保存对话历史（严格关联当前用户的 user_id）
-    3. 返回答案
+    1. 优先从questions表中查找匹配的问题，如果找到则直接返回答案
+    2. 如果没有找到匹配的问题，则调用AI服务生成回答（支持多模型切换、重试和自动降级）
+    3. 保存对话历史（严格关联当前用户的 user_id）
+    4. 返回答案
     """
     try:
         logger.info(f"用户提问 - 用户ID: {current_user.id}, 会话ID: {request.session_id}, 问题: {request.question}")
 
-        # 直接调用AI服务生成回答
+        # 1. 首先尝试从questions表中查找匹配的预设问题
+        preset_question = await find_preset_question(request.question, db)
+
+        if preset_question:
+            # 找到匹配的预设问题，直接使用预设答案
+            logger.info(f"使用预设问题答案 - 问题ID: {preset_question.id}, 问题: {preset_question.question}")
+
+            # 获取当前北京时间
+            current_time = get_beijing_time()
+
+            # 保存对话历史，标记为非AI生成
+            history = AskHistory(
+                session_id=request.session_id,
+                question=request.question,
+                answer=preset_question.answer,
+                reasoning_content=None,
+                is_ai_generated=False,
+                ai_mode=None,
+                created_at=current_time,
+                user_id=current_user.id
+            )
+            db.add(history)
+            await db.commit()
+
+            logger.info(f"[预设问题回答] 用户ID: {current_user.id}, 会话ID: {request.session_id}, 时间: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+            return AskResponse(answer=preset_question.answer, matched=True, reasoning_content="")
+
+        # 2. 没有找到预设问题，调用AI服务生成回答
         from app.core.config import settings
 
         reasoning_content = ""  # 初始化推理内容
 
-        logger.info(f"开始调用AI服务 - 用户选择模型: {request.model}, 深度思考: {request.deep_thinking}, 问题: {request.question}")
+        logger.info(f"未找到预设问题，开始调用AI服务 - 用户选择模型: {request.model}, 深度思考: {request.deep_thinking}, 问题: {request.question}")
 
         # 根据深度思考模式和用户选择的模型，确定实际使用的模型
         if request.deep_thinking:
@@ -694,20 +773,60 @@ async def ask_question_stream(
 ):
     """
     用户提问接口（流式传输）
-    1. 直接调用AI服务生成回答（支持多模型切换、重试和自动降级）
-    2. 使用Server-Sent Events (SSE)流式返回结果
-    3. 保存对话历史（严格关联当前用户的 user_id）
+    1. 优先从questions表中查找匹配的问题，如果找到则直接返回答案
+    2. 如果没有找到匹配的问题，则调用AI服务生成回答（支持多模型切换、重试和自动降级）
+    3. 使用Server-Sent Events (SSE)流式返回结果
+    4. 保存对话历史（严格关联当前用户的 user_id）
     """
     async def generate():
         try:
             logger.info(f"用户提问（流式） - 用户ID: {current_user.id}, 会话ID: {request.session_id}, 问题: {request.question}")
 
+            # 1. 首先尝试从questions表中查找匹配的预设问题
+            preset_question = await find_preset_question(request.question, db)
+
+            if preset_question:
+                # 找到匹配的预设问题，直接流式返回答案
+                logger.info(f"使用预设问题答案（流式） - 问题ID: {preset_question.id}, 问题: {preset_question.question}")
+
+                # 模拟流式输出，将答案分段发送
+                answer = preset_question.answer
+                chunk_size = 50  # 每50个字符分一段
+
+                for i in range(0, len(answer), chunk_size):
+                    chunk = answer[i:i + chunk_size]
+                    yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
+                    await asyncio.sleep(0.05)  # 小延迟模拟打字效果
+
+                # 获取当前北京时间
+                current_time = get_beijing_time()
+
+                # 保存对话历史，标记为非AI生成
+                history = AskHistory(
+                    session_id=request.session_id,
+                    question=request.question,
+                    answer=answer,
+                    reasoning_content=None,
+                    is_ai_generated=False,
+                    ai_mode=None,
+                    created_at=current_time,
+                    user_id=current_user.id
+                )
+                db.add(history)
+                await db.commit()
+
+                logger.info(f"[预设问题回答（流式）] 用户ID: {current_user.id}, 会话ID: {request.session_id}, 时间: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+                yield "data: [DONE]\n\n"
+                return
+
+            # 2. 没有找到预设问题，调用AI服务生成回答
             from app.core.config import settings
 
             reasoning_content = ""
             full_answer = ""
 
-            logger.info(f"开始调用AI服务（流式） - 用户选择模型: {request.model}, 深度思考: {request.deep_thinking}, 问题: {request.question}")
+            logger.info(f"未找到预设问题，开始调用AI服务（流式） - 用户选择模型: {request.model}, 深度思考: {request.deep_thinking}, 问题: {request.question}")
 
             if request.deep_thinking:
                 actual_model_name = settings.DEEPSEEK_MODEL_THINKING

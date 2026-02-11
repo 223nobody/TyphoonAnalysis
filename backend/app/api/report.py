@@ -158,6 +158,22 @@ async def generate_report(
     return db_report
 
 
+@router.get("/{report_id}", response_model=ReportResponse)
+async def get_report(
+    report_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """获取报告详情"""
+    query = select(Report).where(Report.id == report_id)
+    result = await db.execute(query)
+    report = result.scalar_one_or_none()
+    
+    if not report:
+        raise HTTPException(status_code=404, detail="报告不存在")
+    
+    return report
+
+
 @router.get("", response_model=List[ReportResponse])
 async def get_reports(
     typhoon_id: str = None,
@@ -176,20 +192,4 @@ async def get_reports(
     reports = result.scalars().all()
     
     return reports
-
-
-@router.get("/{report_id}", response_model=ReportResponse)
-async def get_report(
-    report_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """获取报告详情"""
-    query = select(Report).where(Report.id == report_id)
-    result = await db.execute(query)
-    report = result.scalar_one_or_none()
-    
-    if not report:
-        raise HTTPException(status_code=404, detail="报告不存在")
-    
-    return report
 

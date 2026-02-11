@@ -4,7 +4,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, or_
 from pydantic import BaseModel
 from datetime import datetime
 import logging
@@ -67,6 +67,47 @@ async def get_typhoons(
     count_result = await db.execute(count_query)
     total = len(count_result.scalars().all())
 
+    return TyphoonListResponse(total=total, items=typhoons)
+
+
+@router.get("/search", response_model=TyphoonListResponse)
+async def search_typhoons(
+    keyword: str = Query(..., description="搜索关键词"),
+    limit: int = Query(100, ge=1, le=200),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    搜索台风（按台风ID、名称或中文名称搜索）
+    搜索范围包括所有年份和状态的台风
+    """
+    logger.info(f"搜索台风，关键词: {keyword}")
+
+    # 构建搜索条件（不区分大小写）
+    search_pattern = f"%{keyword}%"
+
+    query = select(Typhoon).where(
+        or_(
+            Typhoon.typhoon_id.ilike(search_pattern),
+            Typhoon.typhoon_name.ilike(search_pattern),
+            Typhoon.typhoon_name_cn.ilike(search_pattern)
+        )
+    ).order_by(desc(Typhoon.typhoon_id)).limit(limit)
+
+    result = await db.execute(query)
+    typhoons = result.scalars().all()
+
+    # 获取总数
+    count_query = select(Typhoon).where(
+        or_(
+            Typhoon.typhoon_id.ilike(search_pattern),
+            Typhoon.typhoon_name.ilike(search_pattern),
+            Typhoon.typhoon_name_cn.ilike(search_pattern)
+        )
+    )
+    count_result = await db.execute(count_query)
+    total = len(count_result.scalars().all())
+
+    logger.info(f"搜索完成，找到 {len(typhoons)} 个台风")
     return TyphoonListResponse(total=total, items=typhoons)
 
 

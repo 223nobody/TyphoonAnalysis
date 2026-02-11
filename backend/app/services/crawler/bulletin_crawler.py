@@ -119,7 +119,7 @@ class BulletinCrawler:
             bulletin_data: 原始公报数据
             
         Returns:
-            Optional[Dict]: 解析后的公报信息
+            Optional[Dict]: 解析后的公报信息，如果没有活跃台风则返回None
         """
         try:
             list_data = bulletin_data.get('list', [])
@@ -135,10 +135,17 @@ class BulletinCrawler:
                     info_dict[label] = text
             
             # 提取关键信息
+            typhoon_name = info_dict.get('命名', '')
+            
+            # 检查是否有有效的台风名称（没有台风时通常为空或"无"）
+            if not typhoon_name or typhoon_name.strip() == '' or typhoon_name == '无':
+                logger.info("当前没有活跃台风")
+                return None
+            
             parsed = {
                 'release_time': bulletin_data.get('releaseTime'),
                 'description': bulletin_data.get('description'),
-                'typhoon_name': info_dict.get('命名', ''),
+                'typhoon_name': typhoon_name,
                 'typhoon_number': info_dict.get('编号', ''),
                 'time': info_dict.get('时间', ''),
                 'position': info_dict.get('中心位置', ''),

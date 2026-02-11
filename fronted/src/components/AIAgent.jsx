@@ -204,16 +204,6 @@ const InputArea = ({
     [],
   );
 
-  const handleKeyDown = useCallback(
-    (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        onSendMessage();
-      }
-    },
-    [onSendMessage],
-  );
-
   return (
     <div className="ai-agent-input" role="form" aria-label="消息输入区域">
       <div className="input-wrapper">
@@ -224,7 +214,6 @@ const InputArea = ({
           placeholder="输入您的问题，按 Enter 发送..."
           loading={sending}
           style={{ width: "100%", maxWidth: 800 }}
-          onKeyDown={handleKeyDown}
         />
       </div>
       <div className="input-controls">
@@ -394,6 +383,7 @@ function AIAgent() {
   const lastScrollHeightRef = useRef(0);
   const isStreamingRef = useRef(false);
   const chatSectionRef = useRef(null);
+  const isSubmittingRef = useRef(false); // 防止重复提交的 ref
 
   const SCROLL_THRESHOLD = 100;
   const SCROLL_DEBOUNCE_TIME = 150;
@@ -609,7 +599,8 @@ function AIAgent() {
 
   const handleQuestionClick = useCallback(
     async (questionText) => {
-      if (!questionText.trim() || sending) return;
+      // 使用 ref 防止重复提交（比 state 更可靠，因为 ref 的更新是同步的）
+      if (!questionText.trim() || sending || isSubmittingRef.current) return;
 
       const token = localStorage.getItem("token");
       if (!token) {
@@ -617,6 +608,9 @@ function AIAgent() {
         navigate("/login");
         return;
       }
+
+      // 标记正在提交，防止重复点击
+      isSubmittingRef.current = true;
 
       // 用户发起提问时，强制开启 autoScroll，忽略之前手动向上滚动导致的 autoScroll=false 状态
       setAutoScroll(true);
@@ -740,6 +734,8 @@ function AIAgent() {
         setMessages((prev) => prev.filter((msg) => msg.key !== aiMessageKey));
       } finally {
         setSending(false);
+        // 重置提交状态，允许新的提交
+        isSubmittingRef.current = false;
       }
     },
     [

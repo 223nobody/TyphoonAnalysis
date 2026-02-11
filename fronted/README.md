@@ -1,585 +1,422 @@
-# 台风分析系统 - 前端文档
+# 台风分析系统 - 前端应用
+
+<p align="center">
+  <img src="https://img.shields.io/badge/React-18-61DAFB.svg" alt="React 18">
+  <img src="https://img.shields.io/badge/Vite-5.0-646CFF.svg" alt="Vite 5.0">
+  <img src="https://img.shields.io/badge/Ant%20Design-6.x-1677FF.svg" alt="Ant Design">
+  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
+</p>
 
 ## 项目简介
 
-台风分析系统前端是一个基于 **React 18** 构建的现代化 Web 应用，提供台风数据可视化、统计分析、路径预测、AI 智能客服、图像分析等功能。采用响应式设计，支持多种数据展示方式，集成 Ant Design X 组件库。
+台风分析系统前端是一个基于 **React 18** 构建的现代化数据可视化平台，专注于台风路径展示、智能预测、数据分析和交互式可视化。系统采用模块化架构设计，支持多维度数据展示和实时交互。
+
+### 核心特性
+
+- **交互式地图可视化** - 基于 Leaflet 的台风路径实时展示
+- **智能预测可视化** - AI 预测路径与置信度展示
+- **多维度数据分析** - ECharts 图表统计与对比
+- **AI 智能客服** - 集成多模型对话系统
+- **图像智能分析** - 卫星云图 AI 识别
+- **响应式设计** - 适配多种屏幕尺寸
 
 ## 技术栈
 
-- **框架**: React 18
-- **UI 组件库**: Ant Design 6.x + Ant Design X 2.x
-- **地图可视化**: Leaflet 1.9 + React-Leaflet 4.2
-- **图表库**: ECharts 6.0 + echarts-for-react 3.0
-- **HTTP 客户端**: Axios 1.6
-- **路由**: React Router DOM 7.12
-- **构建工具**: Vite 5.0
-- **样式**: CSS3 + 内联样式
-- **其他**: 
-  - html2pdf.js (PDF导出)
-  - marked (Markdown渲染)
-  - crypto-js (加密)
-  - ali-oss (阿里云OSS)
+### 核心框架
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| React | 18.x | UI 框架 |
+| Vite | 5.0 | 构建工具 |
+| React Router | 7.x | 路由管理 |
+| Axios | 1.6 | HTTP 客户端 |
+
+### UI 组件库
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| Ant Design | 6.x | 基础组件库 |
+| Ant Design X | 2.x | AI 对话组件 |
+| Ant Design Charts | 2.x | 统计图表 |
+
+### 可视化技术
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| Leaflet | 1.9 | 地图可视化 |
+| React-Leaflet | 4.2 | React 地图组件 |
+| ECharts | 6.0 | 数据图表 |
+| D3.js | 7.x | 高级可视化 |
 
 ## 项目结构
 
 ```
 fronted/
-├── public/                 # 静态资源
+├── public/                     # 静态资源
+│   └── vite.svg               # 应用图标
 ├── src/
-│   ├── components/        # React组件
-│   │   ├── AIAgent.jsx               # AI智能客服
-│   │   ├── AIAgentButton.jsx         # AI客服按钮
+│   ├── components/            # React 组件
+│   │   ├── AIAgent.jsx               # AI 智能客服
+│   │   ├── AIAgentButton.jsx         # AI 客服悬浮按钮
 │   │   ├── AlertBanner.jsx           # 预警横幅
-│   │   ├── AlertCenter.jsx           # 预警中心
+│   │   ├── AlertCenter.jsx           # 预警管理中心
 │   │   ├── AvatarUpload.jsx          # 头像上传
-│   │   ├── Header.jsx                # 页面头部
-│   │   ├── ImageAnalysis.jsx          # 图像分析
-│   │   ├── Login.jsx                 # 登录组件
+│   │   ├── Header.jsx                # 页面头部导航
+│   │   ├── ImageAnalysis.jsx         # 图像分析
+│   │   ├── Login.jsx                 # 登录页面
 │   │   ├── MapVisualization.jsx      # 地图可视化
 │   │   ├── Prediction.jsx            # 台风预测
-│   │   ├── Register.jsx              # 注册组件
-│   │   ├── ReportGeneration.jsx       # 报告生成
-│   │   ├── StatisticsPanel.jsx        # 统计分析
+│   │   ├── PredictionVisualization.jsx # 预测可视化
+│   │   ├── Register.jsx              # 注册页面
+│   │   ├── ReportGeneration.jsx      # 报告生成
+│   │   ├── StatisticsPanel.jsx       # 统计分析
 │   │   ├── TabNavigation.jsx         # 标签导航
 │   │   ├── TyphoonList.jsx           # 台风列表
 │   │   ├── TyphoonQuery.jsx          # 台风查询
-│   │   └── UserCenter.jsx           # 用户中心
-│   ├── pictures/          # 图片资源
-│   │   ├── deepseek.png
-│   │   └── taifeng.gif
-│   ├── services/          # API服务层
-│   │   ├── api.js                    # API调用封装
-│   │   ├── ossConfig.js              # OSS配置
-│   │   ├── ossUploadService.js       # OSS上传服务
-│   │   └── ossUtils.js              # OSS工具函数
-│   ├── styles/            # 样式文件
-│   │   ├── AIAgent.css               # AI客服样式
-│   │   ├── AIAgentButton.css         # AI客服按钮样式
-│   │   ├── AlertCenter.css           # 预警中心样式
-│   │   ├── Auth.css                  # 认证样式
-│   │   ├── AvatarUpload.css          # 头像上传样式
-│   │   ├── Header.css                # 头部样式
-│   │   ├── ImageAnalysis.css          # 图像分析样式
-│   │   ├── MapVisualization.css      # 地图可视化样式
-│   │   ├── ReportGeneration.css       # 报告生成样式
-│   │   ├── StatisticsPanel.css        # 统计分析样式
-│   │   ├── TyphoonQuery.css          # 台风查询样式
-│   │   ├── common.css                # 通用样式
-│   │   └── index.css                # 主样式文件
-│   ├── App.jsx             # 根组件
-│   └── main.jsx            # 应用入口
-├── .eslintrc.cjs         # ESLint配置
-├── .gitignore
-├── index.html            # HTML模板
-├── package.json          # 项目依赖配置
-└── vite.config.js        # Vite配置
+│   │   └── UserCenter.jsx            # 用户中心
+│   ├── pictures/              # 图片资源
+│   │   ├── deepseek.png       # DeepSeek 图标
+│   │   └── taifeng.gif        # 台风动画
+│   ├── services/              # API 服务层
+│   │   ├── api.js             # API 调用封装
+│   │   ├── ossConfig.js       # OSS 配置
+│   │   ├── ossUploadService.js # OSS 上传服务
+│   │   └── ossUtils.js        # OSS 工具函数
+│   ├── styles/                # 样式文件
+│   │   ├── AIAgent.css        # AI 客服样式
+│   │   ├── AIAgentButton.css  # AI 按钮样式
+│   │   ├── AlertCenter.css    # 预警中心样式
+│   │   ├── Auth.css           # 认证页面样式
+│   │   ├── AvatarUpload.css   # 头像上传样式
+│   │   ├── Header.css         # 头部样式
+│   │   ├── ImageAnalysis.css  # 图像分析样式
+│   │   ├── MapVisualization.css # 地图可视化样式
+│   │   ├── ReportGeneration.css # 报告生成样式
+│   │   ├── StatisticsPanel.css  # 统计分析样式
+│   │   ├── TyphoonQuery.css   # 台风查询样式
+│   │   ├── common.css         # 通用样式
+│   │   └── index.css          # 主样式文件
+│   ├── App.jsx                # 根组件
+│   └── main.jsx               # 应用入口
+├── .eslintrc.cjs             # ESLint 配置
+├── index.html                # HTML 模板
+├── package.json              # 项目依赖
+└── vite.config.js            # Vite 配置
 ```
 
-## 核心功能
+## 核心功能模块
 
 ### 1. 台风路径可视化
 
-**文件**: `src/components/MapVisualization.jsx`
+**组件**: `MapVisualization.jsx`
+
+基于 Leaflet 的交互式地图，支持多台风路径叠加显示。
 
 **功能特性**:
+- 实时路径绘制与动画
+- 强度等级颜色编码
+- 风速大小映射
+- 多台风叠加对比
+- 年份筛选 (2000-2026)
+- 悬浮信息展示
 
-- 🗺️ 基于 Leaflet 的交互式地图
-- 📍 台风路径实时绘制
-- 🎨 根据强度等级显示不同颜色
-- 📊 路径点大小反映风速强度
-- 🔍 支持多台风叠加显示
-- 📅 年份筛选（2000-2026 年）
-- 🔎 台风名称/ID 搜索
-- 📌 悬浮显示详细信息（时间、位置、气压、风速等）
+**颜色规范**:
+| 强度等级 | 颜色 | 风速范围 |
+|----------|------|----------|
+| 热带低压 | `#3498db` | < 17.2 m/s |
+| 热带风暴 | `#2ecc71` | 17.2-24.4 m/s |
+| 强热带风暴 | `#f1c40f` | 24.5-32.6 m/s |
+| 台风 | `#e67e22` | 32.7-41.4 m/s |
+| 强台风 | `#e74c3c` | 41.5-50.9 m/s |
+| 超强台风 | `#c0392b` | ≥ 51.0 m/s |
 
-**使用说明**:
+### 2. 预测可视化
 
-1. 左侧面板选择年份和状态筛选台风
-2. 点击台风卡片在地图上显示路径
-3. 勾选"多台风叠加显示"可同时查看多个台风
-4. 鼠标悬停在路径点上查看详细信息
+**组件**: `PredictionVisualization.jsx`
 
-### 2. 统计分析
-
-**文件**: `src/components/StatisticsPanel.jsx`
+AI 预测路径可视化，展示未来 24/48/72 小时预测结果。
 
 **功能特性**:
+- 点击路径点触发预测
+- 红色虚线预测路径
+- 预测点强度可视化
+- 置信度展示
+- 预测结果面板
 
-- 📈 台风数量统计（按年份、月份、强度）
-- 📊 ECharts 图表可视化
-- 📥 数据导出（JSON/CSV 格式）
-- 🔢 支持单个/批量导出
-- ✅ 可选包含路径数据
+### 3. AI 智能客服
+
+**组件**: `AIAgent.jsx`
+
+集成多模型 AI 对话系统。
+
+**模型支持**:
+| 模型 | 特点 | 深度思考 |
+|------|------|----------|
+| DeepSeek-R1 | 深度推理 | 支持 |
+| DeepSeek-V3 | 通用对话 | - |
+| GLM-4 | 中文优化 | - |
+| Qwen | 多模态 | - |
+
+**功能**:
+- 实时对话交互
+- 会话历史管理
+- 热门问题推荐
+- 模型自动降级
+
+### 4. 图像分析
+
+**组件**: `ImageAnalysis.jsx`
+
+卫星云图智能分析。
+
+**分析模式**:
+- **基础模式** - 快速特征提取
+- **高级模式** - 详细结构分析
+- **OpenCV 模式** - 传统算法
+- **融合模式** - 综合方法
+
+### 5. 统计分析
+
+**组件**: `StatisticsPanel.jsx`
+
+多维度数据统计与可视化。
 
 **图表类型**:
-
-- 年度台风数量趋势图
+- 年度趋势折线图
 - 月度分布柱状图
 - 强度等级饼图
+- 路径热力图
 
-### 3. 台风预测
-
-**文件**: `src/components/Prediction.jsx`
-
-**功能特性**:
-
-- 🤖 基于 AI 模型的路径预测
-- 📍 预测未来 24/48/72 小时路径
-- 🎯 显示预测置信度
-- 📊 预测结果可视化
-- 📈 多机构预报路径对比
-
-### 4. 预警管理
-
-**文件**: `src/components/AlertCenter.jsx`
-
-**功能特性**:
-
-- ⚠️ 台风预警信息管理
-- 🔔 预警等级分类（蓝色/黄色/橙色/红色）
-- 📝 预警详情查看
-- 🗑️ 预警删除功能
-- 🔍 按台风 ID 或等级筛选
-- 🔄 自动刷新预警信息
-
-### 5. AI 智能客服
-
-**文件**: `src/components/AIAgent.jsx`
-
-**功能特性**:
-
-- 🤖 集成多个 AI 模型（DeepSeek、GLM、Qwen）
-- 🧠 支持深度思考模式（DeepSeek-R1）
-- 💬 实时对话交互
-- 📝 对话历史记录管理
-- 🔥 热门问题快速回复
-- 🔄 模型自动降级和重试机制
-- 📋 会话列表管理
-
-**使用说明**:
-
-1. 点击"AI 客服"进入对话界面
-2. 选择 AI 模型（DeepSeek/GLM/Qwen）
-3. 开启/关闭"深度思考"模式
-   - 开启：使用 DeepSeek-R1 深度思考模型（更准确但较慢）
-   - 关闭：使用常规模型（更快）
-4. 输入问题并发送
-5. 查看 AI 回答和对话历史
-6. 可点击热门问题快速提问
-
-**深度思考模式说明**:
-
-- 当开启深度思考模式时，无论选择哪个模型，都会使用 DeepSeek-R1 深度思考模型
-- 深度思考模式提供更详细的推理过程和更准确的答案
-- 响应时间会比常规模式长
-
-### 6. 图像分析
-
-**文件**: `src/components/ImageAnalysis.jsx`
-
-**功能特性**:
-
-- 🖼️ 卫星云图上传和管理
-- 🔍 多种分析模式（基础/高级/OpenCV/融合）
-- 🤖 AI 模型智能分析（Qwen-VL、GLM-4V）
-- 📊 提取台风特征（中心位置、云系结构、强度估计）
-- 📷 支持红外/可见光图像
-- 📋 图像历史记录查看
-
-**使用说明**:
-
-1. 进入"图像分析"面板
-2. 上传卫星云图（支持 JPG、PNG 格式）
-3. 选择分析模式：
-   - **基础模式**：快速分析，提供基本信息
-   - **高级模式**：详细分析，包含更多特征
-   - **OpenCV 模式**：使用计算机视觉算法
-   - **融合模式**：结合多种方法的综合分析
-4. 选择 AI 模型（Qwen-VL 或 GLM-4V）
-5. 点击"开始分析"
-6. 查看分析结果和提取的台风特征
-
-### 7. 报告生成
-
-**文件**: `src/components/ReportGeneration.jsx`
-
-**功能特性**:
-
-- 📄 AI 自动生成台风分析报告
-- 📊 支持综合报告、预测报告、影响评估
-- 🤖 多种 AI 模型可选
-- 📥 报告导出（PDF/Word）
-- 📝 Markdown 格式渲染
-- 🎨 支持报告预览
-
-**报告类型**:
-
-- **综合分析报告**：包含台风生命周期、路径特征、强度演变、历史影响
-- **预测报告**：包含当前状态、未来路径预测、强度变化预测、预警建议
-- **影响评估报告**：包含影响区域评估、灾害风险分析、影响程度评估、防灾减灾建议
-
-### 8. 用户认证
-
-**文件**: `src/components/Login.jsx`, `src/components/Register.jsx`
-
-**功能特性**:
-
-- 🔐 用户登录/注册
-- 👤 头像上传（支持 OSS）
-- 📝 用户信息管理
-- 🔒 密码加密存储
-- 📧 表单验证
-
-## API 接口
-
-### API 配置
-
-**文件**: `src/services/api.js`
-
-**基础 URL**: `/api` (通过 Vite 代理转发到后端)
-
-### 主要接口
-
-#### 1. 台风数据 API
-
-```javascript
-// 获取台风列表
-getTyphoonList(params);
-// params: { year, status, limit }
-
-// 获取台风详情
-getTyphoonById(typhoonId);
-
-// 获取台风路径
-getTyphoonPath(typhoonId);
-
-// 搜索台风
-searchTyphoons(params);
-```
-
-#### 2. 统计分析 API
-
-```javascript
-// 获取年度统计
-getYearlyStatistics(startYear, endYear);
-
-// 获取强度分布统计
-getIntensityStatistics(year, typhoonId);
-
-// 台风对比分析
-compareTyphoons(typhoonIds);
-```
-
-#### 3. 预警中心 API
-
-```javascript
-// 获取活跃预警
-getActiveAlerts();
-
-// 获取历史预警
-getAlertHistory(typhoonId, level, limit);
-
-// 获取台风预报路径数据
-getTyphoonForecast(typhoonId);
-```
-
-#### 4. 数据导出 API
-
-```javascript
-// 导出单个台风数据
-exportTyphoonData(typhoonId, includePath);
-
-// 批量导出台风数据
-exportBatchTyphoonData(typhoonIds, format, includePath);
-```
-
-#### 5. 智能预测 API
-
-```javascript
-// 路径预测
-predictPath(typhoonId, hours);
-
-// 强度预测
-predictIntensity(typhoonId, hours);
-```
-
-#### 6. 图像分析 API
-
-```javascript
-// 上传图像
-uploadImage(file, typhoonId);
-
-// 分析图像
-analyzeImage(imageId, analysisMode, imageType);
-
-// 获取台风图像列表
-getTyphoonImages(typhoonId, imageType, limit);
-
-// 获取图像分析历史
-getImageAnalysisHistory(imageId);
-
-// 删除图像
-deleteImage(imageId);
-```
-
-#### 7. 报告生成 API
-
-```javascript
-// 生成台风报告
-generateReport(typhoonId, reportType, aiProvider);
-
-// 下载报告
-downloadReport(reportId, format);
-```
-
-#### 8. AI 客服 API
-
-```javascript
-// 创建对话会话
-createAISession();
-
-// 获取会话列表
-getAISessions();
-
-// 获取会话历史记录
-getAISessionHistory(sessionId);
-
-// 获取热门问题
-getAIQuestions();
-
-// 发送问题获取回答
-askAIQuestion(sessionId, question, model, deepThinking);
-// 参数:
-// - sessionId: 会话 ID
-// - question: 用户问题
-// - model: AI 模型 (deepseek/glm/qwen)
-// - deepThinking: 是否启用深度思考模式 (boolean)
-```
-
-#### 9. 认证 API
-
-```javascript
-// 用户登录
-login(username, password);
-
-// 用户注册
-register(userData);
-
-// 获取当前用户信息
-getCurrentUser();
-
-// 更新用户信息
-updateUser(userData);
-
-// 上传用户头像
-uploadAvatar(file);
-```
-
-## 样式规范
-
-### 颜色方案
-
-**强度等级颜色**:
-
-- 热带低压: `#3498db` (蓝色)
-- 热带风暴: `#2ecc71` (绿色)
-- 强热带风暴: `#f1c40f` (黄色)
-- 台风: `#e67e22` (橙色)
-- 强台风: `#e74c3c` (红色)
-- 超强台风: `#c0392b` (深红色)
-
-**主题色**:
-
-- 主色调: `#667eea` (紫色)
-- 渐变色: `linear-gradient(135deg, #667eea 0%, #764ba2 100%)`
-
-### 路径点大小规则
-
-- 风速 < 20 m/s: 半径 4px
-- 风速 20-30 m/s: 半径 6px
-- 风速 30-40 m/s: 半径 8px
-- 风速 40-50 m/s: 半径 10px
-- 风速 > 50 m/s: 半径 12px
-
-## 安装与运行
+## 快速开始
 
 ### 环境要求
 
 - Node.js >= 16.0.0
 - npm >= 8.0.0 或 yarn >= 1.22.0
+- 后端服务已启动
 
-### 安装依赖
+### 安装步骤
+
+1. **进入项目目录**
 
 ```bash
-# 进入前端目录
 cd fronted
+```
 
-# 安装依赖
+2. **安装依赖**
+
+```bash
 npm install
-# 或使用 yarn
+# 或
 yarn install
 ```
 
-### 开发模式
+3. **配置代理**
+
+编辑 `vite.config.js` 确保代理配置正确：
+
+```javascript
+server: {
+  proxy: {
+    '/api': {
+      target: 'http://localhost:8000',
+      changeOrigin: true,
+    }
+  }
+}
+```
+
+4. **启动开发服务器**
 
 ```bash
-# 启动开发服务器
 npm run dev
 # 或
 yarn dev
 ```
 
-访问 `http://localhost:5173` 查看应用
+访问 `http://localhost:5173`
 
 ### 生产构建
 
 ```bash
 # 构建生产版本
 npm run build
-# 或
-yarn build
 
 # 预览生产构建
 npm run preview
-# 或
-yarn preview
-```
-
-### 代码检查
-
-```bash
-# 运行 ESLint 检查
-npm run lint
 ```
 
 ## 开发指南
 
-### 代码风格
+### 代码规范
 
-- 使用 4 空格缩进
-- 组件使用函数式组件 + Hooks
-- 使用 ES6+ 语法
-- 遵循 React 最佳实践
+- **组件命名**: PascalCase (如 `MapVisualization.jsx`)
+- **函数命名**: camelCase (如 `getTyphoonList`)
+- **常量命名**: UPPER_SNAKE_CASE (如 `API_BASE_URL`)
+- **缩进**: 2 空格
+- **引号**: 单引号
 
-### 命名规范
+### 组件开发示例
 
-- 组件文件: PascalCase (如 `MapVisualization.jsx`)
-- 工具函数: camelCase (如 `getTyphoonList`)
-- 常量: UPPER_SNAKE_CASE (如 `API_BASE_URL`)
+```jsx
+import React, { useState, useEffect } from 'react';
+import { Card } from 'antd';
 
-### Git 提交规范
+const TyphoonCard = ({ typhoon }) => {
+  const [loading, setLoading] = useState(false);
 
-```
-feat: 新功能
-fix: 修复bug
-docs: 文档更新
-style: 代码格式调整
-refactor: 重构
-perf: 性能优化
-test: 测试相关
-chore: 构建/工具链相关
-```
+  useEffect(() => {
+    // 组件挂载逻辑
+  }, []);
 
-## 常见问题
+  return (
+    <Card loading={loading} title={typhoon.name}>
+      {/* 组件内容 */}
+    </Card>
+  );
+};
 
-### 1. 地图无法加载
-
-**原因**: 瓦片服务访问失败
-
-**解决方案**:
-
-- 检查网络连接
-- 当前使用高德地图瓦片服务（国内稳定）
-- 可在代码中切换其他瓦片服务
-
-### 2. API 请求失败
-
-**原因**: 后端服务未启动或端口不匹配
-
-**解决方案**:
-
-```bash
-# 确保后端服务运行在 http://localhost:8000
-cd ../backend
-python main.py
+export default TyphoonCard;
 ```
 
-### 3. 查询不到历史年份数据
+### API 调用示例
 
-**原因**:
+```javascript
+import { getTyphoonList, predictPath } from '../services/api';
 
-- 数据库中没有历史数据
-- API 参数传递错误
+// 获取台风列表
+const typhoons = await getTyphoonList({ year: 2024 });
 
-**解决方案**:
+// 预测路径
+const prediction = await predictPath('202001', 48);
+```
 
-- 运行后端数据导入脚本
-- 检查浏览器控制台 Network 面板确认 API 请求参数
+## API 接口
 
-### 4. OSS 上传失败
+### 台风数据
 
-**原因**: OSS 配置错误或权限不足
+```javascript
+// 获取台风列表
+getTyphoonList(params)
+// params: { year, status, search, limit }
 
-**解决方案**:
+// 获取台风详情
+getTyphoonById(typhoonId)
 
-- 检查 `src/services/ossConfig.js` 中的配置
-- 确认 OSS Bucket 存在且有访问权限
-- 检查 STS 临时凭证是否正确获取
+// 获取台风路径
+getTyphoonPath(typhoonId)
+```
+
+### 预测服务
+
+```javascript
+// 路径预测
+predictPath(typhoonId, hours)
+// hours: 24 | 48 | 72
+
+// 任意起点预测
+predictFromArbitraryStart(data)
+```
+
+### AI 客服
+
+```javascript
+// 发送消息
+askAIQuestion(sessionId, question, model, deepThinking)
+
+// 获取会话列表
+getAISessions()
+
+// 获取热门问题
+getAIQuestions()
+```
+
+## 样式规范
+
+### 主题色
+
+```css
+:root {
+  --primary-color: #667eea;
+  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --success-color: #52c41a;
+  --warning-color: #faad14;
+  --error-color: #f5222d;
+}
+```
+
+### 响应式断点
+
+| 断点 | 宽度 | 设备 |
+|------|------|------|
+| xs | < 576px | 手机 |
+| sm | ≥ 576px | 平板 |
+| md | ≥ 768px | 笔记本 |
+| lg | ≥ 992px | 桌面 |
+| xl | ≥ 1200px | 大屏 |
 
 ## 性能优化
 
-### 前端优化
+### 代码分割
 
-- 组件懒加载
-- 图片压缩
-- 代码分割
-- 使用 CDN
-- 启用浏览器缓存
-- 防抖和节流
-- 虚拟滚动（长列表）
+```jsx
+import { lazy, Suspense } from 'react';
 
-### 构建优化
+const AIAgent = lazy(() => import('./components/AIAgent'));
 
-- Vite 的快速冷启动
-- 按需编译
-- 源码映射支持
-- 生产环境代码压缩
+<Suspense fallback={<Loading />}>
+  <AIAgent />
+</Suspense>
+```
+
+### 图片优化
+
+- 使用 WebP 格式
+- 懒加载非首屏图片
+- 压缩图片资源
+
+### 缓存策略
+
+- 组件级缓存 (React.memo)
+- 数据缓存 (SWR/React Query)
+- 浏览器缓存
+
+## 常见问题
+
+### Q: 地图无法加载？
+
+A: 检查网络连接和瓦片服务配置。默认使用高德地图瓦片。
+
+### Q: API 请求失败？
+
+A: 确保后端服务已启动，并检查 Vite 代理配置。
+
+### Q: 构建失败？
+
+A: 检查 Node.js 版本是否 >= 16，并清除 node_modules 重新安装。
+
+```bash
+rm -rf node_modules
+npm install
+```
 
 ## 更新日志
 
-### v1.0.0 (2026-01-30)
+### v1.0.0 (2026-02-08)
 
-**核心功能**:
+- 完成 React 18 架构升级
+- 实现台风路径可视化
+- 添加 AI 预测可视化
+- 集成 AI 智能客服
+- 实现图像分析功能
+- 完善用户认证系统
 
-- ✅ 完成台风路径可视化功能
-- ✅ 实现统计分析面板
-- ✅ 添加数据导出功能
-- ✅ 支持年份筛选（2000-2026 年）
-- ✅ 集成 AI 智能客服系统（支持 DeepSeek、GLM、Qwen）
-- ✅ 深度思考模式（DeepSeek-R1）
-- ✅ 图像分析功能（卫星云图分析）
-- ✅ 多种图像分析模式（基础/高级/OpenCV/融合）
-- ✅ 报告生成功能（综合报告、预测报告、影响评估）
-- ✅ 对话历史管理
-- ✅ 热门问题快速回复
-- ✅ 集成 Ant Design X 组件库
-- ✅ 用户认证系统（登录/注册）
-- ✅ 头像上传功能（支持 OSS）
-- ✅ 预警管理功能
-- ✅ 台风预测功能
+## 浏览器支持
 
-**优化改进**:
-
-- ✅ 优化前后端交互逻辑
-- ✅ 改进错误处理机制
-- ✅ 增强用户体验
-- ✅ 优化组件性能
-- ✅ 移除调试日志和 console 输出
-
-## 技术支持
-
-如有问题或建议，请联系开发团队或提交 Issue。
+| 浏览器 | 最低版本 |
+|--------|----------|
+| Chrome | 90+ |
+| Firefox | 88+ |
+| Safari | 14+ |
+| Edge | 90+ |
 
 ## 许可证
 
-MIT License
+MIT License © 2026 TyphoonAnalysis Team
