@@ -9,7 +9,7 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
-from app.api import typhoon, prediction, analysis, report, crawler, statistics, export, alert, ai_agent, auth, user_stats
+from app.api import typhoon, prediction, analysis, report, crawler, statistics, export, alert, ai_agent, auth, user_stats, asr
 from app.api.v1 import images
 from app.services.scheduler import start_scheduler, shutdown_scheduler
 
@@ -30,6 +30,18 @@ async def lifespan(app: FastAPI):
     # 初始化数据库
     await init_db()
     logger.info("数据库初始化完成")
+
+    # 预加载 ASR 模型（避免第一次请求时加载）
+    logger.info("正在预加载 ASR 语音识别模型...")
+    try:
+        from app.api.asr import get_asr_model
+        # 在后台线程中加载模型，避免阻塞启动
+        import asyncio
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, get_asr_model)
+        logger.info("ASR 模型预加载完成")
+    except Exception as e:
+        logger.warning(f"ASR 模型预加载失败（将在第一次请求时重试）: {e}")
 
     # 启动定时任务调度器（会自动执行启动时完整爬取）
     start_scheduler()
@@ -86,6 +98,7 @@ app.include_router(alert.router, prefix="/api")
 app.include_router(ai_agent.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(user_stats.router, prefix="/api")
+app.include_router(asr.router, prefix="/api")
 app.include_router(images.router)
 
 

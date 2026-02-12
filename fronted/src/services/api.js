@@ -267,7 +267,11 @@ export const triggerCrawler = async () => {
  * @param {number} forecastHours - 预报时效（小时）
  * @param {boolean} useEnsemble - 是否使用集合预测
  */
-export const predictPath = async (typhoonId, forecastHours, useEnsemble = false) => {
+export const predictPath = async (
+  typhoonId,
+  forecastHours,
+  useEnsemble = false,
+) => {
   return apiClient.post("/predictions/path", {
     typhoon_id: typhoonId,
     forecast_hours: forecastHours,
@@ -305,7 +309,11 @@ export const predictBatch = async (typhoonIds, forecastHours) => {
  * @param {string} predictionType - 预测类型筛选(path/intensity)
  * @param {number} limit - 返回记录数量限制
  */
-export const getTyphoonPredictions = async (typhoonId, predictionType = null, limit = 100) => {
+export const getTyphoonPredictions = async (
+  typhoonId,
+  predictionType = null,
+  limit = 100,
+) => {
   const params = { limit };
   if (predictionType) params.prediction_type = predictionType;
   return apiClient.get(`/predictions/${typhoonId}`, { params });
@@ -344,7 +352,7 @@ export const predictFromArbitraryStart = async (
   startLongitude,
   startPressure = null,
   startWindSpeed = null,
-  forecastHours = 48
+  forecastHours = 48,
 ) => {
   return apiClient.post("/predictions/arbitrary-start", {
     typhoon_id: typhoonId,
@@ -370,7 +378,7 @@ export const rollingPrediction = async (
   initialForecastHours = 48,
   updateIntervalHours = 6,
   maxIterations = 5,
-  confidenceThreshold = 0.5
+  confidenceThreshold = 0.5,
 ) => {
   return apiClient.post("/predictions/rolling", {
     typhoon_id: typhoonId,
@@ -390,7 +398,7 @@ export const rollingPrediction = async (
 export const predictWithVirtualObservations = async (
   typhoonId,
   virtualObservations,
-  forecastHours = 48
+  forecastHours = 48,
 ) => {
   return apiClient.post("/predictions/virtual-observations", {
     typhoon_id: typhoonId,
@@ -759,6 +767,52 @@ export const getUserReports = async (skip = 0, limit = 50) => {
   return apiClient.get("/user-stats/reports", {
     params: { skip, limit },
   });
+};
+
+// ========== ASR 语音识别 API ==========
+
+/**
+ * 语音识别 - 将音频文件转换为文字
+ * @param {Blob} audioBlob - 音频文件 Blob
+ * @param {string} language - 语言代码 (如 'zh', 'en', 'yue')，不传则自动检测
+ * @returns {Promise<{success: boolean, text: string, language: string, duration: number, processing_time: number}>}
+ */
+export const transcribeAudio = async (audioBlob, language = "auto") => {
+  const formData = new FormData();
+  formData.append("audio", audioBlob, "recording.wav");
+  formData.append("language", language);
+
+  const token = localStorage.getItem("token");
+  const response = await fetch(`${API_BASE_URL}/asr/transcribe`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || "语音识别失败");
+  }
+
+  return response.json();
+};
+
+/**
+ * ASR 服务健康检查
+ * @returns {Promise<{status: string, model_loaded: boolean, cuda_available: boolean, cuda_device_count: number}>}
+ */
+export const checkASRHealth = async () => {
+  return apiClient.get("/asr/health");
+};
+
+/**
+ * 获取 ASR 支持的语言列表
+ * @returns {Promise<{success: boolean, languages: Object}>}
+ */
+export const getASRLanguages = async () => {
+  return apiClient.get("/asr/languages");
 };
 
 export default apiClient;

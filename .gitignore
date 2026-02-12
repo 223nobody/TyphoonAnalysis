@@ -27,7 +27,6 @@ MANIFEST
 venv/
 env/
 ENV/
-venv*/
 env*/
 *.env
 

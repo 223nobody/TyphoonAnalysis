@@ -4,19 +4,20 @@
   <img src="https://img.shields.io/badge/React-18-61DAFB.svg" alt="React 18">
   <img src="https://img.shields.io/badge/Vite-5.0-646CFF.svg" alt="Vite 5.0">
   <img src="https://img.shields.io/badge/Ant%20Design-6.x-1677FF.svg" alt="Ant Design">
+  <img src="https://img.shields.io/badge/Voice%20Input-Supported-success.svg" alt="Voice Input">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
 </p>
 
 ## 项目简介
 
-台风分析系统前端是一个基于 **React 18** 构建的现代化数据可视化平台，专注于台风路径展示、智能预测、数据分析和交互式可视化。系统采用模块化架构设计，支持多维度数据展示和实时交互。
+台风分析系统前端是一个基于 **React 18** 构建的现代化数据可视化平台，专注于台风路径展示、智能预测、数据分析和交互式可视化。系统采用模块化架构设计，支持多维度数据展示和实时交互，并集成了**语音输入**功能，让用户可以通过语音与 AI 助手进行交互。
 
 ### 核心特性
 
 - **交互式地图可视化** - 基于 Leaflet 的台风路径实时展示
 - **智能预测可视化** - AI 预测路径与置信度展示
 - **多维度数据分析** - ECharts 图表统计与对比
-- **AI 智能客服** - 集成多模型对话系统
+- **AI 智能客服** - 集成多模型对话系统，**支持语音输入**
 - **图像智能分析** - 卫星云图 AI 识别
 - **响应式设计** - 适配多种屏幕尺寸
 
@@ -45,6 +46,12 @@
 | ECharts | 6.0 | 数据图表 |
 | D3.js | 7.x | 高级可视化 |
 
+### 音频处理
+| 技术 | 用途 |
+|------|------|
+| Web Audio API | 浏览器音频录制 |
+| MediaRecorder | 媒体流录制 |
+
 ## 项目结构
 
 ```
@@ -53,7 +60,7 @@ fronted/
 │   └── vite.svg               # 应用图标
 ├── src/
 │   ├── components/            # React 组件
-│   │   ├── AIAgent.jsx               # AI 智能客服
+│   │   ├── AIAgent.jsx               # AI 智能客服 (含语音输入)
 │   │   ├── AIAgentButton.jsx         # AI 客服悬浮按钮
 │   │   ├── AlertBanner.jsx           # 预警横幅
 │   │   ├── AlertCenter.jsx           # 预警管理中心
@@ -75,12 +82,12 @@ fronted/
 │   │   ├── deepseek.png       # DeepSeek 图标
 │   │   └── taifeng.gif        # 台风动画
 │   ├── services/              # API 服务层
-│   │   ├── api.js             # API 调用封装
+│   │   ├── api.js             # API 调用封装 (含 ASR 接口)
 │   │   ├── ossConfig.js       # OSS 配置
 │   │   ├── ossUploadService.js # OSS 上传服务
 │   │   └── ossUtils.js        # OSS 工具函数
 │   ├── styles/                # 样式文件
-│   │   ├── AIAgent.css        # AI 客服样式
+│   │   ├── AIAgent.css        # AI 客服样式 (含语音按钮)
 │   │   ├── AIAgentButton.css  # AI 按钮样式
 │   │   ├── AlertCenter.css    # 预警中心样式
 │   │   ├── Auth.css           # 认证页面样式
@@ -140,11 +147,11 @@ AI 预测路径可视化，展示未来 24/48/72 小时预测结果。
 - 置信度展示
 - 预测结果面板
 
-### 3. AI 智能客服
+### 3. AI 智能客服 (含语音输入)
 
 **组件**: `AIAgent.jsx`
 
-集成多模型 AI 对话系统。
+集成多模型 AI 对话系统，**支持语音输入功能**。
 
 **模型支持**:
 | 模型 | 特点 | 深度思考 |
@@ -156,9 +163,44 @@ AI 预测路径可视化，展示未来 24/48/72 小时预测结果。
 
 **功能**:
 - 实时对话交互
+- **语音输入**: 点击麦克风图标进行语音输入
 - 会话历史管理
 - 热门问题推荐
 - 模型自动降级
+
+#### 语音输入功能详解
+
+**使用方式**:
+1. 点击输入框右侧的麦克风图标
+2. 开始说话，系统实时显示录音时长
+3. 再次点击或等待 60 秒自动停止
+4. 语音自动转换为文字并发送
+
+**技术实现**:
+- 使用 Web Audio API 进行音频采集
+- 录制格式: WAV (16kHz, 16bit, 单声道)
+- 后端使用 Qwen3-ASR 模型进行识别
+- 支持中文、英文、粤语自动检测
+
+**API 接口**:
+```javascript
+// 语音识别
+import { transcribeAudio } from '../services/api';
+
+const handleVoiceInput = async (audioBlob) => {
+  try {
+    const result = await transcribeAudio(audioBlob, 'auto');
+    console.log('识别结果:', result.text);
+  } catch (error) {
+    console.error('语音识别失败:', error);
+  }
+};
+```
+
+**界面展示**:
+- 录音按钮带脉冲动画效果
+- 实时显示录音时长 (00:00 - 00:60)
+- 录音状态视觉反馈
 
 ### 4. 图像分析
 
@@ -190,7 +232,7 @@ AI 预测路径可视化，展示未来 24/48/72 小时预测结果。
 
 - Node.js >= 16.0.0
 - npm >= 8.0.0 或 yarn >= 1.22.0
-- 后端服务已启动
+- 后端服务已启动 (包括 ASR 服务)
 
 ### 安装步骤
 
@@ -208,9 +250,9 @@ npm install
 yarn install
 ```
 
-3. **配置代理**
+3. **配置代理** (开发环境)
 
-编辑 `vite.config.js` 确保代理配置正确：
+`vite.config.js` 已配置代理：
 
 ```javascript
 server: {
@@ -218,8 +260,8 @@ server: {
     '/api': {
       target: 'http://localhost:8000',
       changeOrigin: true,
-    }
-  }
+    },
+  },
 }
 ```
 
@@ -233,190 +275,208 @@ yarn dev
 
 访问 `http://localhost:5173`
 
-### 生产构建
+### 构建生产版本
 
 ```bash
-# 构建生产版本
 npm run build
-
-# 预览生产构建
-npm run preview
+# 或
+yarn build
 ```
 
-## 开发指南
+构建输出在 `dist/` 目录。
 
-### 代码规范
+## API 服务层
 
-- **组件命名**: PascalCase (如 `MapVisualization.jsx`)
-- **函数命名**: camelCase (如 `getTyphoonList`)
-- **常量命名**: UPPER_SNAKE_CASE (如 `API_BASE_URL`)
-- **缩进**: 2 空格
-- **引号**: 单引号
+### 封装说明
 
-### 组件开发示例
+所有 API 调用统一封装在 `src/services/api.js`：
 
-```jsx
-import React, { useState, useEffect } from 'react';
-import { Card } from 'antd';
+```javascript
+// 台风数据
+export const getTyphoonList = async (params) => { ... }
+export const getTyphoonById = async (id) => { ... }
 
-const TyphoonCard = ({ typhoon }) => {
-  const [loading, setLoading] = useState(false);
+// AI 对话
+export const sendChatMessage = async (message, model) => { ... }
 
-  useEffect(() => {
-    // 组件挂载逻辑
-  }, []);
+// 语音识别 (新增)
+export const transcribeAudio = async (audioBlob, language) => { ... }
+export const checkASRHealth = async () => { ... }
+```
 
-  return (
-    <Card loading={loading} title={typhoon.name}>
-      {/* 组件内容 */}
-    </Card>
-  );
+### ASR 语音识别 API
+
+**接口列表**:
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/asr/transcribe` | POST | 语音转文字 |
+| `/api/asr/health` | GET | 服务健康检查 |
+| `/api/asr/languages` | GET | 支持语言列表 |
+
+**使用示例**:
+
+```javascript
+import { transcribeAudio } from './services/api';
+
+// 录制音频后调用
+const audioBlob = await recordAudio();
+const result = await transcribeAudio(audioBlob, 'auto');
+console.log(result.text); // 输出识别文字
+```
+
+## 组件开发指南
+
+### AIAgent 组件
+
+**文件**: `src/components/AIAgent.jsx`
+
+**主要功能**:
+- 多模型 AI 对话
+- 语音输入支持
+- 会话管理
+- 消息历史
+
+**语音输入实现**:
+
+```javascript
+// 开始录音
+const startRecording = async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const mediaRecorder = new MediaRecorder(stream);
+  // 处理音频数据...
 };
 
-export default TyphoonCard;
+// 停止录音并识别
+const stopRecording = async () => {
+  const audioBlob = await getRecordedAudio();
+  const result = await transcribeAudio(audioBlob);
+  setInputMessage(result.text);
+};
 ```
 
-### API 调用示例
-
-```javascript
-import { getTyphoonList, predictPath } from '../services/api';
-
-// 获取台风列表
-const typhoons = await getTyphoonList({ year: 2024 });
-
-// 预测路径
-const prediction = await predictPath('202001', 48);
-```
-
-## API 接口
-
-### 台风数据
-
-```javascript
-// 获取台风列表
-getTyphoonList(params)
-// params: { year, status, search, limit }
-
-// 获取台风详情
-getTyphoonById(typhoonId)
-
-// 获取台风路径
-getTyphoonPath(typhoonId)
-```
-
-### 预测服务
-
-```javascript
-// 路径预测
-predictPath(typhoonId, hours)
-// hours: 24 | 48 | 72
-
-// 任意起点预测
-predictFromArbitraryStart(data)
-```
-
-### AI 客服
-
-```javascript
-// 发送消息
-askAIQuestion(sessionId, question, model, deepThinking)
-
-// 获取会话列表
-getAISessions()
-
-// 获取热门问题
-getAIQuestions()
-```
-
-## 样式规范
-
-### 主题色
+**样式文件**: `src/styles/AIAgent.css`
 
 ```css
-:root {
-  --primary-color: #667eea;
-  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  --success-color: #52c41a;
-  --warning-color: #faad14;
-  --error-color: #f5222d;
+/* 语音输入按钮 */
+.voice-input-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  /* ... */
+}
+
+.voice-input-button.recording {
+  width: auto;
+  min-width: 72px;
+  border-radius: 18px;
+  /* 显示计时器 */
+}
+
+.recording-time {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 13px;
 }
 ```
 
-### 响应式断点
+## 开发规范
 
-| 断点 | 宽度 | 设备 |
-|------|------|------|
-| xs | < 576px | 手机 |
-| sm | ≥ 576px | 平板 |
-| md | ≥ 768px | 笔记本 |
-| lg | ≥ 992px | 桌面 |
-| xl | ≥ 1200px | 大屏 |
+### 代码风格
+
+- 使用 ESLint 进行代码检查
+- 使用 Prettier 进行代码格式化
+- 组件使用函数式组件 + Hooks
+
+### 命名规范
+
+- 组件: PascalCase (如 `AIAgent.jsx`)
+- 工具函数: camelCase (如 `transcribeAudio`)
+- 常量: UPPER_SNAKE_CASE
+- CSS 类: kebab-case (如 `voice-input-button`)
+
+### 文件组织
+
+```
+src/
+├── components/     # 页面级组件
+├── services/       # API 封装
+├── styles/         # 样式文件
+├── pictures/       # 图片资源
+├── App.jsx         # 根组件
+└── main.jsx        # 入口文件
+```
 
 ## 性能优化
 
-### 代码分割
+### 构建优化
 
-```jsx
-import { lazy, Suspense } from 'react';
+- Vite 自动代码分割
+- 懒加载大型组件
+- 图片资源压缩
 
-const AIAgent = lazy(() => import('./components/AIAgent'));
+### 运行时优化
 
-<Suspense fallback={<Loading />}>
-  <AIAgent />
-</Suspense>
-```
+- 使用 React.memo 避免不必要渲染
+- 使用 useMemo/useCallback 缓存计算
+- 虚拟列表处理大量数据
 
-### 图片优化
+### 语音输入优化
 
-- 使用 WebP 格式
-- 懒加载非首屏图片
-- 压缩图片资源
+- 使用 useRef 解决闭包问题
+- 录音计时器使用 setInterval
+- 自动清理音频资源
 
-### 缓存策略
+## 浏览器兼容性
 
-- 组件级缓存 (React.memo)
-- 数据缓存 (SWR/React Query)
-- 浏览器缓存
+| 浏览器 | 最低版本 | 说明 |
+|--------|----------|------|
+| Chrome | 80+ | 完全支持 |
+| Firefox | 75+ | 完全支持 |
+| Safari | 14+ | 完全支持 |
+| Edge | 80+ | 完全支持 |
+
+**注意**: 语音输入功能需要浏览器支持 Web Audio API 和 MediaRecorder API。
 
 ## 常见问题
 
-### Q: 地图无法加载？
+### Q: 语音输入无法使用？
 
-A: 检查网络连接和瓦片服务配置。默认使用高德地图瓦片。
+A: 请检查：
+1. 浏览器是否授予麦克风权限
+2. 后端 ASR 服务是否正常运行
+3. 是否使用 HTTPS (生产环境必需)
 
-### Q: API 请求失败？
+### Q: 语音识别准确率低？
 
-A: 确保后端服务已启动，并检查 Vite 代理配置。
+A: 建议：
+1. 在安静环境下使用
+2. 说话清晰、语速适中
+3. 使用标准普通话
 
-### Q: 构建失败？
+### Q: 录音时长限制？
 
-A: 检查 Node.js 版本是否 >= 16，并清除 node_modules 重新安装。
+A: 单次录音最长 60 秒，超时自动停止。
 
-```bash
-rm -rf node_modules
-npm install
-```
+### Q: 支持哪些语言？
+
+A: 主要支持中文（简体）、英文、粤语，自动检测语言。
+
+### Q: 地图加载失败？
+
+A: 检查网络连接，确保能访问 Leaflet CDN。
 
 ## 更新日志
 
+### v1.1.0 (2026-02-12)
+
+- 新增语音输入功能
+- AIAgent 组件支持语音转文字
+- 集成 ASR 语音识别 API
+- 优化录音按钮交互体验
+
 ### v1.0.0 (2026-02-08)
 
-- 完成 React 18 架构升级
+- 完成 React 前端架构
 - 实现台风路径可视化
-- 添加 AI 预测可视化
-- 集成 AI 智能客服
-- 实现图像分析功能
-- 完善用户认证系统
-
-## 浏览器支持
-
-| 浏览器 | 最低版本 |
-|--------|----------|
-| Chrome | 90+ |
-| Firefox | 88+ |
-| Safari | 14+ |
-| Edge | 90+ |
-
-## 许可证
-
-MIT License © 2026 TyphoonAnalysis Team
+- 集成 AI 对话系统
+- 完成图像分析功能

@@ -31,6 +31,8 @@ import {
   UserOutlined,
   ThunderboltOutlined,
   SettingOutlined,
+  AudioOutlined,
+  AudioMutedOutlined,
 } from "@ant-design/icons";
 import {
   createAISession,
@@ -39,6 +41,7 @@ import {
   getAIQuestions,
   askAIQuestion,
   askAIQuestionStream,
+  transcribeAudio,
 } from "../services/api";
 import "../styles/AIAgent.css";
 
@@ -183,7 +186,7 @@ const Sidebar = ({
 
 /**
  * 输入区域子组件
- * 提供消息输入和模型选择功能
+ * 提供消息输入、语音输入和模型选择功能
  */
 const InputArea = ({
   inputText,
@@ -194,6 +197,12 @@ const InputArea = ({
   onModelChange,
   deepThinking,
   onDeepThinkingToggle,
+  // 语音输入相关 props
+  isRecording,
+  recordingTime,
+  isTranscribing,
+  onStartRecording,
+  onStopRecording,
 }) => {
   const modelOptions = useMemo(
     () => [
@@ -204,6 +213,13 @@ const InputArea = ({
     [],
   );
 
+  // 格式化录音时间显示 (MM:SS)
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
   return (
     <div className="ai-agent-input" role="form" aria-label="消息输入区域">
       <div className="input-wrapper">
@@ -211,9 +227,47 @@ const InputArea = ({
           value={inputText}
           onChange={onInputChange}
           onSubmit={onSendMessage}
-          placeholder="输入您的问题，按 Enter 发送..."
-          loading={sending}
+          placeholder={
+            isRecording
+              ? `正在录音... ${formatTime(recordingTime)}`
+              : isTranscribing
+                ? "正在识别语音..."
+                : "输入您的问题，按 Enter 发送..."
+          }
+          loading={sending || isTranscribing}
           style={{ width: "100%", maxWidth: 800 }}
+          prefix={
+            <Tooltip
+              title={
+                isRecording
+                  ? "点击停止录音"
+                  : isTranscribing
+                    ? "正在识别中..."
+                    : "点击开始语音输入"
+              }
+            >
+              <Button
+                type={isRecording ? "primary" : "text"}
+                danger={isRecording}
+                icon={isRecording ? <AudioMutedOutlined /> : <AudioOutlined />}
+                onClick={isRecording ? onStopRecording : onStartRecording}
+                loading={isTranscribing}
+                className={`voice-input-button ${isRecording ? "recording" : ""}`}
+                aria-label={isRecording ? "停止录音" : "开始语音输入"}
+                style={
+                  isRecording
+                    ? { width: "auto", minWidth: "72px", padding: "0 12px" }
+                    : {}
+                }
+              >
+                {isRecording && (
+                  <span className="recording-time">
+                    {formatTime(recordingTime)}
+                  </span>
+                )}
+              </Button>
+            </Tooltip>
+          }
         />
       </div>
       <div className="input-controls">
@@ -254,7 +308,11 @@ const InputArea = ({
           </Button>
         </Space>
         <Text type="secondary" className="input-hint">
-          AI 可能会产生错误信息，请注意核实重要内容
+          {isRecording
+            ? "正在录音，点击麦克风图标停止"
+            : isTranscribing
+              ? "正在将语音转换为文字..."
+              : "AI 可能会产生错误信息，请注意核实重要内容"}
         </Text>
       </div>
     </div>
@@ -375,6 +433,11 @@ function AIAgent() {
   const [streamingMessageKey, setStreamingMessageKey] = useState(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
+  // 语音输入相关状态
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+
   const bubbleListRef = useRef(null);
   const chatEndRef = useRef(null);
   const isUserScrollingRef = useRef(false);
@@ -384,6 +447,13 @@ function AIAgent() {
   const isStreamingRef = useRef(false);
   const chatSectionRef = useRef(null);
   const isSubmittingRef = useRef(false); // 防止重复提交的 ref
+
+  // 语音录制相关 refs
+  const mediaRecorderRef = useRef(null);
+  const recordingTimerRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const isRecordingRef = useRef(false); // 用于解决闭包问题
+  const stopRecordingRef = useRef(null); // 用于在 startRecording 中调用 stopRecording
 
   const SCROLL_THRESHOLD = 100;
   const SCROLL_DEBOUNCE_TIME = 150;
@@ -861,6 +931,241 @@ function AIAgent() {
     setDeepThinking((prev) => !prev);
   }, []);
 
+  // ==================== 语音输入功能 ====================
+
+  // 将 AudioBuffer 转换为 WAV 格式的 Blob
+  const bufferToWave = useCallback((abuffer, len) => {
+    let numOfChan = abuffer.numberOfChannels,
+      length = len * numOfChan * 2 + 44,
+      buffer = new ArrayBuffer(length),
+      view = new DataView(buffer),
+      channels = [],
+      i,
+      sample,
+      offset = 0,
+      pos = 0;
+
+    // 写入 WAV 头部
+    // "RIFF"
+    setUint32(0x46464952);
+    // file length - 8
+    setUint32(length - 8);
+    // "WAVE"
+    setUint32(0x45564157);
+    // "fmt " chunk
+    setUint32(0x20746d66);
+    // length = 16
+    setUint32(16);
+    // PCM (uncompressed)
+    setUint16(1);
+    // 声道数
+    setUint16(numOfChan);
+    // 采样率
+    setUint32(abuffer.sampleRate);
+    // 字节率
+    setUint32(abuffer.sampleRate * 2 * numOfChan);
+    // 块对齐
+    setUint16(numOfChan * 2);
+    // 位深度
+    setUint16(16);
+    // "data" chunk
+    setUint32(0x61746164);
+    // 数据长度
+    setUint32(length - pos - 4);
+
+    // 写入音频数据
+    for (i = 0; i < abuffer.numberOfChannels; i++)
+      channels.push(abuffer.getChannelData(i));
+
+    while (pos < length) {
+      for (i = 0; i < numOfChan; i++) {
+        sample = Math.max(-1, Math.min(1, channels[i][offset]));
+        sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+        view.setInt16(pos, sample, true);
+        pos += 2;
+      }
+      offset++;
+    }
+
+    return new Blob([buffer], { type: "audio/wav" });
+
+    function setUint16(data) {
+      view.setUint16(pos, data, true);
+      pos += 2;
+    }
+
+    function setUint32(data) {
+      view.setUint32(pos, data, true);
+      pos += 4;
+    }
+  }, []);
+
+  /**
+   * 调用后端 ASR 服务进行语音识别
+   */
+  const handleTranscribe = useCallback(async (blob) => {
+    if (!blob) return;
+
+    setIsTranscribing(true);
+    try {
+      // 使用 api.js 中的 transcribeAudio 函数
+      const data = await transcribeAudio(blob, "auto");
+
+      if (data.success) {
+        // 将识别结果填入输入框
+        setInputText((prev) => {
+          const newText = prev + (prev ? " " : "") + data.text;
+          return newText;
+        });
+        message.success(`语音转文字完成 (${data.language})`);
+      } else {
+        throw new Error(data.error || "识别失败");
+      }
+    } catch (error) {
+      console.error("语音识别失败:", error);
+      message.error(`语音转文字失败: ${error.message}`);
+    } finally {
+      setIsTranscribing(false);
+      audioChunksRef.current = [];
+    }
+  }, []);
+
+  /**
+   * 停止录音
+   */
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && isRecordingRef.current) {
+      // 停止录音并获取 WAV 格式的 Blob
+      const audioBlob = mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      isRecordingRef.current = false; // 更新 ref
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      // 开始识别
+      handleTranscribe(audioBlob);
+    }
+  }, [handleTranscribe]);
+
+  // 将 stopRecording 存入 ref，供 startRecording 使用
+  stopRecordingRef.current = stopRecording;
+
+  /**
+   * 开始录音 - 使用 Web Audio API 录制为 WAV 格式
+   */
+  const startRecording = useCallback(async () => {
+    try {
+      // 请求麦克风权限
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000, // 16kHz 采样率
+          channelCount: 1, // 单声道
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+
+      // 创建 AudioContext
+      const audioContext = new (
+        window.AudioContext || window.webkitAudioContext
+      )({
+        sampleRate: 16000,
+      });
+
+      // 创建音频源
+      const source = audioContext.createMediaStreamSource(stream);
+
+      // 创建处理器节点
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+      // 存储音频数据
+      const audioData = [];
+
+      processor.onaudioprocess = (e) => {
+        const channelData = e.inputBuffer.getChannelData(0);
+        audioData.push(new Float32Array(channelData));
+      };
+
+      // 连接节点
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+      // 存储引用以便停止时使用
+      mediaRecorderRef.current = {
+        audioContext,
+        processor,
+        source,
+        stream,
+        audioData,
+        stop: function () {
+          this.processor.disconnect();
+          this.source.disconnect();
+          this.stream.getTracks().forEach((track) => track.stop());
+          this.audioContext.close();
+
+          // 合并音频数据
+          const length = this.audioData.reduce(
+            (acc, curr) => acc + curr.length,
+            0,
+          );
+          const mergedData = new Float32Array(length);
+          let offset = 0;
+          this.audioData.forEach((chunk) => {
+            mergedData.set(chunk, offset);
+            offset += chunk.length;
+          });
+
+          // 创建 AudioBuffer
+          const audioBuffer = audioContext.createBuffer(1, length, 16000);
+          audioBuffer.getChannelData(0).set(mergedData);
+
+          // 转换为 WAV
+          return bufferToWave(audioBuffer, length);
+        },
+      };
+
+      setIsRecording(true);
+      isRecordingRef.current = true; // 更新 ref
+      setRecordingTime(0);
+
+      // 开始计时
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime((prev) => {
+          // 限制最大录音时长为 60 秒
+          if (prev >= 59) {
+            stopRecordingRef.current?.();
+            return 60;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+
+      message.info("开始录音，请点击麦克风图标停止");
+    } catch (error) {
+      console.error("录音失败:", error);
+      if (error.name === "NotAllowedError") {
+        message.error("麦克风权限被拒绝，请在浏览器设置中允许访问麦克风");
+      } else if (error.name === "NotFoundError") {
+        message.error("未找到麦克风设备");
+      } else {
+        message.error("无法访问麦克风，请检查设备");
+      }
+    }
+  }, [bufferToWave]);
+
+  // 清理函数
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+      if (mediaRecorderRef.current && isRecordingRef.current) {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
+
   return (
     <div className="ai-agent-container" role="main" aria-label="AI 对话助手">
       <Sidebar
@@ -920,6 +1225,12 @@ function AIAgent() {
           onModelChange={handleModelChange}
           deepThinking={deepThinking}
           onDeepThinkingToggle={handleDeepThinkingToggle}
+          // 语音输入 props
+          isRecording={isRecording}
+          recordingTime={recordingTime}
+          isTranscribing={isTranscribing}
+          onStartRecording={startRecording}
+          onStopRecording={stopRecording}
         />
       </main>
     </div>

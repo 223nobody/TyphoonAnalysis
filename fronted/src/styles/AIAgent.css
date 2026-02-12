@@ -562,6 +562,101 @@
   transform: translateY(-2px);
 }
 
+/* ==================== 语音输入按钮样式 ==================== */
+.voice-input-button {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.voice-input-button:hover {
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+}
+
+.voice-input-button.recording {
+  animation: recordingPulse 1.5s ease-in-out infinite;
+  background: linear-gradient(135deg, #ff4d4f 0%, #ff7875 100%);
+  border-color: transparent;
+  color: #ffffff;
+  border-radius: 18px;
+  width: auto;
+  min-width: 72px;
+  height: 36px;
+  padding: 0 12px;
+  gap: 6px;
+}
+
+.voice-input-button.recording:hover {
+  background: linear-gradient(135deg, #ff7875 0%, #ff4d4f 100%);
+  color: #ffffff;
+}
+
+.recording-time {
+  font-size: 13px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  min-width: 36px;
+  text-align: center;
+}
+
+@keyframes recordingPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(255, 77, 79, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 79, 0);
+  }
+}
+
+/* 录音状态提示 */
+.recording-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #ff4d4f;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.recording-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #ff4d4f;
+  border-radius: 50%;
+  animation: recordingBlink 1s infinite;
+}
+
+@keyframes recordingBlink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+}
+
+/* 深色模式下的语音按钮 */
+@media (prefers-color-scheme: dark) {
+  .voice-input-button:hover {
+    background: rgba(102, 126, 234, 0.2);
+    color: #667eea;
+  }
+}
+
 /* ==================== 滚动条样式 ==================== */
 .sidebar-content::-webkit-scrollbar,
 .ai-agent-chat::-webkit-scrollbar {

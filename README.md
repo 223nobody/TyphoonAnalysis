@@ -1,8 +1,17 @@
 # 🌀 台风分析系统 (Typhoon Analysis System)
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.9+-blue.svg" alt="Python 3.9+">
+  <img src="https://img.shields.io/badge/React-18-61DAFB.svg" alt="React 18">
+  <img src="https://img.shields.io/badge/FastAPI-0.109.0-009688.svg" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Qwen3--ASR-0.6B-orange.svg" alt="Qwen3-ASR">
+  <img src="https://img.shields.io/badge/Voice%20Input-Supported-success.svg" alt="Voice Input">
+  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
+</p>
+
 ## 📋 项目简介
 
-台风分析系统是一个基于 **FastAPI + React + AI 大模型** 的智能台风数据分析与可视化平台。系统集成了台风数据爬取、实时监控、路径可视化、统计分析、智能预测、预警管理、AI 客服等功能，为气象研究和防灾减灾提供全方位的数据支持。
+台风分析系统是一个基于 **FastAPI + React + AI 大模型** 的智能台风数据分析与可视化平台。系统集成了台风数据爬取、实时监控、路径可视化、统计分析、智能预测、预警管理、AI 客服、**语音识别**等功能，为气象研究和防灾减灾提供全方位的数据支持。
 
 ## ✨ 核心特性
 
@@ -27,10 +36,19 @@
 
 - 集成 DeepSeek、GLM、Qwen 等多个 AI 模型
 - 支持深度思考模式（DeepSeek-R1）
+- **语音输入支持** - 通过语音与 AI 交互
 - 台风专业知识问答
 - 对话历史记录管理
 - 热门问题快速回复
 - 模型自动降级和重试机制
+
+### 🎤 语音识别 (新增)
+
+- 集成 Qwen3-ASR 模型进行语音转文字
+- 支持中文、英文、粤语自动检测
+- 自动繁体转简体文本规范化
+- 实时录音与识别
+- 单次录音最长 60 秒
 
 ### 🖼️ 图像分析
 
@@ -94,7 +112,8 @@
                             ↓
 ┌─────────────────────────────────────────────────────────┐
 │                   AI 服务层 (AI Services)                │
-│  DeepSeek + GLM + Qwen (通过 aiping.cn 统一接口)       │
+│  DeepSeek + GLM + Qwen + Qwen3-ASR                     │
+│  (通过 aiping.cn 统一接口)                             │
 └─────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -119,8 +138,7 @@ TyphoonAnalysis/
 │   │   │   ├── analysis.py    # 分析API
 │   │   │   ├── report.py      # 报告API
 │   │   │   ├── ai_agent.py    # AI客服API
-│   │   │   └── v1/
-│   │   │       └── images.py  # 图像分析API
+│   │   │   └── asr.py         # 语音识别API (新增)
 │   │   ├── core/              # 核心配置
 │   │   │   ├── config.py      # 应用配置
 │   │   │   └── database.py    # 数据库配置
@@ -128,9 +146,9 @@ TyphoonAnalysis/
 │   │   │   ├── typhoon.py     # 台风相关模型
 │   │   │   └── image.py       # 图像相关模型
 │   │   ├── schemas/           # Pydantic模式
-│   │   │   └── typhoon.py     # 数据验证模式
 │   │   └── services/          # 业务逻辑
 │   │       ├── ai/            # AI服务
+│   │       ├── asr/           # 语音识别服务 (新增)
 │   │       ├── crawler/       # 爬虫服务
 │   │       ├── image/         # 图像处理
 │   │       ├── lstm/          # LSTM预测
@@ -141,17 +159,17 @@ TyphoonAnalysis/
 │   ├── .env                   # 环境变量配置
 │   └── README.md              # 后端文档
 │
-├── service/                    # 前端应用
+├── fronted/                    # 前端应用
 │   ├── src/
 │   │   ├── components/        # React组件
 │   │   │   ├── MapVisualization.jsx    # 地图可视化
 │   │   │   ├── StatisticsPanel.jsx     # 统计分析
 │   │   │   ├── PredictionPanel.jsx     # 预测功能
 │   │   │   ├── AlertPanel.jsx          # 预警管理
-│   │   │   ├── AIAgent.jsx             # AI客服
+│   │   │   ├── AIAgent.jsx             # AI客服 (含语音输入)
 │   │   │   └── ImageAnalysis.jsx       # 图像分析
 │   │   ├── services/          # API服务
-│   │   │   └── api.js         # API封装
+│   │   │   └── api.js         # API封装 (含ASR接口)
 │   │   ├── styles/            # 样式文件
 │   │   │   ├── AIAgent.css    # AI客服样式
 │   │   │   └── ...
@@ -176,6 +194,7 @@ TyphoonAnalysis/
 
 - Python >= 3.10
 - pip >= 21.0
+- CUDA >= 11.7 (推荐，用于 ASR 加速)
 
 **前端**:
 
@@ -263,13 +282,20 @@ pip install -r requirements.txt
 python main.py
 ```
 
+**直接启动当前项目**
+
+```bash
+..\venv312\Scripts\activate
+ python main.py
+```
+
 后端服务将在 `http://localhost:8000` 启动
 
 #### 4. 启动前端应用
 
 ```bash
 # 打开新终端，进入前端目录
-cd service
+cd fronted
 
 # 安装依赖
 npm install
@@ -310,14 +336,18 @@ yarn dev
 4. 点击"查询"生成图表
 5. 可导出统计数据（JSON/CSV 格式）
 
-### 3. AI 智能客服
+### 3. AI 智能客服 (含语音输入)
 
 1. 点击"AI 客服"进入对话界面
 2. 选择 AI 模型（DeepSeek/GLM/Qwen）
 3. 开启/关闭"深度思考"模式
    - 开启：使用 DeepSeek-R1 深度思考模型（更准确但较慢）
    - 关闭：使用常规模型（更快）
-4. 输入问题并发送
+4. **语音输入**:
+   - 点击输入框右侧的麦克风图标
+   - 开始说话，系统实时显示录音时长
+   - 再次点击或等待 60 秒自动停止
+   - 语音自动转换为文字并发送
 5. 查看 AI 回答和对话历史
 6. 可点击热门问题快速提问
 
@@ -360,36 +390,39 @@ yarn dev
 - **Base URL**: `http://localhost:8000/api`
 - **文档地址**: `http://localhost:8000/docs`
 - **ReDoc 文档**: `http://localhost:8000/redoc`
-- **认证方式**: 暂无（开发环境）
+- **认证方式**: JWT Token
 
 ### 主要端点
 
-| 端点                       | 方法 | 说明             |
-| -------------------------- | ---- | ---------------- |
-| `/typhoons`                | GET  | 获取台风列表     |
-| `/typhoons/{id}`           | GET  | 获取台风详情     |
-| `/typhoons/{id}/path`      | GET  | 获取台风路径     |
-| `/typhoons/{id}/forecast`  | GET  | 获取预报路径     |
-| `/statistics/yearly`       | GET  | 获取年度统计     |
-| `/statistics/intensity`    | GET  | 获取强度统计     |
-| `/statistics/comparison`   | POST | 台风对比分析     |
-| `/export/typhoon/{id}`     | GET  | 导出台风数据     |
-| `/export/batch`            | POST | 批量导出         |
-| `/prediction/path`         | POST | 预测台风路径     |
-| `/prediction/intensity`    | POST | 预测台风强度     |
-| `/alert/active`            | GET  | 获取活跃预警     |
-| `/alert/history`           | GET  | 获取预警历史     |
-| `/crawler/trigger`         | POST | 手动触发爬虫     |
-| `/crawler/status`          | GET  | 获取爬虫状态     |
-| `/ai-agent/sessions`       | POST | 创建 AI 对话会话 |
-| `/ai-agent/sessions`       | GET  | 获取会话列表     |
-| `/ai-agent/sessions/{id}`  | GET  | 获取会话历史     |
-| `/ai-agent/questions`      | GET  | 获取热门问题     |
-| `/ai-agent/ask`            | POST | 发送问题获取回答 |
-| `/api/images/upload`       | POST | 上传图像         |
-| `/api/images/analyze/{id}` | POST | 分析图像         |
-| `/api/images/typhoon/{id}` | GET  | 获取台风图像列表 |
-| `/report/generate`         | POST | 生成台风报告     |
+| 端点                       | 方法 | 说明                |
+| -------------------------- | ---- | ------------------- |
+| `/typhoons`                | GET  | 获取台风列表        |
+| `/typhoons/{id}`           | GET  | 获取台风详情        |
+| `/typhoons/{id}/path`      | GET  | 获取台风路径        |
+| `/typhoons/{id}/forecast`  | GET  | 获取预报路径        |
+| `/statistics/yearly`       | GET  | 获取年度统计        |
+| `/statistics/intensity`    | GET  | 获取强度统计        |
+| `/statistics/comparison`   | POST | 台风对比分析        |
+| `/export/typhoon/{id}`     | GET  | 导出台风数据        |
+| `/export/batch`            | POST | 批量导出            |
+| `/prediction/path`         | POST | 预测台风路径        |
+| `/prediction/intensity`    | POST | 预测台风强度        |
+| `/alert/active`            | GET  | 获取活跃预警        |
+| `/alert/history`           | GET  | 获取预警历史        |
+| `/crawler/trigger`         | POST | 手动触发爬虫        |
+| `/crawler/status`          | GET  | 获取爬虫状态        |
+| `/ai-agent/sessions`       | POST | 创建 AI 对话会话    |
+| `/ai-agent/sessions`       | GET  | 获取会话列表        |
+| `/ai-agent/sessions/{id}`  | GET  | 获取会话历史        |
+| `/ai-agent/questions`      | GET  | 获取热门问题        |
+| `/ai-agent/ask`            | POST | 发送问题获取回答    |
+| `/api/images/upload`       | POST | 上传图像            |
+| `/api/images/analyze/{id}` | POST | 分析图像            |
+| `/api/images/typhoon/{id}` | GET  | 获取台风图像列表    |
+| `/report/generate`         | POST | 生成台风报告        |
+| `/asr/transcribe`          | POST | 语音转文字 (新增)   |
+| `/asr/health`              | GET  | ASR 健康检查 (新增) |
+| `/asr/languages`           | GET  | ASR 支持语言 (新增) |
 
 详细 API 文档请访问: http://localhost:8000/docs
 
@@ -400,6 +433,12 @@ yarn dev
 - 交互式地图展示台风路径
 - 颜色编码表示强度等级
 - 路径点大小反映风速
+
+### AI 智能客服 (含语音输入)
+
+- 多模型 AI 对话
+- 语音输入按钮带脉冲动画
+- 实时录音时长显示
 
 ### 统计分析面板
 
@@ -438,7 +477,7 @@ mypy app/
 ### 前端开发
 
 ```bash
-cd service
+cd fronted
 
 # 安装依赖
 npm install
@@ -453,7 +492,7 @@ npm run build
 npm run preview
 ```
 
-详见: [service/README.md](service/README.md)
+详见: [fronted/README.md](fronted/README.md)
 
 ## 📊 数据说明
 
@@ -487,7 +526,26 @@ npm run preview
 pip install -r requirements.txt
 ```
 
-### 2. 前端无法连接后端
+### 2. 语音输入无法使用
+
+**问题**: 点击麦克风无反应或识别失败
+
+**解决**:
+
+1. 检查浏览器是否授予麦克风权限
+2. 确认后端 ASR 服务正常运行
+3. 生产环境需使用 HTTPS
+4. 检查浏览器是否支持 Web Audio API
+
+### 3. 语音识别返回繁体中文
+
+**问题**: 识别结果显示繁体字
+
+**解决**:
+
+系统已集成 OpenCC 自动转换，无需手动处理。如仍有问题请检查后端日志。
+
+### 4. 前端无法连接后端
 
 **问题**: `Network Error` 或 `CORS Error`
 
@@ -497,7 +555,7 @@ pip install -r requirements.txt
 - 检查防火墙设置
 - 查看后端 CORS 配置
 
-### 3. 地图无法加载
+### 5. 地图无法加载
 
 **问题**: 地图瓦片加载失败
 
@@ -507,7 +565,7 @@ pip install -r requirements.txt
 - 当前使用高德地图瓦片（国内稳定）
 - 可在代码中切换其他瓦片服务
 
-### 4. 查询不到历史数据
+### 6. 查询不到历史数据
 
 **问题**: 选择历史年份无数据
 
@@ -519,7 +577,7 @@ cd backend
 python data.py
 ```
 
-### 5. 数据库锁定错误
+### 7. 数据库锁定错误
 
 **问题**: `database is locked`
 
@@ -556,6 +614,7 @@ python data.py
 - 实现响应缓存
 - 启用 GZIP 压缩
 - 使用连接池
+- **ASR 模型预加载**: 启动时自动加载，避免首次请求延迟
 
 ### 前端优化
 
@@ -564,8 +623,26 @@ python data.py
 - 代码分割
 - 使用 CDN
 - 启用浏览器缓存
+- **语音输入优化**: 使用 useRef 解决闭包问题
 
 ## 🔄 版本历史
+
+### v2.1.0 (2026-02-12)
+
+**新增功能**:
+
+- ✅ 语音识别功能（Qwen3-ASR 模型）
+- ✅ AI 客服支持语音输入
+- ✅ 自动繁体转简体文本规范化
+- ✅ ASR 模型启动预加载优化
+- ✅ 录音计时器实时显示
+
+**优化改进**:
+
+- ✅ 优化语音输入按钮交互
+- ✅ 修复 React 闭包导致的计时器问题
+- ✅ 统一 API 调用封装
+- ✅ 更新项目文档
 
 ### v2.0.0 (2026-01-13)
 
