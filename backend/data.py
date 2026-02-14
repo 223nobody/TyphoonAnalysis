@@ -1,3 +1,4 @@
+"“”用于存储台风相关数据，初始化数据库"""
 import requests
 import json
 from urllib import request

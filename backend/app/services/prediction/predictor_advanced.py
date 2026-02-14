@@ -136,14 +136,25 @@ class AdvancedTyphoonPredictor(TyphoonPredictor):
             typhoon_name=typhoon_name
         )
         
-        # 4. 调整预测结果的base_time为指定的起点时间
+        # 4. 如果模型预测失败（验证不通过等），使用降级策略
+        if result is None:
+            logger.warning("模型预测失败，使用降级策略进行任意起点预测")
+            result = await self._fallback_prediction(
+                historical_paths=extended_paths,
+                forecast_hours=forecast_hours,
+                typhoon_id=typhoon_id,
+                typhoon_name=typhoon_name
+            )
+        
+        # 5. 调整预测结果的base_time为指定的起点时间
         result.base_time = start_point.timestamp
         
-        # 5. 重新计算预测点的时间
+        # 6. 重新计算预测点的时间（每3小时一个点）
+        interval_hours = 3
         for i, point in enumerate(result.predictions):
-            point.forecast_time = start_point.timestamp + timedelta(hours=6 * (i + 1))
+            point.forecast_time = start_point.timestamp + timedelta(hours=interval_hours * (i + 1))
         
-        # 6. 标记为任意起点预测
+        # 7. 标记为任意起点预测
         result.model_used = f"{result.model_used}-ArbitraryStart"
         
         return result
@@ -194,6 +205,8 @@ class AdvancedTyphoonPredictor(TyphoonPredictor):
             extended = extended[-self.sequence_length:]
         
         # 如果数据不足，向前填充
+        # 确保填充后的时间跨度至少为12小时（满足验证要求）
+        min_required_span_hours = 12
         while len(extended) < self.sequence_length:
             # 复制第一个点并调整时间
             first_point = extended[0]
@@ -202,6 +215,21 @@ class AdvancedTyphoonPredictor(TyphoonPredictor):
             first_timestamp = normalize_datetime(first_point.timestamp)
             filler.timestamp = first_timestamp - timedelta(hours=6)
             extended.insert(0, filler)
+        
+        # 额外检查：确保时间跨度至少为12小时
+        if extended:
+            first_time = normalize_datetime(extended[0].timestamp)
+            last_time = normalize_datetime(extended[-1].timestamp)
+            current_span = (last_time - first_time).total_seconds() / 3600
+            if current_span < min_required_span_hours:
+                # 需要额外填充以满足时间跨度要求
+                additional_points_needed = int((min_required_span_hours - current_span) / 6) + 1
+                for i in range(additional_points_needed):
+                    first_point = extended[0]
+                    filler = copy.deepcopy(first_point)
+                    first_timestamp = normalize_datetime(first_point.timestamp)
+                    filler.timestamp = first_timestamp - timedelta(hours=6)
+                    extended.insert(0, filler)
         
         return extended
 
@@ -235,15 +263,11 @@ class AdvancedTyphoonPredictor(TyphoonPredictor):
         Returns:
             List[PredictionResult]: 每次迭代的预测结果列表
         """
-        logger.info(f"开始滚动预测，最大迭代次数: {config.max_iterations}")
-        
         results = []
         current_paths = list(initial_paths)
-        current_time = max(p.timestamp for p in initial_paths)
+        current_time = max(normalize_datetime(p.timestamp) for p in initial_paths)
         
         for iteration in range(config.max_iterations):
-            logger.info(f"滚动预测迭代 {iteration + 1}/{config.max_iterations}")
-            
             # 1. 执行预测
             result = await self.predict(
                 historical_paths=current_paths,
@@ -254,7 +278,7 @@ class AdvancedTyphoonPredictor(TyphoonPredictor):
             
             # 2. 检查置信度
             if result.overall_confidence < config.confidence_threshold:
-                logger.warning(f"置信度 {result.overall_confidence:.2f} 低于阈值 {config.confidence_threshold}，停止滚动")
+                logger.warning(f"置信度 {result.overall_confidence:.2f} 低于阈值，停止滚动")
                 break
             
             # 3. 保存结果
@@ -270,7 +294,6 @@ class AdvancedTyphoonPredictor(TyphoonPredictor):
             )
             
             if new_observation is None:
-                logger.warning(f"无法获取 {current_time} 的预测数据，停止滚动")
                 break
             
             # 6. 更新当前路径数据
@@ -280,7 +303,6 @@ class AdvancedTyphoonPredictor(TyphoonPredictor):
             if len(current_paths) > self.sequence_length * 2:
                 current_paths = current_paths[-self.sequence_length:]
         
-        logger.info(f"滚动预测完成，共 {len(results)} 次迭代")
         return results
 
     def _extract_prediction_at_time(
@@ -346,8 +368,6 @@ class AdvancedTyphoonPredictor(TyphoonPredictor):
         Returns:
             PredictionResult: 预测结果
         """
-        logger.info(f"基于 {len(virtual_observations)} 个虚拟观测点进行预测")
-        
         # 将虚拟观测点转换为PathData
         virtual_paths = [vo.to_path_data() for vo in virtual_observations]
         

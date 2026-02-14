@@ -778,215 +778,220 @@ async def ask_question_stream(
     3. 使用Server-Sent Events (SSE)流式返回结果
     4. 保存对话历史（严格关联当前用户的 user_id）
     """
+    # 在生成器外部先查询预设问题和必要的数据
+    preset_question = await find_preset_question(request.question, db)
+    
     async def generate():
-        try:
-            logger.info(f"用户提问（流式） - 用户ID: {current_user.id}, 会话ID: {request.session_id}, 问题: {request.question}")
+        # 在生成器内部创建独立的数据库会话
+        from app.core.database import AsyncSessionLocal
+        
+        async with AsyncSessionLocal() as session:
+            try:
+                logger.info(f"用户提问（流式） - 用户ID: {current_user.id}, 会话ID: {request.session_id}, 问题: {request.question}")
 
-            # 1. 首先尝试从questions表中查找匹配的预设问题
-            preset_question = await find_preset_question(request.question, db)
+                # 1. 使用外部查询结果处理预设问题
+                if preset_question:
+                    # 找到匹配的预设问题，直接流式返回答案
+                    logger.info(f"使用预设问题答案（流式） - 问题ID: {preset_question.id}, 问题: {preset_question.question}")
 
-            if preset_question:
-                # 找到匹配的预设问题，直接流式返回答案
-                logger.info(f"使用预设问题答案（流式） - 问题ID: {preset_question.id}, 问题: {preset_question.question}")
+                    # 模拟流式输出，将答案分段发送
+                    answer = preset_question.answer
+                    chunk_size = 50  # 每50个字符分一段
 
-                # 模拟流式输出，将答案分段发送
-                answer = preset_question.answer
-                chunk_size = 50  # 每50个字符分一段
+                    for i in range(0, len(answer), chunk_size):
+                        chunk = answer[i:i + chunk_size]
+                        yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
+                        await asyncio.sleep(0.05)  # 小延迟模拟打字效果
 
-                for i in range(0, len(answer), chunk_size):
-                    chunk = answer[i:i + chunk_size]
-                    yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
-                    await asyncio.sleep(0.05)  # 小延迟模拟打字效果
+                    # 获取当前北京时间
+                    current_time = get_beijing_time()
 
-                # 获取当前北京时间
-                current_time = get_beijing_time()
-
-                # 保存对话历史，标记为非AI生成
-                history = AskHistory(
-                    session_id=request.session_id,
-                    question=request.question,
-                    answer=answer,
-                    reasoning_content=None,
-                    is_ai_generated=False,
-                    ai_mode=None,
-                    created_at=current_time,
-                    user_id=current_user.id
-                )
-                db.add(history)
-                await db.commit()
-
-                logger.info(f"[预设问题回答（流式）] 用户ID: {current_user.id}, 会话ID: {request.session_id}, 时间: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
-
-                yield "data: [DONE]\n\n"
-                return
-
-            # 2. 没有找到预设问题，调用AI服务生成回答
-            from app.core.config import settings
-
-            reasoning_content = ""
-            full_answer = ""
-
-            logger.info(f"未找到预设问题，开始调用AI服务（流式） - 用户选择模型: {request.model}, 深度思考: {request.deep_thinking}, 问题: {request.question}")
-
-            if request.deep_thinking:
-                actual_model_name = settings.DEEPSEEK_MODEL_THINKING
-                actual_model_key = "deepseek"
-                logger.info(f"深度思考模式已启用，强制使用 DeepSeek 深度思考模型: {actual_model_name}")
-            else:
-                if request.model == "deepseek":
-                    actual_model_name = settings.DEEPSEEK_MODEL
-                    actual_model_key = "deepseek"
-                    logger.info(f"使用 DeepSeek 非深度思考模型: {actual_model_name}")
-                elif request.model == "glm":
-                    actual_model_name = settings.GLM_MODEL
-                    actual_model_key = "glm"
-                elif request.model == "qwen":
-                    actual_model_name = settings.QWEN_TEXT_MODEL
-                    actual_model_key = "qwen"
-                else:
-                    actual_model_name = settings.DEEPSEEK_MODEL
-                    actual_model_key = "deepseek"
-
-            model_map = {
-                "deepseek": settings.DEEPSEEK_MODEL if not request.deep_thinking else settings.DEEPSEEK_MODEL_THINKING,
-                "glm": settings.GLM_MODEL,
-                "qwen": settings.QWEN_TEXT_MODEL
-            }
-
-            if request.deep_thinking:
-                fallback_order = {
-                    "deepseek": [],
-                    "glm": [],
-                    "qwen": []
-                }
-            else:
-                fallback_order = {
-                    "deepseek": ["glm", "qwen"],
-                    "glm": ["deepseek", "qwen"],
-                    "qwen": ["deepseek", "glm"]
-                }
-
-            # 调用流式 AI 服务
-            stream_generator, success = await call_ai_service_with_retry(
-                actual_model_key,
-                actual_model_name,
-                request.question,
-                max_retries=2,
-                use_thinking_config=request.deep_thinking,
-                stream=True
-            )
-
-            used_model = actual_model_key
-            selected_model_key = request.model
-
-            # 如果失败，尝试降级
-            if not success and not request.deep_thinking:
-                logger.warning(f"模型 {actual_model_key} 调用失败，开始尝试降级到备选模型")
-                fallback_models = fallback_order.get(actual_model_key, ["deepseek", "glm"])
-
-                for fallback_key in fallback_models:
-                    fallback_name = model_map.get(fallback_key)
-                    if not fallback_name:
-                        continue
-
-                    logger.info(f"尝试降级模型: {fallback_key} ({fallback_name})")
-
-                    stream_generator, success = await call_ai_service_with_retry(
-                        fallback_key,
-                        fallback_name,
-                        request.question,
-                        max_retries=1,
-                        use_thinking_config=False,
-                        stream=True
+                    # 保存对话历史，标记为非AI生成
+                    history = AskHistory(
+                        session_id=request.session_id,
+                        question=request.question,
+                        answer=answer,
+                        reasoning_content=None,
+                        is_ai_generated=False,
+                        ai_mode=None,
+                        created_at=current_time,
+                        user_id=current_user.id
                     )
+                    session.add(history)
+                    await session.commit()
 
-                    if success:
-                        used_model = fallback_key
-                        logger.info(f"模型降级成功 - 从 {selected_model_key} 降级到 {fallback_key}")
-                        break
+                    logger.info(f"[预设问题回答（流式）] 用户ID: {current_user.id}, 会话ID: {request.session_id}, 时间: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-            if success:
-                matched = False
-                is_ai_generated = True
+                    yield "data: [DONE]\n\n"
+                    return
 
-                # 如果使用了降级模型，先发送提示
-                if used_model != selected_model_key:
+                # 2. 没有找到预设问题，调用AI服务生成回答
+                from app.core.config import settings
+
+                reasoning_content = ""
+                full_answer = ""
+
+                logger.info(f"未找到预设问题，开始调用AI服务（流式） - 用户选择模型: {request.model}, 深度思考: {request.deep_thinking}, 问题: {request.question}")
+
+                if request.deep_thinking:
+                    actual_model_name = settings.DEEPSEEK_MODEL_THINKING
+                    actual_model_key = "deepseek"
+                    logger.info(f"深度思考模式已启用，强制使用 DeepSeek 深度思考模型: {actual_model_name}")
+                else:
+                    if request.model == "deepseek":
+                        actual_model_name = settings.DEEPSEEK_MODEL
+                        actual_model_key = "deepseek"
+                        logger.info(f"使用 DeepSeek 非深度思考模型: {actual_model_name}")
+                    elif request.model == "glm":
+                        actual_model_name = settings.GLM_MODEL
+                        actual_model_key = "glm"
+                    elif request.model == "qwen":
+                        actual_model_name = settings.QWEN_TEXT_MODEL
+                        actual_model_key = "qwen"
+                    else:
+                        actual_model_name = settings.DEEPSEEK_MODEL
+                        actual_model_key = "deepseek"
+
+                model_map = {
+                    "deepseek": settings.DEEPSEEK_MODEL if not request.deep_thinking else settings.DEEPSEEK_MODEL_THINKING,
+                    "glm": settings.GLM_MODEL,
+                    "qwen": settings.QWEN_TEXT_MODEL
+                }
+
+                if request.deep_thinking:
+                    fallback_order = {
+                        "deepseek": [],
+                        "glm": [],
+                        "qwen": []
+                    }
+                else:
+                    fallback_order = {
+                        "deepseek": ["glm", "qwen"],
+                        "glm": ["deepseek", "qwen"],
+                        "qwen": ["deepseek", "glm"]
+                    }
+
+                # 调用流式 AI 服务
+                stream_generator, success = await call_ai_service_with_retry(
+                    actual_model_key,
+                    actual_model_name,
+                    request.question,
+                    max_retries=2,
+                    use_thinking_config=request.deep_thinking,
+                    stream=True
+                )
+
+                used_model = actual_model_key
+                selected_model_key = request.model
+
+                # 如果失败，尝试降级
+                if not success and not request.deep_thinking:
+                    logger.warning(f"模型 {actual_model_key} 调用失败，开始尝试降级到备选模型")
+                    fallback_models = fallback_order.get(actual_model_key, ["deepseek", "glm"])
+
+                    for fallback_key in fallback_models:
+                        fallback_name = model_map.get(fallback_key)
+                        if not fallback_name:
+                            continue
+
+                        logger.info(f"尝试降级模型: {fallback_key} ({fallback_name})")
+
+                        stream_generator, success = await call_ai_service_with_retry(
+                            fallback_key,
+                            fallback_name,
+                            request.question,
+                            max_retries=1,
+                            use_thinking_config=False,
+                            stream=True
+                        )
+
+                        if success:
+                            used_model = fallback_key
+                            logger.info(f"模型降级成功 - 从 {selected_model_key} 降级到 {fallback_key}")
+                            break
+
+                if success:
+                    matched = False
+                    is_ai_generated = True
+
+                    # 如果使用了降级模型，先发送提示
+                    if used_model != selected_model_key:
+                        model_names = {
+                            "deepseek": "DeepSeek",
+                            "glm": "GLM（智谱清言）",
+                            "qwen": "Qwen（通义千问）"
+                        }
+                        original_name = model_names.get(selected_model_key, selected_model_key)
+                        used_name = model_names.get(used_model, used_model)
+                        prefix_message = f"[提示：{original_name}模型暂时不可用，已自动切换到{used_name}模型]\n\n"
+                        yield f"data: {json.dumps({'type': 'content', 'content': prefix_message})}\n\n"
+                        full_answer += prefix_message
+
+                    # 实时推送 AI 响应流
+                    async for chunk in stream_generator:
+                        if chunk.get("done"):
+                            # 流式传输完成，使用收集的完整内容
+                            if not full_answer:
+                                full_answer = chunk.get("full_answer", "")
+                            if not reasoning_content:
+                                reasoning_content = chunk.get("full_reasoning", "")
+                            break
+
+                        # 推送推理内容
+                        if chunk.get("reasoning_content"):
+                            reasoning_content += chunk["reasoning_content"]
+                            yield f"data: {json.dumps({'type': 'reasoning_content', 'content': chunk['reasoning_content']})}\n\n"
+
+                        # 推送回答内容
+                        if chunk.get("content"):
+                            full_answer += chunk["content"]
+                            yield f"data: {json.dumps({'type': 'content', 'content': chunk['content']})}\n\n"
+
+                    logger.info(f"AI服务最终成功（流式） - 使用模型: {used_model}, 回答长度: {len(full_answer)}")
+                else:
+                    logger.error(f"所有AI模型均调用失败 - 原始模型: {selected_model_key}")
+
                     model_names = {
                         "deepseek": "DeepSeek",
                         "glm": "GLM（智谱清言）",
                         "qwen": "Qwen（通义千问）"
                     }
                     original_name = model_names.get(selected_model_key, selected_model_key)
-                    used_name = model_names.get(used_model, used_model)
-                    prefix_message = f"[提示：{original_name}模型暂时不可用，已自动切换到{used_name}模型]\n\n"
-                    yield f"data: {json.dumps({'type': 'content', 'content': prefix_message})}\n\n"
-                    full_answer += prefix_message
 
-                # 实时推送 AI 响应流
-                async for chunk in stream_generator:
-                    if chunk.get("done"):
-                        # 流式传输完成，使用收集的完整内容
-                        if not full_answer:
-                            full_answer = chunk.get("full_answer", "")
-                        if not reasoning_content:
-                            reasoning_content = chunk.get("full_reasoning", "")
-                        break
+                    full_answer = f"抱歉，{original_name}模型暂时不可用，且备选模型也无法响应。\n\n建议您：\n1. 稍后重试\n2. 尝试切换到其他AI模型"
+                    matched = False
+                    is_ai_generated = False
+                    yield f"data: {json.dumps({'type': 'content', 'content': full_answer})}\n\n"
 
-                    # 推送推理内容
-                    if chunk.get("reasoning_content"):
-                        reasoning_content += chunk["reasoning_content"]
-                        yield f"data: {json.dumps({'type': 'reasoning_content', 'content': chunk['reasoning_content']})}\n\n"
+                current_time = get_beijing_time()
 
-                    # 推送回答内容
-                    if chunk.get("content"):
-                        full_answer += chunk["content"]
-                        yield f"data: {json.dumps({'type': 'content', 'content': chunk['content']})}\n\n"
+                # 获取模型显示名称
+                ai_mode = get_model_display_name(used_model, request.deep_thinking) if is_ai_generated else None
 
-                logger.info(f"AI服务最终成功（流式） - 使用模型: {used_model}, 回答长度: {len(full_answer)}")
-            else:
-                logger.error(f"所有AI模型均调用失败 - 原始模型: {selected_model_key}")
+                history = AskHistory(
+                    session_id=request.session_id,
+                    question=request.question,
+                    answer=full_answer,
+                    reasoning_content=reasoning_content if request.deep_thinking else None,
+                    is_ai_generated=is_ai_generated,
+                    ai_mode=ai_mode,
+                    created_at=current_time,
+                    user_id=current_user.id
+                )
+                session.add(history)
+                await session.commit()
 
-                model_names = {
-                    "deepseek": "DeepSeek",
-                    "glm": "GLM（智谱清言）",
-                    "qwen": "Qwen（通义千问）"
-                }
-                original_name = model_names.get(selected_model_key, selected_model_key)
+                answer_time = get_beijing_time()
+                answer_time_str = answer_time.strftime("%Y-%m-%d %H:%M:%S")
+                logger.info(f"[AI回答（流式）] 用户ID: {current_user.id}, 会话ID: {request.session_id}, 时间: {answer_time_str}, 回答长度: {len(full_answer)}, 推理内容长度: {len(reasoning_content)}, AI生成: {is_ai_generated}, AI模型: {ai_mode}")
 
-                full_answer = f"抱歉，{original_name}模型暂时不可用，且备选模型也无法响应。\n\n建议您：\n1. 稍后重试\n2. 尝试切换到其他AI模型"
-                matched = False
-                is_ai_generated = False
-                yield f"data: {json.dumps({'type': 'content', 'content': full_answer})}\n\n"
+                yield "data: [DONE]\n\n"
 
-            current_time = get_beijing_time()
-
-            # 获取模型显示名称
-            ai_mode = get_model_display_name(used_model, request.deep_thinking) if is_ai_generated else None
-
-            history = AskHistory(
-                session_id=request.session_id,
-                question=request.question,
-                answer=full_answer,
-                reasoning_content=reasoning_content if request.deep_thinking else None,
-                is_ai_generated=is_ai_generated,
-                ai_mode=ai_mode,
-                created_at=current_time,
-                user_id=current_user.id
-            )
-            db.add(history)
-            await db.commit()
-
-            answer_time = get_beijing_time()
-            answer_time_str = answer_time.strftime("%Y-%m-%d %H:%M:%S")
-            logger.info(f"[AI回答（流式）] 用户ID: {current_user.id}, 会话ID: {request.session_id}, 时间: {answer_time_str}, 回答长度: {len(full_answer)}, 推理内容长度: {len(reasoning_content)}, AI生成: {is_ai_generated}, AI模型: {ai_mode}")
-
-            yield "data: [DONE]\n\n"
-
-        except Exception as e:
-            await db.rollback()
-            logger.error(f"处理提问失败（流式） - 用户ID: {current_user.id}, 会话ID: {request.session_id}, 错误: {str(e)}")
-            yield f"data: {json.dumps({'type': 'error', 'message': f'处理提问失败: {str(e)}'})}\n\n"
-            yield "data: [DONE]\n\n"
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"处理提问失败（流式） - 用户ID: {current_user.id}, 会话ID: {request.session_id}, 错误: {str(e)}")
+                yield f"data: {json.dumps({'type': 'error', 'message': f'处理提问失败: {str(e)}'})}\n\n"
+                yield "data: [DONE]\n\n"
 
     return StreamingResponse(
         generate(),

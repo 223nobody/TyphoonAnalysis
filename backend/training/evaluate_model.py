@@ -1,19 +1,20 @@
 """
 模型评估脚本
 
-用于评估训练好的模型性能，检查置信度和预测效果
+评估训练好的模型在测试集上的性能
 """
-import logging
 import argparse
+import logging
 from pathlib import Path
-import torch
-import numpy as np
-from torch.utils.data import DataLoader
 
-from app.services.prediction.data.dataset import CSVTyphoonDataset, TyphoonDataCollator
-from app.services.prediction.models.lstm_model import LSTMTyphoonModel
-from app.services.prediction.models.loss_functions import TyphoonPredictionLoss
-from app.services.prediction.data.preprocessor import DataPreprocessor
+import torch
+import torch.nn as nn
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
+
+from train_standalone import TransformerLSTMModel, TyphoonDataset, collate_fn
+from torch.utils.data import DataLoader, random_split
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,197 +23,214 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def evaluate_model(model_path: str, device: str = 'cpu'):
+def evaluate_model(model, test_loader, device):
     """
     评估模型性能
     
-    Args:
-        model_path: 模型文件路径
-        device: 计算设备
+    Returns:
+        dict: 包含各项评估指标
     """
-    logger.info("=" * 70)
-    logger.info("模型评估")
-    logger.info("=" * 70)
-    
-    device = torch.device(device if torch.cuda.is_available() else 'cpu')
-    logger.info(f"使用设备: {device}")
-    
-    # 1. 加载模型
-    logger.info(f"\n加载模型: {model_path}")
-    try:
-        checkpoint = torch.load(model_path, map_location=device)
-        
-        # 检查保存的内容
-        logger.info(f"检查点内容: {list(checkpoint.keys())}")
-        
-        if 'train_losses' in checkpoint:
-            logger.info(f"训练损失历史: {checkpoint['train_losses']}")
-        if 'val_losses' in checkpoint:
-            logger.info(f"验证损失历史: {checkpoint['val_losses']}")
-            
-    except Exception as e:
-        logger.error(f"加载模型失败: {e}")
-        return
-    
-    # 2. 创建验证数据集
-    logger.info("\n创建验证数据集...")
-    try:
-        val_dataset = CSVTyphoonDataset(
-            start_year=2018,  # 使用2018-2020年作为验证集
-            end_year=2020,
-            sequence_length=12,
-            prediction_steps=8
-        )
-        
-        if len(val_dataset) == 0:
-            logger.error("验证数据集为空")
-            return
-            
-        logger.info(f"验证数据集大小: {len(val_dataset)} 个样本")
-        
-    except Exception as e:
-        logger.error(f"创建数据集失败: {e}")
-        import traceback
-        traceback.print_exc()
-        return
-    
-    # 3. 创建数据加载器
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=32,
-        shuffle=False,
-        collate_fn=TyphoonDataCollator(),
-        num_workers=0
-    )
-    
-    # 4. 初始化模型
-    logger.info("\n初始化模型...")
-    model = LSTMTyphoonModel(
-        input_size=10,
-        hidden_size=128,
-        num_layers=3,
-        output_size=4,
-        prediction_steps=8,
-        dropout=0.2,
-        attention_heads=8
-    ).to(device)
-    
-    # 加载模型权重
-    if 'model_state_dict' in checkpoint:
-        model.load_state_dict(checkpoint['model_state_dict'])
-        logger.info("✅ 模型权重加载成功")
-    else:
-        logger.warning("⚠️ 检查点中没有模型权重")
-        return
-    
     model.eval()
     
-    # 5. 评估模型
-    logger.info("\n开始评估...")
-    criterion = TyphoonPredictionLoss(
-        path_weight=1.0,
-        intensity_weight=0.5,
-        physics_weight=0.3
-    )
-    
-    total_loss = 0.0
-    total_samples = 0
     all_predictions = []
     all_targets = []
+    all_confidences = []
     
     with torch.no_grad():
-        for batch_idx, (inputs, targets) in enumerate(val_loader):
+        for inputs, targets in tqdm(test_loader, desc="评估中"):
             inputs = inputs.to(device)
             targets = targets.to(device)
             
-            # 前向传播
-            outputs, confidence, _ = model(inputs)
+            pred_mean, pred_std, confidence = model(inputs)
             
-            # 计算损失
-            loss = criterion(outputs, targets)
-            
-            # 检查是否有NaN
-            if torch.isnan(loss):
-                logger.warning(f"批次 {batch_idx}: 损失为NaN，跳过")
-                continue
-            
-            total_loss += loss.item() * inputs.size(0)
-            total_samples += inputs.size(0)
-            
-            # 保存预测和目标
-            all_predictions.append(outputs.cpu().numpy())
+            all_predictions.append(pred_mean.cpu().numpy())
             all_targets.append(targets.cpu().numpy())
-            
-            if batch_idx % 10 == 0:
-                logger.info(f"批次 {batch_idx}/{len(val_loader)}, 损失: {loss.item():.6f}")
+            all_confidences.append(confidence.cpu().numpy())
     
-    # 6. 计算平均损失
-    if total_samples > 0:
-        avg_loss = total_loss / total_samples
-        logger.info(f"\n✅ 评估完成")
-        logger.info(f"平均验证损失: {avg_loss:.6f}")
-        logger.info(f"有效样本数: {total_samples}")
-    else:
-        logger.error("❌ 没有有效样本，无法计算损失")
-        return
+    # 合并所有批次
+    predictions = np.concatenate(all_predictions, axis=0)
+    targets = np.concatenate(all_targets, axis=0)
+    confidences = np.concatenate(all_confidences, axis=0)
     
-    # 7. 分析预测结果
-    if all_predictions and all_targets:
-        predictions = np.concatenate(all_predictions, axis=0)
-        targets = np.concatenate(all_targets, axis=0)
-        
-        logger.info("\n" + "=" * 70)
-        logger.info("预测结果分析")
-        logger.info("=" * 70)
-        
-        # 计算各维度的MAE
-        mae_lat = np.mean(np.abs(predictions[:, :, 0] - targets[:, :, 0]))
-        mae_lon = np.mean(np.abs(predictions[:, :, 1] - targets[:, :, 1]))
-        mae_pressure = np.mean(np.abs(predictions[:, :, 2] - targets[:, :, 2]))
-        mae_wind = np.mean(np.abs(predictions[:, :, 3] - targets[:, :, 3]))
-        
-        logger.info(f"\n平均绝对误差 (MAE):")
-        logger.info(f"  纬度: {mae_lat:.4f}°")
-        logger.info(f"  经度: {mae_lon:.4f}°")
-        logger.info(f"  气压: {mae_pressure:.2f} hPa")
-        logger.info(f"  风速: {mae_wind:.2f} m/s")
-        
-        # 计算RMSE
-        rmse_lat = np.sqrt(np.mean((predictions[:, :, 0] - targets[:, :, 0])**2))
-        rmse_lon = np.sqrt(np.mean((predictions[:, :, 1] - targets[:, :, 1])**2))
-        
-        logger.info(f"\n均方根误差 (RMSE):")
-        logger.info(f"  纬度: {rmse_lat:.4f}°")
-        logger.info(f"  经度: {rmse_lon:.4f}°")
-        
-        # 分析预测值范围
-        logger.info(f"\n预测值统计:")
-        logger.info(f"  纬度范围: [{predictions[:, :, 0].min():.2f}, {predictions[:, :, 0].max():.2f}]")
-        logger.info(f"  经度范围: [{predictions[:, :, 1].min():.2f}, {predictions[:, :, 1].max():.2f}]")
-        logger.info(f"  气压范围: [{predictions[:, :, 2].min():.2f}, {predictions[:, :, 2].max():.2f}]")
-        logger.info(f"  风速范围: [{predictions[:, :, 3].min():.2f}, {predictions[:, :, 3].max():.2f}]")
-        
-        # 检查是否有异常值
-        if np.isnan(predictions).any():
-            logger.warning(f"⚠️ 预测结果中包含 {np.isnan(predictions).sum()} 个NaN值")
-        if np.isinf(predictions).any():
-            logger.warning(f"⚠️ 预测结果中包含 {np.isinf(predictions).sum()} 个Inf值")
+    # 计算各项误差指标
+    # 纬度误差
+    lat_errors = np.abs(predictions[:, :, 0] - targets[:, :, 0])
+    lat_mae = np.mean(lat_errors)
+    lat_rmse = np.sqrt(np.mean(lat_errors ** 2))
     
-    logger.info("\n" + "=" * 70)
-    logger.info("评估完成")
-    logger.info("=" * 70)
+    # 经度误差
+    lon_errors = np.abs(predictions[:, :, 1] - targets[:, :, 1])
+    lon_mae = np.mean(lon_errors)
+    lon_rmse = np.sqrt(np.mean(lon_errors ** 2))
+    
+    # 气压误差
+    pressure_errors = np.abs(predictions[:, :, 2] - targets[:, :, 2])
+    pressure_mae = np.mean(pressure_errors)
+    
+    # 风速误差
+    wind_errors = np.abs(predictions[:, :, 3] - targets[:, :, 3])
+    wind_mae = np.mean(wind_errors)
+    
+    # 路径误差（欧氏距离）
+    path_errors = np.sqrt(lat_errors ** 2 + lon_errors ** 2)
+    path_mae = np.mean(path_errors)
+    path_rmse = np.sqrt(np.mean(path_errors ** 2))
+    
+    # 按预测时间步分析
+    time_step_errors = []
+    for t in range(predictions.shape[1]):
+        step_error = np.mean(path_errors[:, t])
+        time_step_errors.append(step_error)
+    
+    # 置信度统计
+    avg_confidence = np.mean(confidences)
+    confidence_std = np.std(confidences)
+    
+    return {
+        'lat_mae': lat_mae,
+        'lat_rmse': lat_rmse,
+        'lon_mae': lon_mae,
+        'lon_rmse': lon_rmse,
+        'pressure_mae': pressure_mae,
+        'wind_mae': wind_mae,
+        'path_mae': path_mae,
+        'path_rmse': path_rmse,
+        'time_step_errors': time_step_errors,
+        'avg_confidence': avg_confidence,
+        'confidence_std': confidence_std,
+    }
+
+
+def print_evaluation_results(results):
+    """打印评估结果"""
+    logger.info("\n" + "="*70)
+    logger.info("模型评估结果")
+    logger.info("="*70)
+    
+    logger.info("\n【路径预测误差】")
+    logger.info(f"  纬度 MAE: {results['lat_mae']:.4f}°")
+    logger.info(f"  纬度 RMSE: {results['lat_rmse']:.4f}°")
+    logger.info(f"  经度 MAE: {results['lon_mae']:.4f}°")
+    logger.info(f"  经度 RMSE: {results['lon_rmse']:.4f}°")
+    logger.info(f"  路径 MAE: {results['path_mae']:.4f}°")
+    logger.info(f"  路径 RMSE: {results['path_rmse']:.4f}°")
+    
+    logger.info("\n【强度预测误差】")
+    logger.info(f"  气压 MAE: {results['pressure_mae']:.4f}")
+    logger.info(f"  风速 MAE: {results['wind_mae']:.4f}")
+    
+    logger.info("\n【按预测时间步的路径误差】")
+    for i, error in enumerate(results['time_step_errors']):
+        hours = (i + 1) * 6  # 每步6小时
+        logger.info(f"  {hours}h: {error:.4f}°")
+    
+    logger.info("\n【置信度统计】")
+    logger.info(f"  平均置信度: {results['avg_confidence']:.4f}")
+    logger.info(f"  置信度标准差: {results['confidence_std']:.4f}")
+    
+    logger.info("\n" + "="*70)
 
 
 def main():
     parser = argparse.ArgumentParser(description='模型评估')
-    parser.add_argument('--model-path', type=str, default='./models/final_model.pth',
-                        help='模型文件路径')
-    parser.add_argument('--device', type=str, default='cuda',
-                        help='设备 (cpu/cuda)')
+    parser.add_argument('--model-path', type=str, required=True, help='模型文件路径')
+    parser.add_argument('--csv-path', type=str, required=True, help='测试数据CSV路径')
+    parser.add_argument('--start-year', type=int, default=2023, help='测试数据起始年份')
+    parser.add_argument('--end-year', type=int, default=2024, help='测试数据结束年份')
+    parser.add_argument('--batch-size', type=int, default=32, help='批次大小')
+    parser.add_argument('--device', type=str, default='cuda', help='设备')
     
     args = parser.parse_args()
     
-    evaluate_model(args.model_path, args.device)
+    logger.info("="*70)
+    logger.info("模型评估")
+    logger.info("="*70)
+    
+    device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
+    logger.info(f"使用设备: {device}")
+    
+    try:
+        # 加载测试数据
+        logger.info("\n加载测试数据...")
+        test_dataset = TyphoonDataset(
+            csv_path=args.csv_path,
+            sequence_length=12,
+            prediction_steps=8,
+            start_year=args.start_year,
+            end_year=args.end_year
+        )
+        
+        logger.info(f"测试样本数: {len(test_dataset)}")
+        
+        if len(test_dataset) == 0:
+            logger.error("测试集为空")
+            return
+        
+        test_loader = DataLoader(
+            test_dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            collate_fn=collate_fn
+        )
+        
+        # 加载模型
+        logger.info("\n加载模型...")
+        model = TransformerLSTMModel(
+            input_size=10,
+            hidden_size=256,
+            num_lstm_layers=2,
+            num_transformer_layers=2,
+            num_heads=8,
+            output_size=4,
+            prediction_steps=8,
+            dropout=0.2
+        )
+        
+        checkpoint = torch.load(args.model_path, map_location=device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model = model.to(device)
+        
+        logger.info(f"模型加载成功: {args.model_path}")
+        
+        # 评估模型
+        logger.info("\n开始评估...")
+        results = evaluate_model(model, test_loader, device)
+        
+        # 打印结果
+        print_evaluation_results(results)
+        
+        # 保存评估结果
+        output_dir = Path('evaluation_results')
+        output_dir.mkdir(exist_ok=True)
+        
+        results_file = output_dir / f'eval_{args.start_year}_{args.end_year}.txt'
+        with open(results_file, 'w') as f:
+            f.write("模型评估结果\n")
+            f.write("="*70 + "\n\n")
+            f.write(f"模型路径: {args.model_path}\n")
+            f.write(f"测试数据: {args.csv_path}\n")
+            f.write(f"测试年份: {args.start_year}-{args.end_year}\n")
+            f.write(f"测试样本数: {len(test_dataset)}\n\n")
+            
+            f.write("【路径预测误差】\n")
+            f.write(f"  纬度 MAE: {results['lat_mae']:.4f}°\n")
+            f.write(f"  纬度 RMSE: {results['lat_rmse']:.4f}°\n")
+            f.write(f"  经度 MAE: {results['lon_mae']:.4f}°\n")
+            f.write(f"  经度 RMSE: {results['lon_rmse']:.4f}°\n")
+            f.write(f"  路径 MAE: {results['path_mae']:.4f}°\n")
+            f.write(f"  路径 RMSE: {results['path_rmse']:.4f}°\n\n")
+            
+            f.write("【按预测时间步的路径误差】\n")
+            for i, error in enumerate(results['time_step_errors']):
+                hours = (i + 1) * 6
+                f.write(f"  {hours}h: {error:.4f}°\n")
+        
+        logger.info(f"\n评估结果已保存到: {results_file}")
+        
+    except Exception as e:
+        logger.error(f"评估过程中发生错误: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == '__main__':

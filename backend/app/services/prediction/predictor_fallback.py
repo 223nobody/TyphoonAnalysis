@@ -91,7 +91,8 @@ class TyphoonPredictor:
             raise ValueError("历史数据不足，至少需要3个观测点")
 
         # 计算平均移动趋势
-        recent_paths = sorted(historical_paths, key=lambda x: x.timestamp)[-5:]
+        from .predictor import normalize_datetime
+        recent_paths = sorted(historical_paths, key=lambda x: normalize_datetime(x.timestamp))[-5:]
 
         lat_diffs = np.diff([p.latitude for p in recent_paths])
         lon_diffs = np.diff([p.longitude for p in recent_paths])
@@ -111,24 +112,27 @@ class TyphoonPredictor:
         base_time = last_point.timestamp
 
         predictions = []
-        num_points = forecast_hours // 6
+        interval_hours = 3  # 每3小时一个预测点
+        num_points = forecast_hours // interval_hours
 
         for i in range(1, num_points + 1):
-            forecast_time = base_time + timedelta(hours=6 * i)
+            forecast_time = base_time + timedelta(hours=interval_hours * i)
 
-            pred_lat = last_point.latitude + avg_lat_change * i
-            pred_lon = last_point.longitude + avg_lon_change * i
+            # 计算预测步数因子（相对于6小时的步长）
+            step_factor = (interval_hours * i) / 6.0
+            pred_lat = last_point.latitude + avg_lat_change * step_factor
+            pred_lon = last_point.longitude + avg_lon_change * step_factor
 
             # 强度预测
             pred_pressure = None
             pred_wind = None
             if last_point.center_pressure is not None:
-                pred_pressure = last_point.center_pressure + avg_pressure_change * i
+                pred_pressure = last_point.center_pressure + avg_pressure_change * step_factor
             if last_point.max_wind_speed is not None:
-                pred_wind = max(0, last_point.max_wind_speed + avg_wind_change * i)
+                pred_wind = max(0, last_point.max_wind_speed + avg_wind_change * step_factor)
 
-            # 置信度随时间递减
-            conf = max(0.3, 0.7 - i * 0.05)
+            # 置信度随时间递减，每3小时约衰减5%
+            conf = max(0.45, 0.85 - i * 0.05)
 
             point = PredictedPoint(
                 forecast_time=forecast_time,

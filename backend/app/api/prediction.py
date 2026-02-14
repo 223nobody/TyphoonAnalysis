@@ -1,6 +1,7 @@
 """
 预测API路由
 """
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +10,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from app.core.database import get_db
+
+logger = logging.getLogger(__name__)
 from app.core.config import settings
 from app.models.typhoon import Prediction, TyphoonPath, Typhoon
 from app.schemas.typhoon import PredictionCreate, PredictionResponse
@@ -26,17 +29,26 @@ _predictor: Optional[TyphoonPredictor] = None
 
 
 def get_predictor() -> TyphoonPredictor:
-    """获取或初始化预测器实例"""
+    """获取或初始化预测器实例（单例模式）"""
     global _predictor
     if _predictor is None:
-        # 模型路径
-        model_path = Path(__file__).parent.parent.parent / "models" / "best_model.pth"
+        # 模型路径 - 使用V3版本模型（添加moving_direction特征）
+        model_path = Path(__file__).parent.parent.parent / "training" / "models" / "best_model.pth"
+        
+        use_relative_target = True  # V3模型使用相对位置变化
+        
+        if model_path.exists():
+            logger.info(f"使用V3模型: {model_path}, use_relative_target={use_relative_target}")
+        else:
+            logger.warning(f"未找到V3模型文件: {model_path}，将使用降级策略")
+            model_path = None
         
         _predictor = TyphoonPredictor(
-            model_path=str(model_path) if model_path.exists() else None,
+            model_path=str(model_path) if model_path else None,
             device="cuda",
             sequence_length=12,
-            prediction_steps=8
+            prediction_steps=8,
+            use_relative_target=use_relative_target
         )
     return _predictor
 
@@ -555,13 +567,23 @@ def get_advanced_predictor() -> AdvancedTyphoonPredictor:
     """获取或初始化高级预测器实例"""
     global _advanced_predictor
     if _advanced_predictor is None:
-        model_path = Path(__file__).parent.parent.parent / "models" / "best_model.pth"
+        # 模型路径 - 使用V3版本模型（添加moving_direction特征）
+        model_path = Path(__file__).parent.parent.parent / "training" / "models" / "best_model.pth"
+        
+        use_relative_target = True  # V3模型使用相对位置变化
+        
+        if model_path.exists():
+            logger.info(f"高级预测器使用V3模型: {model_path}, use_relative_target={use_relative_target}")
+        else:
+            logger.warning(f"高级预测器未找到V3模型文件: {model_path}，将使用降级策略")
+            model_path = None
         
         _advanced_predictor = AdvancedTyphoonPredictor(
-            model_path=str(model_path) if model_path.exists() else None,
+            model_path=str(model_path) if model_path else None,
             device="cuda",
             sequence_length=12,
-            prediction_steps=8
+            prediction_steps=8,
+            use_relative_target=use_relative_target
         )
     return _advanced_predictor
 
@@ -574,7 +596,7 @@ async def predict_from_arbitrary_start(
     start_longitude: float = Body(..., description="起点经度"),
     start_pressure: Optional[float] = Body(None, description="起点中心气压（可选）"),
     start_wind_speed: Optional[float] = Body(None, description="起点最大风速（可选）"),
-    forecast_hours: int = Body(48, description="预报时效（小时）"),
+    forecast_hours: int = Body(12, description="预报时效（小时），默认12小时，每3小时一个预测点"),
     db: AsyncSession = Depends(get_db)
 ):
     """

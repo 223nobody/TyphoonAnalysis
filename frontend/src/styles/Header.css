@@ -1,0 +1,160 @@
+/* Header 容器 */
+.header {
+  background: white;
+  padding: 16px 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  min-height: 72px;
+}
+
+/* 标题区域 - 左侧 */
+.header-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e3a8a;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e3a8a;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+/* 图标样式 */
+.header-icon {
+  font-size: 26px;
+  color: #3b82f6;
+}
+
+/* API文档按钮 - 绝对定位在用户区域左侧 */
+.header-button-api-docs {
+  position: absolute;
+  right: 230px;
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%) !important;
+  border: none !important;
+  box-shadow: 0 2px 4px rgba(30, 64, 175, 0.2);
+  height: 40px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+.header-button-api-docs:hover {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%) !important;
+  box-shadow: 0 4px 8px rgba(30, 64, 175, 0.3);
+}
+.header-button-api-health {
+  position: absolute;
+  right: 110px;
+  background: linear-gradient(135deg, #1eaf4e 0%, #3bdaf6 100%) !important;
+  border: none !important;
+  box-shadow: 0 2px 4px rgba(30, 64, 175, 0.2);
+  height: 40px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+.header-button-api-health:hover {
+  background: linear-gradient(135deg, #1eaf4e 0%, #3bdaf6 100%) !important;
+  box-shadow: 0 4px 8px rgba(30, 64, 175, 0.3);
+}
+/* 用户区域 - 绝对定位在右侧 */
+.header-user {
+  position: absolute;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 100px;
+  background-color: #ffffff;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 6px 12px;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.user-info:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.user-info .username {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e3a8a;
+}
+
+.header-user .login-link {
+  padding: 6px 20px;
+  height: 40px;
+  margin-top: 11px;
+  background: linear-gradient(135deg, hsl(226, 71%, 40%) 0%, #3b82f6 100%);
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(30, 64, 175, 0.2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-user .login-link:hover {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  box-shadow: 0 4px 8px rgba(30, 64, 175, 0.3);
+}
+
+/* 小屏幕优化 */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  .header-title {
+    font-size: 18px;
+  }
+
+  .header h1 {
+    font-size: 18px;
+  }
+
+  .header-button-api-docs {
+    position: static;
+    transform: none;
+  }
+
+  .header-user {
+    position: static;
+  }
+}

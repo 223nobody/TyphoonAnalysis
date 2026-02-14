@@ -1,9 +1,9 @@
 # 台风分析系统 - 后端服务
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.9+-blue.svg" alt="Python 3.9+">
+  <img src="https://img.shields.io/badge/Python-3.13+-blue.svg" alt="Python 3.13+">
   <img src="https://img.shields.io/badge/FastAPI-0.109.0-009688.svg" alt="FastAPI">
-  <img src="https://img.shields.io/badge/PyTorch-1.13.1-EE4C2C.svg" alt="PyTorch">
+  <img src="https://img.shields.io/badge/PyTorch-2.6.0-EE4C2C.svg" alt="PyTorch">
   <img src="https://img.shields.io/badge/Qwen3--ASR-0.6B-orange.svg" alt="Qwen3-ASR">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
 </p>
@@ -30,17 +30,17 @@
 | ---------- | ------- | ----------- |
 | FastAPI    | 0.109.0 | Web 框架    |
 | Uvicorn    | 0.27.0  | ASGI 服务器 |
-| SQLAlchemy | 2.0.0   | ORM 框架    |
-| Pydantic   | 2.5.0   | 数据验证    |
+| SQLAlchemy | 2.0.36  | ORM 框架    |
+| Pydantic   | 2.9.2   | 数据验证    |
 
 ### AI/ML 技术
 
 | 技术         | 版本   | 用途         |
 | ------------ | ------ | ------------ |
-| PyTorch      | 1.13.1 | 深度学习框架 |
-| scikit-learn | 1.3.0  | 机器学习工具 |
-| NumPy        | 1.24.0 | 数值计算     |
-| pandas       | 2.0.0  | 数据处理     |
+| PyTorch      | 2.6.0  | 深度学习框架 |
+| scikit-learn | 1.5.2  | 机器学习工具 |
+| NumPy        | 2.1.3  | 数值计算     |
+| pandas       | 2.2.3  | 数据处理     |
 
 ### AI 服务集成
 
@@ -59,7 +59,7 @@ backend/
 │   │   ├── ai_agent.py           # AI 智能客服
 │   │   ├── alert.py              # 预警管理
 │   │   ├── analysis.py           # 图像分析
-│   │   ├── asr.py                # 语音识别 (新增)
+│   │   ├── asr.py                # 语音识别
 │   │   ├── auth.py               # 用户认证
 │   │   ├── crawler.py            # 数据爬取
 │   │   ├── export.py             # 数据导出
@@ -82,7 +82,7 @@ backend/
 │       │   ├── deepseek_service.py
 │       │   ├── glm_service.py
 │       │   └── qwen_service.py
-│       ├── asr/                  # 语音识别服务 (新增)
+│       ├── asr/                  # 语音识别服务
 │       │   ├── asr_service.py    # ASR 核心服务
 │       │   └── qwen_asr.py       # Qwen3-ASR 模型封装
 │       ├── crawler/              # 数据爬取
@@ -158,7 +158,7 @@ GET    /api/ai/questions         # 热门问题
 | GLM-4 | 中文优化 | 报告生成 |
 | Qwen-VL | 多模态 | 图像分析 |
 
-### 3. 语音识别系统 (新增)
+### 3. 语音识别系统
 
 集成 **Qwen3-ASR** 模型，提供高质量的语音转文字服务。
 
@@ -169,6 +169,7 @@ GET    /api/ai/questions         # 热门问题
 - **语言支持**: 中文、英文、粤语等 (自动检测)
 - **文本处理**: 自动繁体转简体
 - **性能优化**: 启动时预加载模型，首次请求无需等待
+- **GPU 加速**: 支持 CUDA 12.4，自动检测 GPU 可用性
 
 **API 端点**:
 
@@ -233,8 +234,8 @@ scheduler.start()
 
 ### 环境要求
 
-- Python >= 3.9
-- CUDA >= 11.7 (GPU 训练可选，ASR 推荐)
+- Python >= 3.13
+- CUDA >= 12.4 (GPU 加速推荐，特别是 ASR 语音识别)
 - SQLite3
 
 ### 安装步骤
@@ -243,13 +244,13 @@ scheduler.start()
 
 ```bash
 cd backend
-python -m venv venv
+python -m venv venv312
 
 # Windows
-venv\Scripts\activate
+venv312\Scripts\activate
 
 # Linux/Mac
-source venv/bin/activate
+source venv312/bin/activate
 ```
 
 2. **安装依赖**
@@ -258,26 +259,36 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-3. **配置环境变量**
+3. **安装 GPU 版 PyTorch (推荐)**
+
+```bash
+# 卸载 CPU 版本（如果已安装）
+pip uninstall torch torchvision torchaudio -y
+
+# 安装 CUDA 12.4 版本
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+```
+
+4. **配置环境变量**
 
 ```bash
 cp .env.example .env
 # 编辑 .env 文件，配置 API 密钥
 ```
 
-4. **初始化数据库**
+5. **初始化数据库**
 
 ```bash
 python -c "from app.core.database import init_db; init_db()"
 ```
 
-5. **导入历史数据**
+6. **导入历史数据**
 
 ```bash
 python data.py
 ```
 
-6. **启动服务**
+7. **启动服务**
 
 ```bash
 # 开发模式
@@ -431,11 +442,14 @@ pytest tests/test_prediction.py -v
 ### Docker 部署
 
 ```dockerfile
-FROM python:3.9-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# 安装 GPU 版 PyTorch (根据 CUDA 版本调整)
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 COPY . .
 EXPOSE 8000
@@ -455,7 +469,10 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ### Q: 模型加载失败？
 
-A: 检查模型文件路径和 PyTorch 版本兼容性。
+A: 检查模型文件路径和 PyTorch 版本兼容性。确保安装了正确版本的 PyTorch：
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+```
 
 ### Q: AI 接口调用失败？
 
@@ -471,7 +488,7 @@ A: 系统已集成 OpenCC 自动将繁体转换为简体，无需额外配置。
 
 ### Q: ASR 首次请求响应慢？
 
-A: 模型在启动时会自动预加载，如果仍慢请检查 GPU 是否正常工作。
+A: 模型在启动时会自动预加载，如果仍慢请检查 GPU 是否正常工作。查看日志中的 `使用设备: cuda` 确认 GPU 已启用。
 
 ### Q: ASR 支持哪些音频格式？
 
@@ -481,7 +498,39 @@ A: 支持 WAV, MP3, FLAC, M4A, OGG, WebM 格式，推荐 WAV 格式以获得最�
 
 A: 使用 Qwen3-ASR-0.6B 模型，需要约 4GB 显存。CPU 模式也可运行但速度较慢。
 
+### Q: 安装依赖时出现编译错误？
+
+A: 某些包（如 lxml, Pillow）在 Python 3.13 上需要较新版本。requirements.txt 已更新到兼容版本：
+- lxml: 5.1.0 → 5.3.0
+- Pillow: 10.0.0 → 11.0.0
+- pandas: 2.1.4 → 2.2.3
+- numpy: 1.26.4 → 2.1.3
+
+### Q: FastAPI 启动时出现 Pydantic 错误？
+
+A: 确保 pydantic 和 pydantic-settings 版本兼容：
+- pydantic: 2.5.0 → 2.9.2
+- pydantic-settings: 2.1.0 → 2.6.1
+
+### Q: SQLAlchemy 出现兼容性问题？
+
+A: Python 3.13 需要 SQLAlchemy 2.0.36+：
+- sqlalchemy: 2.0.0 → 2.0.36
+
+### Q: pkg_resources 模块找不到？
+
+A: 需要安装特定版本的 setuptools：
+```bash
+pip install setuptools==69.5.1
+```
+
 ## 更新日志
+
+### v1.2.0 (2026-02-13)
+
+- 更新依赖版本以支持 Python 3.13
+- 优化 PyTorch GPU 版本安装流程
+- 更新 README 安装说明
 
 ### v1.1.0 (2026-02-12)
 

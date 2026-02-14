@@ -86,7 +86,7 @@ def generate_json_content(typhoon_data: dict, include_path: bool = True) -> str:
 @router.get("/typhoon/{typhoon_id}")
 async def export_typhoon_data(
     typhoon_id: str,
-    format: str = Query("csv", regex="^(csv|json)$", description="导出格式"),
+    format: str = Query("csv", pattern="^(csv|json)$", description="导出格式"),
     include_path: bool = Query(True, description="是否包含路径数据"),
     db: AsyncSession = Depends(get_db)
 ):
