@@ -42,6 +42,7 @@ const Register = () => {
 
   return (
     <div className="auth-container">
+      <div className="floating-orbs" />
       <div className="auth-card">
         <div className="auth-header">
           <h1>创建账号</h1>
@@ -138,7 +139,6 @@ const Register = () => {
               htmlType="submit"
               className="auth-button"
               loading={loading}
-              style={{ transition: "all 0.2s ease" }}
             >
               注册
             </Button>
@@ -146,12 +146,8 @@ const Register = () => {
         </Form>
 
         <div className="auth-footer">
-          已有账号？{" "}
-          <a
-            href="/login"
-            onClick={handleLoginClick}
-            style={{ cursor: "pointer", transition: "color 0.2s ease" }}
-          >
+          <span>已有账号？</span>{" "}
+          <a href="/login" onClick={handleLoginClick}>
             立即登录
           </a>
         </div>

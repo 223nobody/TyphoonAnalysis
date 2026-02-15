@@ -161,7 +161,7 @@ class QwenService:
             }
 
             headers = {
-                "Authorization": f"Bearer {self.api_key}",
+                "Authorization": self.api_key,
                 "Content-Type": "application/json"
             }
 
@@ -841,7 +841,7 @@ class QwenService:
                 }
 
                 headers = {
-                    "Authorization": f"Bearer {self.api_key}",
+                    "Authorization": self.api_key,
                     "Content-Type": "application/json"
                 }
 

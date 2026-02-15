@@ -5,7 +5,6 @@
 import React, { useState } from "react";
 import {
   predictPath,
-  predictIntensity,
   predictFromArbitraryStart,
   rollingPrediction,
   predictWithVirtualObservations,
@@ -26,12 +25,6 @@ function Prediction() {
     useEnsemble: false,
   });
 
-  // 强度预测表单
-  const [intensityForm, setIntensityForm] = useState({
-    typhoonId: "",
-    hours: 48,
-  });
-
   // 任意起点预测表单
   const [arbitraryForm, setArbitraryForm] = useState({
     typhoonId: "",
@@ -49,7 +42,7 @@ function Prediction() {
     initialHours: 48,
     updateInterval: 6,
     maxIterations: 5,
-    confidenceThreshold: 0.5,
+    confidenceThreshold: 0.6,
   });
 
   // 虚拟观测点预测表单
@@ -101,27 +94,6 @@ function Prediction() {
       setResult({ type: "path", data: response });
     } catch (err) {
       setError(err.message || "路径预测失败");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 处理强度预测
-  const handleIntensityPrediction = async () => {
-    if (!validateTyphoonId(intensityForm.typhoonId)) {
-      setError("请输入有效的台风编号（4位或6位数字）");
-      return;
-    }
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await predictIntensity(
-        intensityForm.typhoonId,
-        parseInt(intensityForm.hours),
-      );
-      setResult({ type: "intensity", data: response });
-    } catch (err) {
-      setError(err.message || "强度预测失败");
     } finally {
       setLoading(false);
     }
@@ -515,55 +487,6 @@ function Prediction() {
     </div>
   );
 
-  // 渲染强度预测表单
-  const renderIntensityForm = () => (
-    <div>
-      <div
-        style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "15px" }}
-      >
-        <div className="form-group">
-          <label>台风编号</label>
-          <input
-            type="text"
-            placeholder="例如: 2601 或 202601"
-            value={intensityForm.typhoonId}
-            onChange={(e) =>
-              setIntensityForm({ ...intensityForm, typhoonId: e.target.value })
-            }
-          />
-        </div>
-        <div className="form-group">
-          <label>预报时效（小时）</label>
-          <select
-            value={intensityForm.hours}
-            onChange={(e) =>
-              setIntensityForm({ ...intensityForm, hours: e.target.value })
-            }
-          >
-            <option value={12}>12小时</option>
-            <option value={24}>24小时</option>
-            <option value={48}>48小时</option>
-            <option value={72}>72小时</option>
-            <option value={120}>120小时</option>
-          </select>
-        </div>
-      </div>
-      <button
-        className="btn"
-        onClick={handleIntensityPrediction}
-        disabled={loading}
-      >
-        🎯 开始强度预测
-      </button>
-      <div className="info-card" style={{ marginTop: "15px" }}>
-        <p style={{ margin: 0, fontSize: "13px", color: "#1e40af" }}>
-          💡 <strong>说明：</strong>
-          基于AI模型预测台风强度变化趋势。支持4位(如2601)或6位(如202601)台风编号。
-        </p>
-      </div>
-    </div>
-  );
-
   // 渲染任意起点预测表单
   const renderArbitraryForm = () => (
     <div>
@@ -943,7 +866,6 @@ function Prediction() {
           }}
         >
           <option value="path">路径预测</option>
-          <option value="intensity">强度预测</option>
           <option value="arbitrary">任意起点预测</option>
           <option value="rolling">滚动预测</option>
           <option value="virtual">虚拟观测点预测</option>
@@ -952,7 +874,6 @@ function Prediction() {
 
       {/* 根据类型渲染不同表单 */}
       {predictionType === "path" && renderPathForm()}
-      {predictionType === "intensity" && renderIntensityForm()}
       {predictionType === "arbitrary" && renderArbitraryForm()}
       {predictionType === "rolling" && renderRollingForm()}
       {predictionType === "virtual" && renderVirtualForm()}
@@ -978,8 +899,6 @@ function Prediction() {
           {(result.type === "path" ||
             result.type === "arbitrary" ||
             result.type === "virtual") &&
-            renderPredictionTable(result.data, true)}
-          {result.type === "intensity" &&
             renderPredictionTable(result.data, true)}
           {result.type === "rolling" && renderRollingResult(result.data)}
         </div>
