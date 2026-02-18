@@ -31,10 +31,15 @@ class Settings(BaseSettings):
     AI_API_KEY_THINKING: str = Field(default="", description="深度思考模式专用API密钥")
     AI_API_BASE_URL_THINKING: str = Field(default="", description="深度思考模式专用API基础URL")
 
+    # 视觉语言模型专用配置
+    AI_API_KEY_VL: str = Field(default="", description="视觉语言模型专用API密钥（用于视频/图像分析）")
+    AI_API_BASE_URL_VL: str = Field(default="https://dashscope.aliyuncs.com/api/v1", description="视觉语言模型API基础URL")
+
     # AI模型名称配置
     DEEPSEEK_MODEL: str = Field(default="", description="DeepSeek模型名称（非深度思考模式）")
     DEEPSEEK_MODEL_THINKING: str = Field(default="", description="DeepSeek模型名称（深度思考模式）")
     QWEN_TEXT_MODEL: str = Field(default="", description="Qwen文本生成模型")
+    QWEN_VL_MODEL: str = Field(default="qwen-vl-max-latest", description="Qwen视觉语言模型")
     GLM_MODEL: str = Field(default="", description="GLM模型名称")
 
 

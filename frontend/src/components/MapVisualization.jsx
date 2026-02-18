@@ -256,6 +256,9 @@ function MapVisualization({
   const hasProcessedUrlTyphoonId = useRef(false);
   const hasTriedYearSwitch = useRef(false);
 
+  // 使用ref跟踪是否已经处理过活跃台风自动选中
+  const hasAutoSelectedActiveTyphoon = useRef(false);
+
   // 处理URL参数中的typhoon_id - 第一阶段：提取年份并切换
   useEffect(() => {
     if (urlTyphoonId && !hasProcessedUrlTyphoonId.current) {
@@ -348,6 +351,52 @@ function MapVisualization({
     hasProcessedUrlTyphoonId.current = false;
     hasTriedYearSwitch.current = false;
   }, [urlTyphoonId]);
+
+  // 自动选中活跃台风 - 当没有URL参数且没有选中任何台风时
+  useEffect(() => {
+    // 如果有URL参数，不自动选中活跃台风
+    if (urlTyphoonId) {
+      return;
+    }
+
+    // 如果已经处理过，跳过
+    if (hasAutoSelectedActiveTyphoon.current) {
+      return;
+    }
+
+    // 如果正在加载或没有数据，跳过
+    if (listLoading || typhoons.length === 0) {
+      return;
+    }
+
+    // 如果已经选中了台风，跳过
+    if (selectedTyphoons && selectedTyphoons.size > 0) {
+      return;
+    }
+
+    // 查找活跃台风（status === 1）
+    const activeTyphoons = typhoons.filter((t) => t.status === 1);
+
+    if (activeTyphoons.length > 0) {
+      // 默认选中第一个活跃台风
+      const firstActiveTyphoon = activeTyphoons[0];
+      console.log(
+        `🌀 检测到活跃台风，自动选中: ${firstActiveTyphoon.typhoon_id} - ${firstActiveTyphoon.typhoon_name_cn || firstActiveTyphoon.typhoon_name}`,
+      );
+
+      if (onTyphoonSelect) {
+        onTyphoonSelect(firstActiveTyphoon.typhoon_id);
+      }
+
+      // 标记已处理
+      hasAutoSelectedActiveTyphoon.current = true;
+    }
+  }, [urlTyphoonId, listLoading, typhoons, selectedTyphoons, onTyphoonSelect]);
+
+  // 当年份变化时，重置活跃台风自动选中标志
+  useEffect(() => {
+    hasAutoSelectedActiveTyphoon.current = false;
+  }, [filters.year]);
 
   // 使用 ref 来跟踪最新的 filters 值，避免闭包问题
   const filtersRef = useRef(filters);
@@ -1656,7 +1705,7 @@ function MapVisualization({
               padding: "15px",
               borderRadius: "10px",
               boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
-              maxWidth: "250px",
+              maxWidth: "280px",
               zIndex: 1000,
             }}
           >

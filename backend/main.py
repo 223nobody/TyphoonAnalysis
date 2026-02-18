@@ -10,7 +10,7 @@ from loguru import logger
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.api import typhoon, prediction, analysis, report, crawler, statistics, export, alert, ai_agent, auth, user_stats, asr
-from app.api.v1 import images
+from app.api.v1 import images, video_analysis
 from app.services.scheduler import start_scheduler, shutdown_scheduler
 
 
@@ -99,7 +99,8 @@ app.include_router(ai_agent.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(user_stats.router, prefix="/api")
 app.include_router(asr.router, prefix="/api")
-app.include_router(images.router)
+app.include_router(images.router, prefix="/api")
+app.include_router(video_analysis.router, prefix="/api")
 
 
 @app.get("/")

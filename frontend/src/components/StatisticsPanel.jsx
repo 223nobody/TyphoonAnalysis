@@ -14,7 +14,7 @@ import "../styles/StatisticsPanel.css";
 import "../styles/common.css";
 
 function StatisticsPanel() {
-  const [statisticsType, setStatisticsType] = useState("yearly");
+  const [activeTab, setActiveTab] = useState("yearly");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -67,7 +67,7 @@ function StatisticsPanel() {
       setError(null);
       const data = await getYearlyStatistics(
         yearlyForm.startYear,
-        yearlyForm.endYear
+        yearlyForm.endYear,
       );
       setResult({ type: "yearly", data });
     } catch (err) {
@@ -199,7 +199,7 @@ function StatisticsPanel() {
       setError(null);
       const data = await getIntensityStatistics(
         intensityForm.year,
-        intensityForm.typhoonId
+        intensityForm.typhoonId,
       );
       setResult({ type: "intensity", data });
     } catch (err) {
@@ -358,7 +358,7 @@ function StatisticsPanel() {
 
       const typhoons = result.data.typhoons || [];
       const typhoonNames = typhoons.map(
-        (t) => t.typhoon_name_cn || t.typhoon_name || t.typhoon_id
+        (t) => t.typhoon_name_cn || t.typhoon_name || t.typhoon_id,
       );
       const maxWindSpeeds = typhoons.map((t) => t.max_wind_speed || 0);
       const minPressures = typhoons.map((t) => t.min_pressure || 0);
@@ -485,7 +485,7 @@ function StatisticsPanel() {
     exportTyphoon(
       exportForm.typhoonId,
       exportForm.format,
-      exportForm.includePath
+      exportForm.includePath,
     );
     alert(`正在导出台风 ${exportForm.typhoonId} 的数据，文件将自动下载...`);
   };
@@ -517,7 +517,7 @@ function StatisticsPanel() {
       const result = await exportBatchTyphoons(
         idArray,
         exportForm.format,
-        exportForm.includePath
+        exportForm.includePath,
       );
       alert(`成功导出 ${result.count} 个台风的数据！`);
     } catch (err) {
@@ -790,64 +790,10 @@ function StatisticsPanel() {
     </div>
   );
 
-  return (
-    <div>
-      <h2>📈 统计分析</h2>
-
-      {/* 统计类型选择 */}
-      <div className="form-group">
-        <label>统计类型</label>
-        <select
-          value={statisticsType}
-          onChange={(e) => setStatisticsType(e.target.value)}
-        >
-          <option value="yearly">年度统计</option>
-          <option value="intensity">强度分布</option>
-          <option value="comparison">台风对比</option>
-          <option value="export">数据导出</option>
-        </select>
-      </div>
-
-      {/* 根据类型渲染不同表单 */}
-      {statisticsType === "yearly" && renderYearlyForm()}
-      {statisticsType === "intensity" && renderIntensityForm()}
-      {statisticsType === "comparison" && renderComparisonForm()}
-      {statisticsType === "export" && renderExportForm()}
-
-      {/* 错误提示 */}
-      {error && (
-        <div className="error-message" style={{ marginTop: "20px" }}>
-          ❌ {error}
-        </div>
-      )}
-
-      {/* 加载状态 */}
-      {loading && <div className="loading">处理中</div>}
-
-      {/* 结果显示 */}
-      {result && renderResult()}
-    </div>
-  );
-
-  // 渲染结果
-  function renderResult() {
-    if (!result || !result.data) return null;
-
-    return (
-      <div className="result-box" style={{ marginTop: "20px" }}>
-        <h3>统计结果</h3>
-        {result.type === "yearly" && renderYearlyResult(result.data)}
-        {result.type === "intensity" && renderIntensityResult(result.data)}
-        {result.type === "comparison" && renderComparisonResult(result.data)}
-      </div>
-    );
-  }
-
   // 渲染年度统计结果
   function renderYearlyResult(data) {
     return (
       <div>
-        {/* ECharts图表容器 */}
         <div
           ref={yearlyChartRef}
           style={{
@@ -934,7 +880,7 @@ function StatisticsPanel() {
                 <p key={intensity}>
                   <strong>{intensity}:</strong> {count}次
                 </p>
-              )
+              ),
             )}
           </div>
         )}
@@ -1022,6 +968,130 @@ function StatisticsPanel() {
       </div>
     );
   }
+
+  // 渲染结果
+  function renderResult() {
+    if (!result || !result.data) return null;
+
+    return (
+      <div className="result-box" style={{ marginTop: "20px" }}>
+        <h3>统计结果</h3>
+        {result.type === "yearly" && renderYearlyResult(result.data)}
+        {result.type === "intensity" && renderIntensityResult(result.data)}
+        {result.type === "comparison" && renderComparisonResult(result.data)}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h2>📈 统计分析</h2>
+
+      {/* 统计类型标签页 */}
+      <div style={{ marginBottom: "20px", borderBottom: "2px solid #e5e7eb" }}>
+        <button
+          onClick={() => {
+            setActiveTab("yearly");
+            setResult(null);
+            setError(null);
+          }}
+          style={{
+            padding: "12px 24px",
+            fontSize: "16px",
+            fontWeight: "bold",
+            border: "none",
+            background: "transparent",
+            borderBottom: activeTab === "yearly" ? "3px solid #3b82f6" : "none",
+            color: activeTab === "yearly" ? "#3b82f6" : "#6b7280",
+            cursor: "pointer",
+            marginRight: "10px",
+          }}
+        >
+          年度统计
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab("intensity");
+            setResult(null);
+            setError(null);
+          }}
+          style={{
+            padding: "12px 24px",
+            fontSize: "16px",
+            fontWeight: "bold",
+            border: "none",
+            background: "transparent",
+            borderBottom:
+              activeTab === "intensity" ? "3px solid #3b82f6" : "none",
+            color: activeTab === "intensity" ? "#3b82f6" : "#6b7280",
+            cursor: "pointer",
+            marginRight: "10px",
+          }}
+        >
+          强度分布
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab("comparison");
+            setResult(null);
+            setError(null);
+          }}
+          style={{
+            padding: "12px 24px",
+            fontSize: "16px",
+            fontWeight: "bold",
+            border: "none",
+            background: "transparent",
+            borderBottom:
+              activeTab === "comparison" ? "3px solid #3b82f6" : "none",
+            color: activeTab === "comparison" ? "#3b82f6" : "#6b7280",
+            cursor: "pointer",
+            marginRight: "10px",
+          }}
+        >
+          台风对比
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab("export");
+            setResult(null);
+            setError(null);
+          }}
+          style={{
+            padding: "12px 24px",
+            fontSize: "16px",
+            fontWeight: "bold",
+            border: "none",
+            background: "transparent",
+            borderBottom: activeTab === "export" ? "3px solid #3b82f6" : "none",
+            color: activeTab === "export" ? "#3b82f6" : "#6b7280",
+            cursor: "pointer",
+          }}
+        >
+          数据导出
+        </button>
+      </div>
+
+      {/* 根据类型渲染不同表单 */}
+      {activeTab === "yearly" && renderYearlyForm()}
+      {activeTab === "intensity" && renderIntensityForm()}
+      {activeTab === "comparison" && renderComparisonForm()}
+      {activeTab === "export" && renderExportForm()}
+
+      {/* 错误提示 */}
+      {error && (
+        <div className="error-message" style={{ marginTop: "20px" }}>
+          ❌ {error}
+        </div>
+      )}
+
+      {/* 加载状态 */}
+      {loading && <div className="loading">处理中</div>}
+
+      {/* 结果显示 */}
+      {result && renderResult()}
+    </div>
+  );
 }
 
 export default StatisticsPanel;

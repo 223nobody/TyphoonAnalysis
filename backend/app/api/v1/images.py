@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 import logging
 
 from app.core.database import get_db
-from app.models.image import TyphoonImage, ImageAnalysisResult
+from app.models.image import TyphoonImage
 from app.services.image.image_service import ImageAnalysisService
 from app.services.crawler.image_crawler import (
     SatelliteCrawler,
@@ -277,8 +277,7 @@ async def get_typhoon_images(
                     "filename": img.filename,
                     "image_type": img.image_type,
                     "upload_time": img.upload_time.isoformat(),
-                    "file_size": img.file_size,
-                    "has_analysis": img.analysis_result is not None
+                    "file_size": img.file_size
                 }
                 for img in images
             ]
@@ -349,45 +348,6 @@ async def crawl_satellite_images(
         raise HTTPException(status_code=500, detail=f"爬取失败: {str(e)}")
 
 
-@router.get("/analysis/history/{image_id}")
-async def get_analysis_history(
-    image_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    获取图像的分析历史
-    
-    Args:
-        image_id: 图像ID
-        db: 数据库会话
-    
-    Returns:
-        分析历史记录
-    """
-    try:
-        service = ImageAnalysisService(db)
-        history = await service.get_analysis_history(image_id)
-        
-        return {
-            "success": True,
-            "image_id": image_id,
-            "count": len(history),
-            "history": [
-                {
-                    "id": record.id,
-                    "analysis_type": record.analysis_type,
-                    "result": record.result,
-                    "analyzed_at": record.analyzed_at.isoformat()
-                }
-                for record in history
-            ]
-        }
-    
-    except Exception as e:
-        logger.error(f"获取分析历史失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"获取历史失败: {str(e)}")
-
-
 @router.delete("/{image_id}")
 async def delete_image(
     image_id: int,
@@ -421,4 +381,3 @@ async def delete_image(
     except Exception as e:
         logger.error(f"删除图像失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
-

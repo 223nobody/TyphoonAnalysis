@@ -2,7 +2,7 @@
  * 智能预测组件 - 集成LSTM深度学习模型
  * 支持：路径预测、强度预测、任意起点预测、滚动预测、虚拟观测点预测
  */
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   predictPath,
   predictFromArbitraryStart,
@@ -13,7 +13,7 @@ import "../styles/ImageAnalysis.css";
 import "../styles/common.css";
 
 function Prediction() {
-  const [predictionType, setPredictionType] = useState("path");
+  const [activeTab, setActiveTab] = useState("path");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -53,7 +53,7 @@ function Prediction() {
   });
 
   // 获取强度等级
-  const getIntensityLevel = (windSpeed, pressure) => {
+  const getIntensityLevel = (windSpeed) => {
     if (!windSpeed) return "未知";
     if (windSpeed >= 51) return "超强台风";
     if (windSpeed >= 41) return "强台风";
@@ -366,10 +366,7 @@ function Prediction() {
                           fontSize: "12px",
                         }}
                       >
-                        {getIntensityLevel(
-                          pred.predicted_wind_speed,
-                          pred.predicted_pressure,
-                        )}
+                        {getIntensityLevel(pred.predicted_wind_speed)}
                       </span>
                     </td>
                   )}
@@ -854,29 +851,43 @@ function Prediction() {
     <div>
       <h2>🎯 智能预测</h2>
 
-      {/* 预测类型选择 */}
-      <div className="form-group">
-        <label>预测类型</label>
-        <select
-          value={predictionType}
-          onChange={(e) => {
-            setPredictionType(e.target.value);
-            setResult(null);
-            setError(null);
-          }}
-        >
-          <option value="path">路径预测</option>
-          <option value="arbitrary">任意起点预测</option>
-          <option value="rolling">滚动预测</option>
-          <option value="virtual">虚拟观测点预测</option>
-        </select>
+      {/* 预测类型标签页 */}
+      <div style={{ marginBottom: "20px", borderBottom: "2px solid #e5e7eb" }}>
+        {[
+          { key: "path", label: "路径预测" },
+          { key: "arbitrary", label: "任意起点预测" },
+          { key: "rolling", label: "滚动预测" },
+          { key: "virtual", label: "虚拟观测点预测" },
+        ].map((tab, index) => (
+          <button
+            key={tab.key}
+            onClick={() => {
+              setActiveTab(tab.key);
+              setResult(null);
+              setError(null);
+            }}
+            style={{
+              padding: "12px 24px",
+              fontSize: "16px",
+              fontWeight: "bold",
+              border: "none",
+              background: "transparent",
+              borderBottom: activeTab === tab.key ? "3px solid #3b82f6" : "none",
+              color: activeTab === tab.key ? "#3b82f6" : "#6b7280",
+              cursor: "pointer",
+              marginRight: index < 3 ? "10px" : "0",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* 根据类型渲染不同表单 */}
-      {predictionType === "path" && renderPathForm()}
-      {predictionType === "arbitrary" && renderArbitraryForm()}
-      {predictionType === "rolling" && renderRollingForm()}
-      {predictionType === "virtual" && renderVirtualForm()}
+      {activeTab === "path" && renderPathForm()}
+      {activeTab === "arbitrary" && renderArbitraryForm()}
+      {activeTab === "rolling" && renderRollingForm()}
+      {activeTab === "virtual" && renderVirtualForm()}
 
       {/* 错误提示 */}
       {error && (

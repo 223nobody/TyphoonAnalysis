@@ -7,7 +7,7 @@ import "../styles/AlertCenter.css";
 import "../styles/common.css";
 
 function AlertCenter() {
-  const [alertFunction, setAlertFunction] = useState("active");
+  const [activeTab, setActiveTab] = useState("active");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -54,10 +54,10 @@ function AlertCenter() {
 
   // 当功能切换时自动加载数据
   useEffect(() => {
-    if (alertFunction === "active") {
+    if (activeTab === "active") {
       loadActiveAlerts();
     }
-  }, [alertFunction]);
+  }, [activeTab]);
 
   // 获取预警级别颜色
   const getAlertLevelColor = (level) => {
@@ -116,7 +116,7 @@ function AlertCenter() {
         </div>
       </div>
       <button className="btn" onClick={loadAlertHistory} disabled={loading}>
-        � 查询历史预警
+        🔍 查询历史预警
       </button>
     </div>
   );
@@ -486,21 +486,52 @@ function AlertCenter() {
     <div>
       <h2>🚨 预警中心</h2>
 
-      {/* 功能选择 */}
-      <div className="form-group">
-        <label>功能选择</label>
-        <select
-          value={alertFunction}
-          onChange={(e) => setAlertFunction(e.target.value)}
+      {/* 标签页选择 */}
+      <div style={{ marginBottom: "20px", borderBottom: "2px solid #e5e7eb" }}>
+        <button
+          onClick={() => {
+            setActiveTab("active");
+            setResult(null);
+            setError(null);
+          }}
+          style={{
+            padding: "12px 24px",
+            fontSize: "16px",
+            fontWeight: "bold",
+            border: "none",
+            background: "transparent",
+            borderBottom: activeTab === "active" ? "3px solid #3b82f6" : "none",
+            color: activeTab === "active" ? "#3b82f6" : "#6b7280",
+            cursor: "pointer",
+            marginRight: "10px",
+          }}
         >
-          <option value="active">台风公报</option>
-          <option value="history">历史预警</option>
-        </select>
+          台风公报
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab("history");
+            setResult(null);
+            setError(null);
+          }}
+          style={{
+            padding: "12px 24px",
+            fontSize: "16px",
+            fontWeight: "bold",
+            border: "none",
+            background: "transparent",
+            borderBottom: activeTab === "history" ? "3px solid #3b82f6" : "none",
+            color: activeTab === "history" ? "#3b82f6" : "#6b7280",
+            cursor: "pointer",
+          }}
+        >
+          历史预警
+        </button>
       </div>
 
       {/* 根据功能渲染不同表单 */}
-      {alertFunction === "active" && renderActiveForm()}
-      {alertFunction === "history" && renderHistoryForm()}
+      {activeTab === "active" && renderActiveForm()}
+      {activeTab === "history" && renderHistoryForm()}
 
       {/* 错误提示 */}
       {error && (

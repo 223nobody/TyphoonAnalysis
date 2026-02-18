@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from PIL import Image
 import numpy as np
 
-from app.models.image import TyphoonImage, ImageAnalysisResult, ImageCrawlLog
+from app.models.image import TyphoonImage
 
 # 导入新的分析模块
 from .opencv_analyzer import OpenCVAnalyzer, OPENCV_AVAILABLE
@@ -75,7 +75,7 @@ class ImageAnalysisService:
             logger.info("✅ 决策融合分析器初始化成功")
         except Exception as e:
             logger.warning(f"⚠️ 决策融合分析器初始化失败: {e}")
-    
+
     async def save_image(
         self,
         filename: str,
@@ -86,14 +86,14 @@ class ImageAnalysisService:
     ) -> TyphoonImage:
         """
         保存图像到数据库
-        
+
         Args:
             filename: 文件名
             content: 图像二进制内容
             typhoon_id: 台风ID
             image_type: 图像类型
             source: 数据源
-        
+
         Returns:
             图像记录对象
         """
@@ -102,13 +102,13 @@ class ImageAnalysisService:
             img = Image.open(io.BytesIO(content))
             width, height = img.size
             img_format = img.format
-            
+
             # 保存到文件系统
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_path = self.save_dir / image_type / f"{timestamp}_{filename}"
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.write_bytes(content)
-            
+
             # 创建数据库记录
             image_record = TyphoonImage(
                 typhoon_id=typhoon_id,
@@ -122,33 +122,33 @@ class ImageAnalysisService:
                 format=img_format.lower() if img_format else None,
                 upload_time=datetime.now()
             )
-            
+
             self.db.add(image_record)
             await self.db.commit()
             await self.db.refresh(image_record)
-            
+
             logger.info(f"✅ 图像保存成功: {filename} (ID: {image_record.id})")
             return image_record
-        
+
         except Exception as e:
             logger.error(f"❌ 图像保存失败: {filename} - {e}", exc_info=True)
             await self.db.rollback()
             raise
-    
+
     async def get_image(self, image_id: int) -> Optional[TyphoonImage]:
         """
         获取图像记录
-        
+
         Args:
             image_id: 图像ID
-        
+
         Returns:
             图像记录对象
         """
         query = select(TyphoonImage).where(TyphoonImage.id == image_id)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
-    
+
     async def get_typhoon_images(
         self,
         typhoon_id: str,
@@ -157,25 +157,25 @@ class ImageAnalysisService:
     ) -> List[TyphoonImage]:
         """
         获取指定台风的图像列表
-        
+
         Args:
             typhoon_id: 台风ID
             image_type: 图像类型筛选
             limit: 返回数量限制
-        
+
         Returns:
             图像列表
         """
         query = select(TyphoonImage).where(TyphoonImage.typhoon_id == typhoon_id)
-        
+
         if image_type:
             query = query.where(TyphoonImage.image_type == image_type)
-        
+
         query = query.order_by(TyphoonImage.upload_time.desc()).limit(limit)
-        
+
         result = await self.db.execute(query)
         return list(result.scalars().all())
-    
+
     async def analyze_image(
         self,
         image: TyphoonImage,
@@ -223,26 +223,11 @@ class ImageAnalysisService:
             processing_time = (datetime.now() - start_time).total_seconds()
             result["processing_time"] = processing_time
 
-            # 保存分析结果
-            analysis_record = ImageAnalysisResult(
-                image_id=image.id,
-                analysis_type=analysis_type,
-                result_data=json.dumps(result, ensure_ascii=False),
-                confidence=result.get("confidence", 0.0),
-                features=json.dumps(result.get("features", {}), ensure_ascii=False),
-                analyzed_at=datetime.now(),
-                processing_time=processing_time
-            )
-
-            self.db.add(analysis_record)
-            await self.db.commit()
-
             logger.info(f"✅ 图像分析完成: ID={image.id}, 类型={analysis_type}, 耗时={processing_time:.2f}s")
             return result
 
         except Exception as e:
             logger.error(f"❌ 图像分析失败: {e}", exc_info=True)
-            await self.db.rollback()
             raise
 
     async def _opencv_analysis(self, img: Image.Image, image_type: str) -> Dict[str, Any]:
@@ -321,20 +306,20 @@ class ImageAnalysisService:
         except Exception as e:
             logger.error(f"❌ 混合方案分析失败: {e}", exc_info=True)
             raise
-    
+
     async def _basic_analysis(self, img: Image.Image) -> Dict[str, Any]:
         """
         基础图像分析
-        
+
         Args:
             img: PIL图像对象
-        
+
         Returns:
             分析结果
         """
         # 转换为numpy数组
         img_array = np.array(img)
-        
+
         # 基础统计信息
         result = {
             "type": "basic",
@@ -355,9 +340,9 @@ class ImageAnalysisService:
             },
             "confidence": 1.0
         }
-        
+
         return result
-    
+
     async def _advanced_analysis(self, img: Image.Image) -> Dict[str, Any]:
         """
         高级图像分析（特征提取）
@@ -386,7 +371,7 @@ class ImageAnalysisService:
         }
 
         return result
-    
+
     def _calculate_sharpness(self, img_array: np.ndarray) -> float:
         """计算图像清晰度"""
         # 使用Laplacian算子计算清晰度
@@ -394,21 +379,20 @@ class ImageAnalysisService:
             gray = np.mean(img_array, axis=2)
         else:
             gray = img_array
-        
-        laplacian = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+
         # 简化计算
         return float(np.std(gray))
-    
+
     def _calculate_texture(self, img_array: np.ndarray) -> float:
         """计算图像纹理复杂度"""
         if len(img_array.shape) == 3:
             gray = np.mean(img_array, axis=2)
         else:
             gray = img_array
-        
+
         # 简化的纹理计算
         return float(np.std(np.diff(gray, axis=0)) + np.std(np.diff(gray, axis=1)))
-    
+
     def _estimate_cloud_coverage(self, img_array: np.ndarray) -> float:
         """估算云量覆盖率"""
         # 简化的云量估算（基于亮度阈值）
@@ -416,51 +400,34 @@ class ImageAnalysisService:
             brightness = np.mean(img_array, axis=2)
         else:
             brightness = img_array
-        
+
         cloud_pixels = np.sum(brightness > 128)
         total_pixels = brightness.size
-        
+
         return float(cloud_pixels / total_pixels)
-    
+
     def _analyze_intensity_distribution(self, img_array: np.ndarray) -> Dict[str, Any]:
         """分析强度分布"""
         if len(img_array.shape) == 3:
             intensity = np.mean(img_array, axis=2)
         else:
             intensity = img_array
-        
+
         hist, bins = np.histogram(intensity, bins=10)
-        
+
         return {
             "histogram": hist.tolist(),
             "bins": bins.tolist(),
             "peak_intensity": float(bins[np.argmax(hist)])
         }
-    
-    async def get_analysis_history(self, image_id: int) -> List[ImageAnalysisResult]:
-        """
-        获取图像的分析历史
-        
-        Args:
-            image_id: 图像ID
-        
-        Returns:
-            分析历史列表
-        """
-        query = select(ImageAnalysisResult).where(
-            ImageAnalysisResult.image_id == image_id
-        ).order_by(ImageAnalysisResult.analyzed_at.desc())
-        
-        result = await self.db.execute(query)
-        return list(result.scalars().all())
-    
+
     async def delete_image(self, image_id: int) -> bool:
         """
         删除图像
-        
+
         Args:
             image_id: 图像ID
-        
+
         Returns:
             是否删除成功
         """
@@ -468,22 +435,21 @@ class ImageAnalysisService:
             image = await self.get_image(image_id)
             if not image:
                 return False
-            
+
             # 删除文件
             if image.file_path:
                 file_path = Path(image.file_path)
                 if file_path.exists():
                     file_path.unlink()
-            
-            # 删除数据库记录（级联删除分析结果）
+
+            # 删除数据库记录
             await self.db.delete(image)
             await self.db.commit()
-            
+
             logger.info(f"✅ 图像删除成功: ID={image_id}")
             return True
-        
+
         except Exception as e:
             logger.error(f"❌ 图像删除失败: {e}", exc_info=True)
             await self.db.rollback()
             return False
-

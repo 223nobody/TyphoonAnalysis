@@ -815,4 +815,63 @@ export const getASRLanguages = async () => {
   return apiClient.get("/asr/languages");
 };
 
+// ========== 视频分析API ==========
+
+/**
+ * 上传视频并分析（合并流程）
+ * @param {File} file - 视频文件
+ * @param {string} analysisType - 分析类型 (comprehensive/tracking/intensity/structure)
+ * @param {boolean} extractFrames - 是否提取关键帧
+ * @param {number} frameInterval - 帧提取间隔（秒）
+ * @returns {Promise<Object>} 分析结果
+ */
+export const uploadAndAnalyzeVideo = async (
+  file,
+  analysisType = "comprehensive",
+  extractFrames = true,
+  frameInterval = 5,
+) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("analysis_type", analysisType);
+  formData.append("extract_frames", extractFrames);
+  formData.append("frame_interval", frameInterval);
+
+  return apiClient.post("/video-analysis/analyze", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+};
+
+/**
+ * 获取视频分析状态
+ * @param {number} analysisId - 分析记录ID
+ * @returns {Promise<Object>} 分析状态
+ */
+export const getVideoAnalysisStatus = async (analysisId) => {
+  return apiClient.get(`/video-analysis/status/${analysisId}`);
+};
+
+/**
+ * 获取视频分析列表
+ * @param {number} limit - 返回数量限制
+ * @param {number} offset - 偏移量
+ * @returns {Promise<Object>} 分析列表
+ */
+export const getVideoAnalysisList = async (limit = 20, offset = 0) => {
+  return apiClient.get("/video-analysis/", {
+    params: { limit, offset },
+  });
+};
+
+/**
+ * 删除视频分析记录
+ * @param {number} analysisId - 分析记录ID
+ * @returns {Promise<Object>} 删除结果
+ */
+export const deleteVideoAnalysis = async (analysisId) => {
+  return apiClient.delete(`/video-analysis/${analysisId}`);
+};
+
 export default apiClient;

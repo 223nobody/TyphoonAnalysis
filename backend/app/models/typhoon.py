@@ -1,7 +1,7 @@
 """
 数据库模型 - 台风数据
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, JSON, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, JSON, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -88,41 +88,6 @@ class Report(Base):
     user = relationship("User", backref="reports")
 
 
-class AlertRecord(Base):
-    """预警记录表 - 保存真实的历史预警数据"""
-    __tablename__ = "alert_records"
-
-    id = Column(Integer, primary_key=True, index=True)
-    typhoon_id = Column(String(50), index=True, nullable=False, comment="台风编号")
-    typhoon_name = Column(String(100), comment="台风名称")
-    alert_level = Column(String(20), index=True, nullable=False, comment="预警级别：blue/yellow/orange/red")
-    alert_type = Column(String(50), comment="预警类型：台风/暴雨/大风等")
-    alert_region = Column(String(200), comment="预警区域")
-    alert_reason = Column(Text, comment="预警原因")
-    alert_content = Column(Text, comment="预警内容详情")
-
-    # 气象数据
-    wind_speed = Column(Float, comment="风速(m/s)")
-    pressure = Column(Float, comment="气压(hPa)")
-    intensity = Column(String(50), comment="强度等级")
-
-    # 时间信息
-    alert_time = Column(DateTime, nullable=False, index=True, comment="预警发布时间")
-    update_time = Column(DateTime, comment="预警更新时间")
-    resolved_time = Column(DateTime, comment="预警解除时间")
-
-    # 状态
-    status = Column(String(20), default="active", comment="状态：active/resolved/expired")
-
-    # 数据来源
-    source = Column(String(100), comment="数据来源：crawler/manual/system")
-    source_url = Column(String(500), comment="原始数据URL")
-
-    # 元数据
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-
 class CrawlerLog(Base):
     """爬虫日志表"""
     __tablename__ = "crawler_logs"
@@ -174,7 +139,7 @@ class AskHistory(Base):
     question = Column(Text, nullable=False, comment="用户提问内容")
     answer = Column(Text, nullable=False, comment="AI回答内容")
     reasoning_content = Column(Text, nullable=True, comment="AI推理内容（深度思考模式）")
-    is_ai_generated = Column(Boolean, default=False, nullable=False, comment="是否由AI生成（True=AI生成，False=预设问题匹配）")
+    is_ai_generated = Column(Integer, default=0, nullable=False, comment="是否由AI生成（1=AI生成，0=预设问题匹配）")
     ai_mode = Column(String(100), nullable=True, comment="AI生成回答使用的模型名称")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
 
@@ -208,4 +173,3 @@ class CollectTyphoon(Base):
     __table_args__ = (
         UniqueConstraint('user_id', 'typhoon_id', name='uq_user_typhoon'),
     )
-

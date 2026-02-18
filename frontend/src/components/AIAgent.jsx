@@ -327,6 +327,8 @@ const MessageList = ({
   bubbleListRef,
   streamingMessageKey,
   chatEndRef,
+  userAvatar,
+  onAvatarClick,
 }) => {
   const formatTimestamp = useCallback((timestamp) => {
     if (!timestamp) return "";
@@ -352,7 +354,27 @@ const MessageList = ({
       return {
         ...msg,
         placement: msg.role === "user" ? "end" : "start",
-        avatar: msg.role === "user" ? <UserOutlined /> : <RobotOutlined />,
+        avatar:
+          msg.role === "user" ? (
+            userAvatar ? (
+              <img
+                src={userAvatar}
+                alt="用户头像"
+                onClick={onAvatarClick}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  cursor: "pointer",
+                }}
+              />
+            ) : (
+              <UserOutlined />
+            )
+          ) : (
+            <RobotOutlined />
+          ),
         variant: msg.role === "user" ? "filled" : "shadow",
         content: (
           <div className="message-with-time">
@@ -403,7 +425,22 @@ const MessageList = ({
           },
           user: {
             placement: "end",
-            avatar: <UserOutlined />,
+            avatar: userAvatar ? (
+              <img
+                src={userAvatar}
+                alt="用户头像"
+                onClick={onAvatarClick}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  cursor: "pointer",
+                }}
+              />
+            ) : (
+              <UserOutlined />
+            ),
             variant: "filled",
             shape: "round",
           },
@@ -433,6 +470,7 @@ function AIAgent() {
   const [deepThinking, setDeepThinking] = useState(false);
   const [streamingMessageKey, setStreamingMessageKey] = useState(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [userAvatar, setUserAvatar] = useState(null);
 
   // 语音输入相关状态
   const [isRecording, setIsRecording] = useState(false);
@@ -662,6 +700,25 @@ function AIAgent() {
       }
     }
   }, [navigate]);
+
+  // 获取当前登录用户头像
+  useEffect(() => {
+    const loadUserAvatar = () => {
+      try {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          const userData = JSON.parse(userStr);
+          if (userData?.avatar_url) {
+            setUserAvatar(userData.avatar_url);
+          }
+        }
+      } catch (error) {
+        console.error("加载用户头像失败:", error);
+      }
+    };
+
+    loadUserAvatar();
+  }, []);
 
   useEffect(() => {
     initializeChat();
@@ -918,6 +975,10 @@ function AIAgent() {
 
   const handleBack = useCallback(() => {
     navigate("/");
+  }, [navigate]);
+
+  const handleAvatarClick = useCallback(() => {
+    navigate("/user-center");
   }, [navigate]);
 
   const handleInputChange = useCallback((value) => {
@@ -1204,6 +1265,8 @@ function AIAgent() {
               bubbleListRef={bubbleListRef}
               streamingMessageKey={streamingMessageKey}
               chatEndRef={chatEndRef}
+              userAvatar={userAvatar}
+              onAvatarClick={handleAvatarClick}
             />
           )}
         </section>
