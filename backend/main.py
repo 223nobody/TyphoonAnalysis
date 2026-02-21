@@ -31,17 +31,16 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("数据库初始化完成")
 
-    # 预加载 ASR 模型（避免第一次请求时加载）
-    logger.info("正在预加载 ASR 语音识别模型...")
+    # 检查 ASR 配置
+    logger.info("正在检查 ASR 语音识别配置...")
     try:
-        from app.api.asr import get_asr_model
-        # 在后台线程中加载模型，避免阻塞启动
-        import asyncio
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, get_asr_model)
-        logger.info("ASR 模型预加载完成")
+        from app.core.config import settings
+        if settings.NLS_APPKEY:
+            logger.info("阿里云 NLS 语音识别配置已设置")
+        else:
+            logger.warning("阿里云 NLS AppKey 未配置，语音识别功能将不可用")
     except Exception as e:
-        logger.warning(f"ASR 模型预加载失败（将在第一次请求时重试）: {e}")
+        logger.warning(f"ASR 配置检查失败: {e}")
 
     # 启动定时任务调度器（会自动执行启动时完整爬取）
     start_scheduler()

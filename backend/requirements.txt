@@ -25,9 +25,12 @@ opencv-python==4.10.0.84
 
 # AI 服务
 dashscope==1.14.0
-qwen-asr==0.0.6
 torch==2.6.0
 huggingface-hub==0.28.1
+
+# 阿里云语音识别 SDK
+# 从 GitHub 安装（宝塔部署时需要先执行: pip install git+https://github.com/aliyun/alibabacloud-nls-python-sdk.git）
+git+https://github.com/aliyun/alibabacloud-nls-python-sdk.git
 
 # 文本处理
 opencc-python-reimplemented==0.1.7

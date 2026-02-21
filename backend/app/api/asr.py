@@ -1,196 +1,258 @@
 """
 ASR 语音识别 API 路由
-集成 Qwen3-ASR 模型到 FastAPI
-支持本地模型部署
+集成阿里云 NLS (智能语音交互) API
+支持实时语音识别
 """
 import os
 import tempfile
-import torch
+import json
+import time
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse
 from datetime import datetime
 import logging
 import opencc
-from pathlib import Path
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 # 创建繁体转简体转换器
-converter = opencc.OpenCC('t2s')  # 繁体转简体
+converter = opencc.OpenCC('t2s')
 
 router = APIRouter(prefix="/asr", tags=["语音识别"])
 
-# 全局 ASR 模型实例
-asr_model = None
-
-ALLOWED_EXTENSIONS = {'wav', 'mp3', 'flac', 'm4a', 'ogg', 'webm'}
-
-# 默认本地模型路径
-DEFAULT_LOCAL_MODEL_PATH = Path(__file__).parent.parent.parent / "data" / "asr_model" / "Qwen3-ASR-0.6B"
+ALLOWED_EXTENSIONS = {'wav', 'mp3', 'pcm', 'm4a', 'ogg', 'webm'}
 
 
-def get_model_path():
-    """
-    获取模型路径
-    优先级：1. 环境变量 QWEN_ASR_MODEL_PATH > 2. 默认本地路径 > 3. HuggingFace Hub
-    """
-    # 1. 检查环境变量
-    env_path = os.environ.get('QWEN_ASR_MODEL_PATH')
-    if env_path and os.path.exists(env_path):
-        logger.info(f"使用环境变量指定的模型路径: {env_path}")
-        return env_path
+def get_nls_token():
+    """获取阿里云 NLS Token"""
+    try:
+        from nls.token import getToken
+        
+        access_key_id = settings.NLS_ACCESS_KEY_ID or settings.OSS_ACCESS_KEY_ID
+        access_key_secret = settings.NLS_ACCESS_KEY_SECRET or settings.OSS_ACCESS_KEY_SECRET
+        
+        if not access_key_id or not access_key_secret:
+            raise ValueError("阿里云 AccessKey 未配置")
+        
+        return getToken(access_key_id, access_key_secret)
+    except Exception as e:
+        logger.error(f"获取 NLS Token 失败: {str(e)}")
+        raise
+
+
+class AliyunASR:
+    """阿里云 NLS 语音识别封装类"""
     
-    # 2. 检查默认本地路径
-    if DEFAULT_LOCAL_MODEL_PATH.exists():
-        logger.info(f"使用本地模型: {DEFAULT_LOCAL_MODEL_PATH}")
-        return str(DEFAULT_LOCAL_MODEL_PATH)
+    def __init__(self):
+        self.appkey = settings.NLS_APPKEY
+        self.url = settings.NLS_URL
+        self.token = None
+        self.result_text = ""
+        self.is_completed = False
+        self.error_message = None
     
-    # 3. 使用 HuggingFace Hub
-    logger.info("本地模型不存在，将从 HuggingFace Hub 加载")
-    return "Qwen/Qwen3-ASR-0.6B"
-
-
-def setup_hf_mirror():
-    """配置 HuggingFace 国内镜像（仅在从 Hub 下载时需要）"""
-    if not os.environ.get('HF_ENDPOINT'):
-        os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
-        logger.info(f"设置 HuggingFace 镜像: {os.environ['HF_ENDPOINT']}")
-    else:
-        logger.info(f"使用已配置的 HuggingFace 镜像: {os.environ.get('HF_ENDPOINT')}")
-
-
-def allowed_file(filename):
-    """检查文件扩展名是否允许"""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-def get_asr_model():
-    """懒加载 ASR 模型"""
-    global asr_model
-    if asr_model is None:
-        logger.info("正在加载 Qwen3-ASR 模型...")
+    def on_start(self, message, *args):
+        """识别开始回调"""
         try:
-            from qwen_asr import Qwen3ASRModel
-
-            # 检测 GPU 可用性
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            logger.info(f"使用设备: {device}")
-
-            # 获取模型路径
-            model_path = get_model_path()
-            
-            # 如果是 HuggingFace Hub 路径，设置镜像
-            if model_path == "Qwen/Qwen3-ASR-0.6B":
-                setup_hf_mirror()
-                logger.info("使用 Qwen3-ASR-0.6B 模型 (从 HuggingFace Hub 加载)")
+            msg_json = json.loads(message)
+            if 'header' in msg_json:
+                status = msg_json['header'].get('status', 0)
+                if status != 20000000:
+                    status_text = msg_json['header'].get('status_text', '')
+                    logger.error(f"语音识别启动异常: [{status}] {status_text}")
+                    self.error_message = f"[{status}] {status_text}"
+        except Exception:
+            pass
+    
+    def on_sentence_end(self, message, *args):
+        """句子结束识别回调 - 保存完整的句子结果"""
+        try:
+            result = json.loads(message)
+            if 'payload' in result:
+                payload = result['payload']
+                if 'result' in payload:
+                    self.result_text = payload['result']
+        except Exception:
+            pass
+    
+    def on_completed(self, message, *args):
+        """识别完成回调"""
+        self.is_completed = True
+    
+    def on_error(self, message, *args):
+        """错误回调"""
+        try:
+            error_json = json.loads(message)
+            if 'header' in error_json:
+                status_text = error_json['header'].get('status_text', '')
+                status = error_json['header'].get('status', '')
+                self.error_message = f"[{status}] {status_text}"
             else:
-                logger.info(f"使用本地部署的 Qwen3-ASR-0.6B 模型: {model_path}")
-
-            asr_model = Qwen3ASRModel.from_pretrained(
-                model_path,
-                dtype=torch.bfloat16 if device == "cuda" else torch.float32,
-                device_map=device,
-                max_inference_batch_size=1,
-                max_new_tokens=256,
+                self.error_message = message
+        except:
+            self.error_message = message
+    
+    def recognize(self, audio_path: str, audio_format: str = "pcm", sample_rate: int = 16000) -> str:
+        """识别音频文件"""
+        from nls import NlsSpeechTranscriber
+        
+        self.token = get_nls_token()
+        
+        sr = NlsSpeechTranscriber(
+            url=self.url,
+            token=self.token,
+            appkey=self.appkey,
+            on_start=self.on_start,
+            on_sentence_end=self.on_sentence_end,
+            on_completed=self.on_completed,
+            on_error=self.on_error
+        )
+        
+        try:
+            sr.start(
+                aformat=audio_format,
+                sample_rate=sample_rate,
+                enable_intermediate_result=False,
+                enable_punctuation_prediction=True,
+                enable_inverse_text_normalization=True,
+                timeout=10
             )
-
-            logger.info("Qwen3-ASR 模型加载完成")
         except Exception as e:
-            logger.error(f"模型加载失败: {str(e)}")
+            error_detail = self.error_message if self.error_message else str(e)
+            raise Exception(f"语音识别启动失败: {error_detail}")
+        
+        try:
+            # 使用更大的块大小提高速度
+            chunk_size = 3200
+            
+            with open(audio_path, "rb") as f:
+                while True:
+                    chunk = f.read(chunk_size)
+                    if not chunk:
+                        break
+                    sr.send_audio(chunk)
+                    time.sleep(0.01)
+            
+            # 等待数据被处理
+            time.sleep(0.5)
+            
+            sr.stop(timeout=30)
+            
+            # 等待识别完成
+            wait_time = 0
+            while not self.is_completed and wait_time < 30:
+                time.sleep(0.1)
+                wait_time += 0.1
+            
+            if not self.is_completed:
+                raise Exception("语音识别超时")
+            
+            return self.result_text
+            
+        except Exception as e:
             raise
 
-    return asr_model
+
+def convert_to_pcm(input_path: str, output_path: str) -> tuple:
+    """将音频文件转换为 PCM 格式"""
+    try:
+        from pydub import AudioSegment
+        
+        ext = input_path.lower().split('.')[-1]
+        
+        if ext == 'wav':
+            audio = AudioSegment.from_wav(input_path)
+        elif ext == 'mp3':
+            audio = AudioSegment.from_mp3(input_path)
+        elif ext in ['m4a', 'mp4']:
+            audio = AudioSegment.from_file(input_path, format='mp4')
+        elif ext == 'ogg':
+            audio = AudioSegment.from_ogg(input_path)
+        elif ext == 'flac':
+            audio = AudioSegment.from_file(input_path, format='flac')
+        elif ext == 'webm':
+            audio = AudioSegment.from_file(input_path, format='webm')
+        else:
+            audio = AudioSegment.from_file(input_path)
+        
+        audio = audio.set_channels(1)
+        audio = audio.set_frame_rate(16000)
+        audio = audio.set_sample_width(2)
+        audio.export(output_path, format='raw')
+        
+        return output_path, 16000
+        
+    except ImportError:
+        raise Exception("pydub 未安装，请运行: pip install pydub")
+    except Exception as e:
+        raise Exception(f"音频格式转换失败: {str(e)}")
 
 
 @router.post("/transcribe")
 async def transcribe(
     audio: UploadFile = File(..., description="音频文件"),
-    language: str = Form(None, description="语言代码 (如 'zh', 'en', 'yue')，不传则自动检测")
+    language: str = Form(None, description="语言代码")
 ):
-    """
-    语音识别接口
-
-    - **audio**: 音频文件 (支持 wav, mp3, flac, m4a, ogg, webm)
-    - **language**: 语言代码 (可选, 如 'zh', 'en', 'yue')，不传则自动检测
-    """
+    """语音识别接口"""
     start_time = datetime.now()
 
-    # 检查文件扩展名
-    if not allowed_file(audio.filename):
+    ext = audio.filename.lower().rsplit('.', 1)[-1] if '.' in audio.filename else ''
+    if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
             detail=f"不支持的文件格式，请上传: {', '.join(ALLOWED_EXTENSIONS)}"
         )
 
-    # 处理语言参数
-    if language == 'auto':
-        language = None
-
-    # 保存临时文件
     temp_path = os.path.join(
         tempfile.gettempdir(),
         f"asr_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{audio.filename}"
     )
+    pcm_path = temp_path + ".pcm"
 
     try:
-        # 保存上传的文件
         content = await audio.read()
         with open(temp_path, "wb") as f:
             f.write(content)
-        logger.info(f"音频文件已保存: {temp_path}")
 
-        # 加载模型并识别
-        model = get_asr_model()
+        pcm_path, sample_rate = convert_to_pcm(temp_path, pcm_path)
 
-        logger.info(f"开始识别，语言: {language or '自动检测'}")
-        results = model.transcribe(
-            audio=temp_path,
-            language=language,
-        )
+        asr = AliyunASR()
+        text = asr.recognize(pcm_path, audio_format="pcm", sample_rate=sample_rate)
 
-        # 获取结果
-        result = results[0]
-        text = result.text
-        detected_language = result.language if hasattr(result, 'language') else 'unknown'
-        duration = result.duration if hasattr(result, 'duration') else 0
-
-        # 繁体转简体
-        text_simplified = converter.convert(text)
-        if text != text_simplified:
-            logger.info(f"文本已转换: '{text}' -> '{text_simplified}'")
-            text = text_simplified
+        text = converter.convert(text)
 
         processing_time = (datetime.now() - start_time).total_seconds()
-
-        logger.info(f"识别完成，耗时: {processing_time:.2f}s，文本长度: {len(text)}")
 
         return {
             "success": True,
             "text": text,
-            "language": detected_language,
-            "duration": duration,
+            "language": language or "auto",
             "processing_time": processing_time
         }
 
     except Exception as e:
-        logger.error(f"识别失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"识别失败: {str(e)}")
 
     finally:
-        # 清理临时文件
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-            logger.info(f"临时文件已清理: {temp_path}")
+        for path in [temp_path, pcm_path]:
+            if os.path.exists(path):
+                os.remove(path)
 
 
 @router.get("/health")
 async def health_check():
     """ASR 服务健康检查"""
+    config_complete = bool(
+        settings.NLS_APPKEY and 
+        (settings.NLS_ACCESS_KEY_ID or settings.OSS_ACCESS_KEY_ID) and
+        (settings.NLS_ACCESS_KEY_SECRET or settings.OSS_ACCESS_KEY_SECRET)
+    )
+    
     return {
-        "status": "healthy",
-        "model_loaded": asr_model is not None,
-        "cuda_available": torch.cuda.is_available(),
-        "cuda_device_count": torch.cuda.device_count() if torch.cuda.is_available() else 0
+        "status": "healthy" if config_complete else "config_incomplete",
+        "service": "阿里云NLS语音识别",
+        "config_complete": config_complete
     }
 
 

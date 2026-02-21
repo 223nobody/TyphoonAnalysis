@@ -75,6 +75,12 @@ class Settings(BaseSettings):
     OSS_REGION: str = Field(default="", description="阿里云OSS Region（如：oss-cn-wuhan）")
     OSS_ENDPOINT: str = Field(default="", description="阿里云OSS Endpoint（如：oss-cn-wuhan-lr.aliyuncs.com）")
 
+    # 阿里云语音识别(NLS)配置
+    NLS_APPKEY: str = Field(default="", description="阿里云智能语音交互 AppKey")
+    NLS_ACCESS_KEY_ID: str = Field(default="", description="阿里云 AccessKey ID（用于获取Token）")
+    NLS_ACCESS_KEY_SECRET: str = Field(default="", description="阿里云 AccessKey Secret（用于获取Token）")
+    NLS_URL: str = Field(default="wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1", description="阿里云NLS服务URL")
+
     class Config:
         env_file = ".env"
         case_sensitive = True

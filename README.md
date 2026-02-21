@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Python-3.9+-blue.svg" alt="Python 3.9+">
   <img src="https://img.shields.io/badge/React-18-61DAFB.svg" alt="React 18">
   <img src="https://img.shields.io/badge/FastAPI-0.109.0-009688.svg" alt="FastAPI">
-  <img src="https://img.shields.io/badge/Qwen3--ASR-0.6B-orange.svg" alt="Qwen3-ASR">
+  <img src="https://img.shields.io/badge/阿里云-NLS-orange.svg" alt="阿里云 NLS">
   <img src="https://img.shields.io/badge/Voice%20Input-Supported-success.svg" alt="Voice Input">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
 </p>
@@ -44,10 +44,11 @@
 
 ### 🎤 语音识别 (新增)
 
-- 集成 Qwen3-ASR 模型进行语音转文字
+- 集成阿里云 NLS (智能语音交互) 服务进行语音转文字
 - 支持中文、英文、粤语自动检测
 - 自动繁体转简体文本规范化
-- 实时录音与识别
+- 实时录音与流式识别
+- 支持多种音频格式 (WAV, MP3, PCM, M4A, OGG, WebM)
 - 单次录音最长 60 秒
 
 ### 🖼️ 图像分析
@@ -112,7 +113,7 @@
                             ↓
 ┌─────────────────────────────────────────────────────────┐
 │                   AI 服务层 (AI Services)                │
-│  DeepSeek + GLM + Qwen + Qwen3-ASR                     │
+│  DeepSeek + GLM + Qwen + 阿里云 NLS                    │
 │  (通过 aiping.cn 统一接口)                             │
 └─────────────────────────────────────────────────────────┘
                             ↓
@@ -148,7 +149,7 @@ TyphoonAnalysis/
 │   │   ├── schemas/           # Pydantic模式
 │   │   └── services/          # 业务逻辑
 │   │       ├── ai/            # AI服务
-│   │       ├── asr/           # 语音识别服务 (新增)
+│       ├── asr/           # 语音识别服务 (阿里云 NLS)
 │   │       ├── crawler/       # 爬虫服务
 │   │       ├── image/         # 图像处理
 │   │       ├── lstm/          # LSTM预测
@@ -194,7 +195,7 @@ TyphoonAnalysis/
 
 - Python >= 3.10 (推荐 3.12)
 - pip >= 21.0
-- CUDA >= 11.7 (可选，用于 GPU 加速 ASR 和预测)
+- CUDA >= 11.7 (可选，用于 GPU 加速预测)
 
 **前端**:
 
@@ -303,12 +304,11 @@ python main.py
 
 后端服务将在 `http://localhost:8000` 启动
 
-> **首次启动说明**：
+> **首次启动说明**:
 >
-> - 首次启动时会自动下载 Qwen3-ASR 语音识别模型（约 1.75GB）
-> - 模型将下载到 `backend/data/asr_model/` 目录
-> - 下载完成后会自动加载模型，这可能需要 1-2 分钟
-> - 后续启动将直接使用本地模型，无需重复下载
+> - 确保已在 `.env` 文件中配置阿里云 NLS 参数（NLS_APPKEY, NLS_ACCESS_KEY_ID, NLS_ACCESS_KEY_SECRET）
+> - 阿里云 NLS 服务需要联网使用，无需下载本地模型
+> - 获取方式：登录 [阿里云智能语音交互控制台](https://nls-portal.console.aliyun.com/) 创建项目获取 AppKey
 
 #### 4. 启动前端应用
 
@@ -603,10 +603,12 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 **解决**:
 
 1. 检查浏览器是否授予麦克风权限
-2. 确认后端 ASR 服务正常运行（查看启动日志中是否显示 "ASR 模型加载完成"）
-3. 首次启动需要下载模型，请等待下载完成
-4. 生产环境需使用 HTTPS
-5. 检查浏览器是否支持 Web Audio API
+2. 确认后端 ASR 服务正常运行（访问 http://localhost:8000/api/asr/health 检查状态）
+3. 检查 `.env` 文件中 NLS_APPKEY 等配置是否正确
+4. 确认阿里云账号已开通语音识别服务
+5. 生产环境需使用 HTTPS
+6. 检查浏览器是否支持 Web Audio API
+7. 查看后端日志获取详细错误信息
 
 ### 5. 语音识别返回繁体中文
 
@@ -685,7 +687,7 @@ python data.py
 - 实现响应缓存
 - 启用 GZIP 压缩
 - 使用连接池
-- **ASR 模型预加载**: 启动时自动加载，避免首次请求延迟
+- **ASR 流式识别**: 实时音频流处理和识别，快速响应
 
 ### 前端优化
 
@@ -702,11 +704,12 @@ python data.py
 
 **新增功能**:
 
-- ✅ 语音识别功能（Qwen3-ASR 模型）
+- ✅ 语音识别功能（阿里云 NLS 服务）
 - ✅ AI 客服支持语音输入
 - ✅ 自动繁体转简体文本规范化
-- ✅ ASR 模型启动预加载优化
+- ✅ ASR 流式识别优化
 - ✅ 录音计时器实时显示
+- ✅ 支持多种音频格式（WAV, MP3, PCM, M4A, OGG, WebM）
 
 **优化改进**:
 
@@ -714,6 +717,7 @@ python data.py
 - ✅ 修复 React 闭包导致的计时器问题
 - ✅ 统一 API 调用封装
 - ✅ 更新项目文档
+- ✅ 使用 pydub 进行音频格式转换
 
 ### v2.0.0 (2026-01-13)
 

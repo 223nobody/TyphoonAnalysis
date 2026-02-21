@@ -17,7 +17,7 @@
 - **高性能异步架构** - 基于 FastAPI + Uvicorn，支持高并发
 - **深度学习预测** - 基于 LSTM + Attention 的台风路径预测模型
 - **多 AI 模型支持** - 集成 DeepSeek、GLM、Qwen 等主流大模型
-- **智能语音识别** - 集成 Qwen3-ASR 模型，支持语音转文字
+- **智能语音识别** - 集成阿里云 NLS 语音识别服务，支持语音转文字
 - **智能图像分析** - 卫星云图自动识别与分析
 - **实时数据爬取** - 自动获取中国气象局台风数据
 - **完整用户系统** - JWT 认证 + OSS 头像存储
@@ -47,7 +47,7 @@
 - **DeepSeek** - 深度思考与推理
 - **通义千问 (Qwen)** - 多模态分析
 - **智谱 GLM** - 中文对话与报告生成
-- **Qwen3-ASR** - 语音识别与转录
+- **阿里云 NLS** - 语音识别与转录
 
 ## 项目结构
 
@@ -82,9 +82,7 @@ backend/
 │       │   ├── deepseek_service.py
 │       │   ├── glm_service.py
 │       │   └── qwen_service.py
-│       ├── asr/                  # 语音识别服务
-│       │   ├── asr_service.py    # ASR 核心服务
-│       │   └── qwen_asr.py       # Qwen3-ASR 模型封装
+│       ├── asr/                  # 语音识别服务 (阿里云 NLS)
 │       ├── crawler/              # 数据爬取
 │       │   ├── cma_crawler.py    # 中国气象局
 │       │   └── bulletin_crawler.py
@@ -160,16 +158,16 @@ GET    /api/ai/questions         # 热门问题
 
 ### 3. 语音识别系统
 
-集成 **Qwen3-ASR** 模型，提供高质量的语音转文字服务。
+集成 **阿里云 NLS (智能语音交互)** 服务，提供高质量的语音转文字服务。
 
 **技术特点**:
 
-- **模型**: Qwen3-ASR-0.6B (适合 4GB 显存)
-- **支持格式**: WAV, MP3, FLAC, M4A, OGG, WebM
+- **服务**: 阿里云 NLS 语音识别 (SpeechTranscriber)
+- **支持格式**: WAV, MP3, PCM, M4A, OGG, WebM
 - **语言支持**: 中文、英文、粤语等 (自动检测)
 - **文本处理**: 自动繁体转简体
-- **性能优化**: 启动时预加载模型，首次请求无需等待
-- **GPU 加速**: 支持 CUDA 12.4，自动检测 GPU 可用性
+- **音频转换**: 使用 pydub 自动转换为 16kHz PCM 格式
+- **流式识别**: 支持实时语音流识别
 
 **API 端点**:
 
@@ -202,10 +200,27 @@ with open('audio.wav', 'rb') as f:
   "success": true,
   "text": "现在有哪些台风？",
   "language": "zh",
-  "confidence": 0.95,
   "processing_time": 1.23
 }
 ```
+
+**配置说明**:
+
+在 `.env` 文件中配置阿里云 NLS 参数：
+
+```bash
+# 阿里云 NLS 语音识别配置
+NLS_APPKEY=your-nls-appkey
+NLS_ACCESS_KEY_ID=your-access-key-id
+NLS_ACCESS_KEY_SECRET=your-access-key-secret
+NLS_URL=wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1
+```
+
+获取方式：
+1. 登录 [阿里云智能语音交互控制台](https://nls-portal.console.aliyun.com/)
+2. 创建项目获取 AppKey
+3. 在 "服务开通与购买" 中开通语音识别服务
+4. 使用阿里云 AccessKey ID 和 AccessKey Secret
 
 ### 4. 图像分析服务
 
@@ -387,15 +402,17 @@ OSS_ENDPOINT=your-endpoint
 
 ### ASR 语音识别配置
 
-ASR 模块支持以下配置选项：
+ASR 模块使用阿里云 NLS 服务，支持以下配置：
 
-| 配置项       | 默认值                         | 说明           |
-| ------------ | ------------------------------ | -------------- |
-| 模型版本     | Qwen3-ASR-0.6B                 | 适合 4GB 显存  |
-| 数据类型     | bfloat16 (GPU) / float32 (CPU) | 自动适配       |
-| 最大新令牌数 | 256                            | 限制输出长度   |
-| 批处理大小   | 1                              | 单文件处理     |
-| 繁体转简体   | 启用                           | 自动文本规范化 |
+| 配置项                | 默认值                                           | 说明           |
+| --------------------- | ------------------------------------------------ | -------------- |
+| NLS_APPKEY            | -                                                | 阿里云项目密钥 |
+| NLS_ACCESS_KEY_ID     | -                                                | 阿里云 AccessKey ID    |
+| NLS_ACCESS_KEY_SECRET | -                                                | 阿里云 AccessKey Secret |
+| NLS_URL               | wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1 | NLS 服务地址   |
+| 音频格式              | PCM                                              | 自动转换       |
+| 采样率                | 16000                                            | 16kHz 单声道   |
+| 繁体转简体            | 启用                                             | 自动文本规范化 |
 
 ## 性能优化
 
@@ -419,10 +436,10 @@ ASR 模块支持以下配置选项：
 
 ### ASR 优化
 
-- **预加载机制**: 应用启动时自动加载 ASR 模型，避免首次请求延迟
-- **懒加载**: 仅在首次语音识别请求时初始化模型
-- **设备自动选择**: 自动检测 CUDA 可用性，优先使用 GPU
-- **内存优化**: 使用 0.6B 轻量级模型，适合消费级显卡
+- **流式识别**: 支持实时语音流识别，边接收边处理
+- **音频自动转换**: 使用 pydub 自动转换为标准 PCM 格式
+- **句子级回调**: 通过阿里云 NLS 句子结束回调获取完整识别结果
+- **并发处理**: 支持多用户同时使用语音识别服务
 
 ## 测试
 
@@ -488,15 +505,27 @@ A: 系统已集成 OpenCC 自动将繁体转换为简体，无需额外配置。
 
 ### Q: ASR 首次请求响应慢？
 
-A: 模型在启动时会自动预加载，如果仍慢请检查 GPU 是否正常工作。查看日志中的 `使用设备: cuda` 确认 GPU 已启用。
+A: 阿里云 NLS 服务响应速度取决于网络状况。如响应慢请检查网络连接，或尝试使用其他阿里云区域的服务节点。
 
 ### Q: ASR 支持哪些音频格式？
 
-A: 支持 WAV, MP3, FLAC, M4A, OGG, WebM 格式，推荐 WAV 格式以获得最佳效果。
+A: 支持 WAV, MP3, PCM, M4A, OGG, WebM 格式，系统自动转换为 16kHz PCM 格式进行识别。
 
-### Q: ASR 需要多少显存？
+### Q: ASR 识别失败或返回空结果？
 
-A: 使用 Qwen3-ASR-0.6B 模型，需要约 4GB 显存。CPU 模式也可运行但速度较慢。
+A: 请检查以下几点：
+1. 确认 NLS_APPKEY 配置正确
+2. 确认阿里云账号已开通语音识别服务
+3. 检查音频文件是否清晰、音量适中
+4. 查看后端日志获取详细错误信息
+
+### Q: 如何获取阿里云 NLS 的 AppKey？
+
+A: 
+1. 登录 [阿里云智能语音交互控制台](https://nls-portal.console.aliyun.com/)
+2. 创建新项目或选择已有项目
+3. 在项目管理页面获取 AppKey
+4. 确保项目已开通"语音识别"服务
 
 ### Q: 安装依赖时出现编译错误？
 
@@ -534,10 +563,10 @@ pip install setuptools==69.5.1
 
 ### v1.1.0 (2026-02-12)
 
-- 新增 Qwen3-ASR 语音识别功能
+- 新增阿里云 NLS 语音识别功能
 - 支持语音转文字实时处理
 - 自动繁体转简体文本规范化
-- 模型启动预加载优化
+- 流式音频处理和识别优化
 
 ### v1.0.0 (2026-02-08)
 
