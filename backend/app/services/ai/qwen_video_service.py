@@ -35,28 +35,26 @@ CV2_AVAILABLE, cv2, np = check_cv2_available()
 
 class BailianVideoService:
     """阿里云百炼视频分析服务"""
-    
+
     # 支持的视频分析模型
     MODELS = {
         "qwen-vl-max": "qwen-vl-max-latest",  # 通义千问VL Max
         "qwen-vl-plus": "qwen-vl-plus-latest",  # 通义千问VL Plus
     }
-    
+
     def __init__(self):
         # 优先使用 VL 专用 API 密钥，否则使用通用密钥
         self.api_key = settings.AI_API_KEY_VL or settings.AI_API_KEY
         self.base_url = settings.AI_API_BASE_URL_VL or "https://dashscope.aliyuncs.com/api/v1"
         self.model = settings.QWEN_VL_MODEL or self.MODELS.get("qwen-vl-max")
-        self.client = httpx.AsyncClient(timeout=300.0)  # 5分钟超时
+        self.timeout = 300.0  # 5分钟超时
         self.max_retries = 3  # 最大重试次数
         self.retry_delay = 2  # 重试间隔（秒）
         logger.info(f"百炼视频服务初始化: model={self.model}, base_url={self.base_url}")
-        
-    async def __aenter__(self):
-        return self
-        
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.client.aclose()
+
+    def _create_client(self):
+        """创建新的 HTTP 客户端"""
+        return httpx.AsyncClient(timeout=self.timeout)
     
     def _get_headers(self) -> Dict[str, str]:
         """获取API请求头"""
@@ -436,47 +434,49 @@ class BailianVideoService:
     ) -> Dict:
         """
         发送API请求，支持重试机制
-        
+
         Args:
             api_url: API地址
             payload: 请求体
-            
+
         Returns:
             API响应结果
         """
         headers = self._get_headers()
         last_error = None
-        
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                logger.info(f"百炼API请求 - 第{attempt}次尝试")
-                
-                response = await self.client.post(
-                    api_url,
-                    headers=headers,
-                    json=payload
-                )
-                
-                response.raise_for_status()
-                return response.json()
-                
-            except httpx.HTTPStatusError as e:
-                last_error = e
-                logger.error(f"百炼API HTTP错误 - 第{attempt}次尝试: {e.response.status_code}")
-                if attempt < self.max_retries:
-                    wait_time = self.retry_delay * attempt
-                    logger.info(f"等待{wait_time}秒后重试...")
-                    import asyncio
-                    await asyncio.sleep(wait_time)
-                    
-            except Exception as e:
-                last_error = e
-                logger.error(f"百炼API请求异常 - 第{attempt}次尝试: {e}")
-                if attempt < self.max_retries:
-                    wait_time = self.retry_delay * attempt
-                    import asyncio
-                    await asyncio.sleep(wait_time)
-        
+
+        # 每次请求创建新的客户端
+        async with self._create_client() as client:
+            for attempt in range(1, self.max_retries + 1):
+                try:
+                    logger.info(f"百炼API请求 - 第{attempt}次尝试")
+
+                    response = await client.post(
+                        api_url,
+                        headers=headers,
+                        json=payload
+                    )
+
+                    response.raise_for_status()
+                    return response.json()
+
+                except httpx.HTTPStatusError as e:
+                    last_error = e
+                    logger.error(f"百炼API HTTP错误 - 第{attempt}次尝试: {e.response.status_code}")
+                    if attempt < self.max_retries:
+                        wait_time = self.retry_delay * attempt
+                        logger.info(f"等待{wait_time}秒后重试...")
+                        import asyncio
+                        await asyncio.sleep(wait_time)
+
+                except Exception as e:
+                    last_error = e
+                    logger.error(f"百炼API请求异常 - 第{attempt}次尝试: {e}")
+                    if attempt < self.max_retries:
+                        wait_time = self.retry_delay * attempt
+                        import asyncio
+                        await asyncio.sleep(wait_time)
+
         # 所有重试都失败
         raise last_error or Exception("百炼API请求失败，已达到最大重试次数")
     

@@ -578,7 +578,8 @@ function ImageAnalysis() {
             background: activeTab === "image" ? "#ffffff" : "transparent",
             color: activeTab === "image" ? "#1f2937" : "#6b7280",
             cursor: "pointer",
-            boxShadow: activeTab === "image" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+            boxShadow:
+              activeTab === "image" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
             transition: "all 0.2s",
           }}
         >
@@ -596,7 +597,8 @@ function ImageAnalysis() {
             background: activeTab === "video" ? "#ffffff" : "transparent",
             color: activeTab === "video" ? "#1f2937" : "#6b7280",
             cursor: "pointer",
-            boxShadow: activeTab === "video" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+            boxShadow:
+              activeTab === "video" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
             transition: "all 0.2s",
           }}
         >
@@ -609,7 +611,9 @@ function ImageAnalysis() {
           <h3 style={{ marginBottom: "20px" }}>卫星云图分析</h3>
 
           <div className="form-group">
-            <label style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}>
+            <label
+              style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}
+            >
               台风ID（可选）
             </label>
             <input
@@ -629,7 +633,9 @@ function ImageAnalysis() {
           </div>
 
           <div className="form-group">
-            <label style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}>
+            <label
+              style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}
+            >
               上传图像文件
             </label>
             <input
@@ -656,20 +662,30 @@ function ImageAnalysis() {
             >
               {analysisForm.imageFile ? (
                 <div>
-                  <div style={{ fontSize: "40px", marginBottom: "12px" }}>📄</div>
+                  <div style={{ fontSize: "40px", marginBottom: "12px" }}>
+                    📄
+                  </div>
                   <p style={{ fontWeight: 600, marginBottom: "4px" }}>
                     {analysisForm.imageFile.name}
                   </p>
                   <p style={{ fontSize: "13px", color: "#6b7280" }}>
                     {formatFileSize(analysisForm.imageFile.size)}
                   </p>
-                  <p style={{ fontSize: "13px", color: "#3b82f6", marginTop: "8px" }}>
+                  <p
+                    style={{
+                      fontSize: "13px",
+                      color: "#3b82f6",
+                      marginTop: "8px",
+                    }}
+                  >
                     点击或拖放更换文件
                   </p>
                 </div>
               ) : (
                 <div>
-                  <div style={{ fontSize: "40px", marginBottom: "12px" }}>🖼️</div>
+                  <div style={{ fontSize: "40px", marginBottom: "12px" }}>
+                    🖼️
+                  </div>
                   <p style={{ fontWeight: 600, marginBottom: "4px" }}>
                     点击或拖放上传图像
                   </p>
@@ -713,7 +729,9 @@ function ImageAnalysis() {
           )}
 
           <div className="form-group">
-            <label style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}>
+            <label
+              style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}
+            >
               分析类型
             </label>
             <select
@@ -740,7 +758,9 @@ function ImageAnalysis() {
           </div>
 
           <div className="form-group">
-            <label style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}>
+            <label
+              style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}
+            >
               图像类型
             </label>
             <select
@@ -765,18 +785,30 @@ function ImageAnalysis() {
             className="btn"
             onClick={handleAnalysis}
             disabled={loading || !uploadedImageId}
-            style={{ width: "100%", padding: "14px 20px", fontSize: "15px", fontWeight: 600 }}
+            style={{
+              width: "100%",
+              padding: "14px 20px",
+              fontSize: "15px",
+              fontWeight: 600,
+            }}
           >
             {loading ? "分析中..." : "开始分析"}
           </button>
 
           {error && (
-            <div className="error-message" style={{ marginTop: "20px", borderRadius: "8px" }}>
+            <div
+              className="error-message"
+              style={{ marginTop: "20px", borderRadius: "8px" }}
+            >
               {error}
             </div>
           )}
 
-          {loading && <div className="loading" style={{ borderRadius: "8px" }}>处理中...</div>}
+          {loading && (
+            <div className="loading" style={{ borderRadius: "8px" }}>
+              处理中...
+            </div>
+          )}
 
           {renderImageResult()}
         </div>
@@ -787,7 +819,9 @@ function ImageAnalysis() {
           <h3 style={{ marginBottom: "20px" }}>视频内容分析</h3>
 
           <div className="form-group">
-            <label style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}>
+            <label
+              style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}
+            >
               上传视频文件
             </label>
             <input
@@ -807,7 +841,11 @@ function ImageAnalysis() {
                 padding: "40px 20px",
                 border: `2px dashed ${videoDragOver ? "#3b82f6" : "#d1d5db"}`,
                 borderRadius: "12px",
-                background: isAnalyzing ? "#f3f4f6" : videoDragOver ? "#eff6ff" : "#fafafa",
+                background: isAnalyzing
+                  ? "#f3f4f6"
+                  : videoDragOver
+                    ? "#eff6ff"
+                    : "#fafafa",
                 textAlign: "center",
                 cursor: isAnalyzing ? "not-allowed" : "pointer",
                 transition: "all 0.2s",
@@ -816,7 +854,9 @@ function ImageAnalysis() {
             >
               {videoFile ? (
                 <div>
-                  <div style={{ fontSize: "40px", marginBottom: "12px" }}>🎬</div>
+                  <div style={{ fontSize: "40px", marginBottom: "12px" }}>
+                    🎬
+                  </div>
                   <p style={{ fontWeight: 600, marginBottom: "4px" }}>
                     {videoFile.name}
                   </p>
@@ -824,14 +864,22 @@ function ImageAnalysis() {
                     {formatFileSize(videoFile.size)}
                   </p>
                   {!isAnalyzing && (
-                    <p style={{ fontSize: "13px", color: "#3b82f6", marginTop: "8px" }}>
+                    <p
+                      style={{
+                        fontSize: "13px",
+                        color: "#3b82f6",
+                        marginTop: "8px",
+                      }}
+                    >
                       点击或拖放更换文件
                     </p>
                   )}
                 </div>
               ) : (
                 <div>
-                  <div style={{ fontSize: "40px", marginBottom: "12px" }}>📁</div>
+                  <div style={{ fontSize: "40px", marginBottom: "12px" }}>
+                    📁
+                  </div>
                   <p style={{ fontWeight: 600, marginBottom: "4px" }}>
                     点击或拖放上传视频
                   </p>
@@ -844,29 +892,18 @@ function ImageAnalysis() {
           </div>
 
           {videoError && (
-            <div className="error-message" style={{ marginBottom: "15px", borderRadius: "8px" }}>
+            <div
+              className="error-message"
+              style={{ marginBottom: "15px", borderRadius: "8px" }}
+            >
               {videoError}
             </div>
           )}
 
-          {analysisId && (
-            <div
-              className="info-card"
-              style={{
-                marginBottom: "15px",
-                background: "#ecfdf5",
-                border: "1px solid #a7f3d0",
-                borderRadius: "8px",
-              }}
-            >
-              <p style={{ margin: 0, color: "#10b981" }}>
-                ✅ 分析记录ID: {analysisId}
-              </p>
-            </div>
-          )}
-
           <div className="form-group">
-            <label style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}>
+            <label
+              style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}
+            >
               分析类型
             </label>
             <select
@@ -923,7 +960,13 @@ function ImageAnalysis() {
 
           {videoAnalysisConfig.extractFrames && (
             <div className="form-group">
-              <label style={{ fontWeight: 600, marginBottom: "8px", display: "block" }}>
+              <label
+                style={{
+                  fontWeight: 600,
+                  marginBottom: "8px",
+                  display: "block",
+                }}
+              >
                 帧提取间隔（秒）
               </label>
               <input
@@ -964,7 +1007,10 @@ function ImageAnalysis() {
           </button>
 
           {isAnalyzing && (
-            <div className="loading" style={{ marginTop: "20px", borderRadius: "8px" }}>
+            <div
+              className="loading"
+              style={{ marginTop: "20px", borderRadius: "8px" }}
+            >
               视频上传并分析中，请稍候...
             </div>
           )}

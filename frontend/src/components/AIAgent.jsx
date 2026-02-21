@@ -254,11 +254,6 @@ const InputArea = ({
                 loading={isTranscribing}
                 className={`voice-input-button ${isRecording ? "recording" : ""}`}
                 aria-label={isRecording ? "停止录音" : "开始语音输入"}
-                style={
-                  isRecording
-                    ? { width: "auto", minWidth: "72px", padding: "0 12px" }
-                    : {}
-                }
               >
                 {isRecording && (
                   <span className="recording-time">
@@ -345,8 +340,11 @@ const MessageList = ({
 
   const bubbleItems = useMemo(() => {
     return messages.map((msg) => {
+      // 只有在深度思考模式下才显示推理内容
       const hasReasoning =
-        msg.reasoningContent && msg.reasoningContent.trim().length > 0;
+        msg.deepThinking &&
+        msg.reasoningContent &&
+        msg.reasoningContent.trim().length > 0;
       const isStreaming = streamingMessageKey === msg.key;
       const showStreamingIndicator =
         isStreaming && (!msg.content || msg.content.length === 0);
@@ -761,6 +759,7 @@ function AIAgent() {
         role: "ai",
         content: "",
         reasoningContent: "",
+        deepThinking: deepThinking, // 标记是否启用了深度思考模式
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, aiMessage]);
@@ -938,11 +937,15 @@ function AIAgent() {
             content: item.question,
             timestamp: item.created_at,
           });
+          // 根据 reasoning_content 是否存在判断是否是深度思考模式
+          const hasReasoning =
+            item.reasoning_content && item.reasoning_content.trim().length > 0;
           historyMessages.push({
             key: `ai_${index}`,
             role: "ai",
             content: item.answer,
             reasoningContent: item.reasoning_content || "",
+            deepThinking: hasReasoning, // 根据 reasoning_content 是否存在判断
             timestamp: item.created_at,
           });
         });

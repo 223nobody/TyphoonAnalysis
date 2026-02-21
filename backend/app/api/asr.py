@@ -1,6 +1,7 @@
 """
 ASR 语音识别 API 路由
 集成 Qwen3-ASR 模型到 FastAPI
+支持本地模型部署
 """
 import os
 import tempfile
@@ -10,6 +11,7 @@ from fastapi.responses import JSONResponse
 from datetime import datetime
 import logging
 import opencc
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +25,33 @@ asr_model = None
 
 ALLOWED_EXTENSIONS = {'wav', 'mp3', 'flac', 'm4a', 'ogg', 'webm'}
 
-# 设置 HuggingFace 镜像源（国内加速）
+# 默认本地模型路径
+DEFAULT_LOCAL_MODEL_PATH = Path(__file__).parent.parent.parent / "data" / "asr_model" / "Qwen3-ASR-0.6B"
+
+
+def get_model_path():
+    """
+    获取模型路径
+    优先级：1. 环境变量 QWEN_ASR_MODEL_PATH > 2. 默认本地路径 > 3. HuggingFace Hub
+    """
+    # 1. 检查环境变量
+    env_path = os.environ.get('QWEN_ASR_MODEL_PATH')
+    if env_path and os.path.exists(env_path):
+        logger.info(f"使用环境变量指定的模型路径: {env_path}")
+        return env_path
+    
+    # 2. 检查默认本地路径
+    if DEFAULT_LOCAL_MODEL_PATH.exists():
+        logger.info(f"使用本地模型: {DEFAULT_LOCAL_MODEL_PATH}")
+        return str(DEFAULT_LOCAL_MODEL_PATH)
+    
+    # 3. 使用 HuggingFace Hub
+    logger.info("本地模型不存在，将从 HuggingFace Hub 加载")
+    return "Qwen/Qwen3-ASR-0.6B"
+
+
 def setup_hf_mirror():
-    """配置 HuggingFace 国内镜像"""
-    # 优先使用环境变量设置的镜像
+    """配置 HuggingFace 国内镜像（仅在从 Hub 下载时需要）"""
     if not os.environ.get('HF_ENDPOINT'):
         os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
         logger.info(f"设置 HuggingFace 镜像: {os.environ['HF_ENDPOINT']}")
@@ -45,19 +70,24 @@ def get_asr_model():
     if asr_model is None:
         logger.info("正在加载 Qwen3-ASR 模型...")
         try:
-            # 设置国内镜像
-            setup_hf_mirror()
-
             from qwen_asr import Qwen3ASRModel
 
             # 检测 GPU 可用性
             device = "cuda" if torch.cuda.is_available() else "cpu"
             logger.info(f"使用设备: {device}")
 
-            # 使用 0.6B 模型以适配 4GB 显存
-            logger.info("使用 Qwen3-ASR-0.6B 模型 (适合 4GB 显存)")
+            # 获取模型路径
+            model_path = get_model_path()
+            
+            # 如果是 HuggingFace Hub 路径，设置镜像
+            if model_path == "Qwen/Qwen3-ASR-0.6B":
+                setup_hf_mirror()
+                logger.info("使用 Qwen3-ASR-0.6B 模型 (从 HuggingFace Hub 加载)")
+            else:
+                logger.info(f"使用本地部署的 Qwen3-ASR-0.6B 模型: {model_path}")
+
             asr_model = Qwen3ASRModel.from_pretrained(
-                "Qwen/Qwen3-ASR-0.6B",
+                model_path,
                 dtype=torch.bfloat16 if device == "cuda" else torch.float32,
                 device_map=device,
                 max_inference_batch_size=1,

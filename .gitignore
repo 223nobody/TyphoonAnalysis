@@ -25,6 +25,7 @@ MANIFEST
 
 # 虚拟环境
 venv/
+venv*/
 env/
 ENV/
 env*/
@@ -64,12 +65,17 @@ data/*.csv
 data/*.xlsx
 data/*.nc
 data/*.nc4
+backend/data/videos/
 
 # 模型文件
 model/*.pth
 model/*.pt
 model/*.joblib
 model/*.h5
+
+# ASR 本地模型（大文件，不提交到 Git）
+backend/data/asr_model/
+*.safetensors
 
 # 临时文件
 tmp/

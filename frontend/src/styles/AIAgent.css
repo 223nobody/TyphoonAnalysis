@@ -640,6 +640,16 @@
 
 .input-wrapper .ant-sender-content {
   padding: 8px 14px;
+  display: flex;
+  align-items: center;
+}
+
+/* 确保 prefix 区域垂直居中 */
+.input-wrapper .ant-sender-prefix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
 }
 
 .input-wrapper .ant-sender textarea {
@@ -748,8 +758,8 @@
 
 /* 语音按钮 */
 .voice-input-button {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   padding: 0;
   display: inline-flex;
@@ -762,6 +772,7 @@
   transition: all var(--transition-bounce);
   position: relative;
   line-height: 1;
+  vertical-align: middle;
 }
 
 .voice-input-button .anticon {
@@ -798,10 +809,10 @@
 
 .voice-input-button.recording {
   width: auto;
-  min-width: 68px;
-  height: 30px;
-  padding: 0 10px;
-  border-radius: 15px;
+  min-width: 72px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
   background: linear-gradient(135deg, #EF4444 0%, #F87171 100%);
   border-color: transparent;
   color: #fff;

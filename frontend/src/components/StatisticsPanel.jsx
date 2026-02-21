@@ -13,6 +13,142 @@ import {
 import "../styles/StatisticsPanel.css";
 import "../styles/common.css";
 
+/**
+ * 解析台风ID输入字符串，支持多种格式：
+ * - 单个ID: "2501"
+ * - 逗号分隔: "2501,2502,2503"
+ * - 圆括号范围(开区间): "(2501,2510)" -> 2502-2509
+ * - 方括号范围(闭区间): "[2501,2510]" -> 2501-2510
+ * - 混合括号(半开半闭): "[2501,2510)" -> 2501-2509, "(2501,2510]" -> 2502-2510
+ * - 混合格式: "2501,[2503,2505],(2507,2510)"
+ *
+ * @param {string} input - 用户输入的ID字符串
+ * @returns {{ids: number[], error: string|null}} - 解析后的ID数组和错误信息
+ */
+function parseTyphoonIds(input) {
+  if (!input || !input.trim()) {
+    return { ids: [], error: "请输入台风ID" };
+  }
+
+  const trimmedInput = input.trim();
+  const result = new Set();
+  const errors = [];
+
+  // 用于匹配范围的正则表达式
+  // 支持 (start,end), [start,end], [start,end), (start,end]
+  const rangePattern = /([\(\[])(\d+)\s*,\s*(\d+)([\)\]])/g;
+
+  // 先提取所有范围表达式，避免与单个ID混淆
+  const ranges = [];
+  let match;
+  let lastIndex = 0;
+
+  while ((match = rangePattern.exec(trimmedInput)) !== null) {
+    const [fullMatch, openBracket, startStr, endStr, closeBracket] = match;
+    const start = parseInt(startStr, 10);
+    const end = parseInt(endStr, 10);
+
+    // 验证数字有效性
+    if (isNaN(start) || isNaN(end)) {
+      errors.push(`范围 "${fullMatch}" 包含无效的ID`);
+      continue;
+    }
+
+    // 验证范围合理性
+    if (start > end) {
+      errors.push(`范围 "${fullMatch}" 起始值(${start})不能大于结束值(${end})`);
+      continue;
+    }
+
+    // 确定包含边界
+    const includeStart = openBracket === "[";
+    const includeEnd = closeBracket === "]";
+
+    // 计算实际范围
+    const actualStart = includeStart ? start : start + 1;
+    const actualEnd = includeEnd ? end : end - 1;
+
+    // 验证范围有效性
+    if (actualStart > actualEnd) {
+      errors.push(
+        `范围 "${fullMatch}" 无效：${includeStart ? "[" : "("}${start},${end}${includeEnd ? "]" : ")"} 不包含任何整数`,
+      );
+      continue;
+    }
+
+    // 限制范围大小（防止输入过大范围导致性能问题）
+    const rangeSize = actualEnd - actualStart + 1;
+    if (rangeSize > 100) {
+      errors.push(
+        `范围 "${fullMatch}" 包含${rangeSize}个ID，超过最大限制(100)`,
+      );
+      continue;
+    }
+
+    ranges.push({
+      start: actualStart,
+      end: actualEnd,
+      fullMatch,
+      index: match.index,
+      length: fullMatch.length,
+    });
+  }
+
+  // 构建排除范围后的字符串，用于提取单个ID
+  let processedInput = trimmedInput;
+  // 从后向前替换，避免索引变化
+  for (let i = ranges.length - 1; i >= 0; i--) {
+    const range = ranges[i];
+    processedInput =
+      processedInput.slice(0, range.index) +
+      " " +
+      processedInput.slice(range.index + range.length);
+  }
+
+  // 处理范围
+  ranges.forEach((range) => {
+    for (let id = range.start; id <= range.end; id++) {
+      result.add(id);
+    }
+  });
+
+  // 处理单个ID（逗号分隔）
+  const singleIds = processedInput
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+
+  singleIds.forEach((idStr) => {
+    // 检查是否包含括号（未匹配到的无效括号）
+    if (/[\(\[\]\)]/.test(idStr)) {
+      errors.push(`"${idStr}" 格式错误：括号不匹配或位置不正确`);
+      return;
+    }
+
+    const id = parseInt(idStr, 10);
+    if (isNaN(id)) {
+      errors.push(`"${idStr}" 不是有效的台风ID`);
+      return;
+    }
+    result.add(id);
+  });
+
+  // 转换为数组并排序，然后转换为字符串（后端期望字符串数组）
+  const idArray = Array.from(result)
+    .sort((a, b) => a - b)
+    .map((id) => String(id));
+
+  // 验证总数限制
+  if (idArray.length === 0) {
+    return { ids: [], error: errors.join("; ") || "未找到有效的台风ID" };
+  }
+
+  return {
+    ids: idArray,
+    error: errors.length > 0 ? errors.join("; ") : null,
+  };
+}
+
 function StatisticsPanel() {
   const [activeTab, setActiveTab] = useState("yearly");
   const [loading, setLoading] = useState(false);
@@ -317,25 +453,34 @@ function StatisticsPanel() {
       return;
     }
 
-    const idArray = comparisonForm.typhoonIds
-      .split(",")
-      .map((id) => id.trim())
-      .filter((id) => id);
+    const { ids, error: parseError } = parseTyphoonIds(
+      comparisonForm.typhoonIds,
+    );
 
-    if (idArray.length === 0) {
+    if (parseError && ids.length === 0) {
+      alert(`输入格式错误: ${parseError}`);
+      return;
+    }
+
+    if (ids.length === 0) {
       alert("请输入有效的台风ID");
       return;
     }
 
-    if (idArray.length > 10) {
-      alert("最多只能对比10个台风");
+    if (ids.length > 10) {
+      alert(`最多只能对比10个台风，当前选择了${ids.length}个`);
       return;
+    }
+
+    // 如果有警告但不影响主要功能，显示警告但继续执行
+    if (parseError) {
+      console.warn("ID解析警告:", parseError);
     }
 
     try {
       setLoading(true);
       setError(null);
-      const data = await compareTyphoons(idArray);
+      const data = await compareTyphoons(ids);
       setResult({ type: "comparison", data });
     } catch (err) {
       setError(err.message);
@@ -497,25 +642,34 @@ function StatisticsPanel() {
       return;
     }
 
-    const idArray = exportForm.batchTyphoonIds
-      .split(",")
-      .map((id) => id.trim())
-      .filter((id) => id);
+    const { ids, error: parseError } = parseTyphoonIds(
+      exportForm.batchTyphoonIds,
+    );
 
-    if (idArray.length === 0) {
+    if (parseError && ids.length === 0) {
+      alert(`输入格式错误: ${parseError}`);
+      return;
+    }
+
+    if (ids.length === 0) {
       alert("请输入有效的台风ID");
       return;
     }
 
-    if (idArray.length > 50) {
-      alert("最多只能批量导出50个台风");
+    if (ids.length > 50) {
+      alert(`最多只能批量导出50个台风，当前选择了${ids.length}个`);
       return;
+    }
+
+    // 如果有警告但不影响主要功能，显示警告但继续执行
+    if (parseError) {
+      console.warn("ID解析警告:", parseError);
     }
 
     try {
       setLoading(true);
       const result = await exportBatchTyphoons(
-        idArray,
+        ids,
         exportForm.format,
         exportForm.includePath,
       );
@@ -615,16 +769,35 @@ function StatisticsPanel() {
   const renderComparisonForm = () => (
     <div>
       <div className="form-group">
-        <label>台风ID列表（用逗号分隔）</label>
+        <label>台风ID列表</label>
         <input
           type="text"
-          placeholder="例如: 2501,2502,2503"
+          placeholder="例如: 2501,2502,2503 或 [2501,2505],(2510,2515)"
           value={comparisonForm.typhoonIds}
           onChange={(e) =>
             setComparisonForm({ ...comparisonForm, typhoonIds: e.target.value })
           }
         />
-        <small>💡 最多可对比10个台风</small>
+        <div
+          className="input-help"
+          style={{ marginTop: "8px", fontSize: "12px", color: "#6b7280" }}
+        >
+          <p style={{ margin: "0 0 4px 0" }}>💡 支持以下格式（可混合使用）:</p>
+          <ul style={{ margin: "0", paddingLeft: "16px" }}>
+            <li>
+              逗号分隔: <code>2501,2502,2503</code>
+            </li>
+            <li>
+              混合括号: <code>[2501,2505)</code> = 2501,2502,2503,2504
+            </li>
+            <li>
+              混合格式: <code>2501,[2503,2505],(2507,2510)</code>
+            </li>
+          </ul>
+          <p style={{ margin: "4px 0 0 0", color: "#ef4444" }}>
+            ⚠️ 最多可对比10个台风
+          </p>
+        </div>
       </div>
       <button
         className="btn"
@@ -714,10 +887,10 @@ function StatisticsPanel() {
       ) : (
         <div>
           <div className="form-group">
-            <label>台风ID列表（用逗号分隔）</label>
+            <label>台风ID列表</label>
             <input
               type="text"
-              placeholder="例如: 2501,2502,2503"
+              placeholder="例如: 2501,2502,2503 或 [2501,2510],(2520,2530)"
               value={exportForm.batchTyphoonIds}
               onChange={(e) =>
                 setExportForm({
@@ -726,7 +899,28 @@ function StatisticsPanel() {
                 })
               }
             />
-            <small>💡 最多可批量导出50个台风</small>
+            <div
+              className="input-help"
+              style={{ marginTop: "8px", fontSize: "12px", color: "#6b7280" }}
+            >
+              <p style={{ margin: "0 0 4px 0" }}>
+                💡 支持以下格式（可混合使用）:
+              </p>
+              <ul style={{ margin: "0", paddingLeft: "16px" }}>
+                <li>
+                  逗号分隔: <code>2501,2502,2503</code>
+                </li>
+                <li>
+                  混合括号: <code>[2501,2505)</code> = 2501-2504（包含起始）
+                </li>
+                <li>
+                  混合格式: <code>2501,[2503,2505],(2507,2510)</code>
+                </li>
+              </ul>
+              <p style={{ margin: "4px 0 0 0", color: "#ef4444" }}>
+                ⚠️ 最多可批量导出50个台风
+              </p>
+            </div>
           </div>
           <div className="form-group">
             <label>导出格式</label>

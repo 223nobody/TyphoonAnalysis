@@ -81,13 +81,12 @@ class VideoService:
 
             # 3. 调用AI服务分析视频
             logger.info(f"开始AI分析: {file_path}")
-            async with video_ai_service as service:
-                ai_result = await service.analyze_video(
-                    video_path=str(file_path),
-                    analysis_type=analysis_type,
-                    extract_frames=extract_frames,
-                    frame_interval=frame_interval
-                )
+            ai_result = await video_ai_service.analyze_video(
+                video_path=str(file_path),
+                analysis_type=analysis_type,
+                extract_frames=extract_frames,
+                frame_interval=frame_interval
+            )
 
             logger.info(f"AI分析结果: success={ai_result.get('success')}")
 

@@ -192,9 +192,9 @@ TyphoonAnalysis/
 
 **后端**:
 
-- Python >= 3.10
+- Python >= 3.10 (推荐 3.12)
 - pip >= 21.0
-- CUDA >= 11.7 (推荐，用于 ASR 加速)
+- CUDA >= 11.7 (可选，用于 GPU 加速 ASR 和预测)
 
 **前端**:
 
@@ -210,15 +210,47 @@ git clone <repository-url>
 cd TyphoonAnalysis
 ```
 
-#### 2. 配置后端环境变量
+#### 2. 配置后端环境
 
-在 `backend` 目录下创建 `.env` 文件：
+进入后端目录：
 
 ```bash
 cd backend
 ```
 
-创建 `.env` 文件并添加以下配置：
+**创建虚拟环境（强烈推荐）**：
+
+```bash
+# 创建虚拟环境
+python -m venv venv
+
+# 激活虚拟环境
+# Windows
+venv\Scripts\activate
+# Linux/Mac
+source venv/bin/activate
+```
+
+**安装依赖**：
+
+```bash
+pip install -r requirements.txt
+```
+
+> **注意**：安装过程可能需要 5-15 分钟，取决于网络速度和硬件性能。`torch` 和 `opencv-python` 包较大，请耐心等待。
+
+**配置环境变量**：
+
+复制示例环境变量文件并修改：
+
+```bash
+# Windows
+copy .env.example .env
+# Linux/Mac
+cp .env.example .env
+```
+
+编辑 `.env` 文件，配置以下关键参数：
 
 ```env
 # 应用配置
@@ -239,11 +271,11 @@ AI_API_KEY=your-ai-api-key-here
 AI_API_BASE_URL=https://aiping.cn/api/v1
 
 # AI 模型配置
-DEEPSEEK_MODEL=deepseek-reasoner              # 深度思考模型
-DEEPSEEK_NOTHINK_MODEL=DeepSeek-R1-0528       # 非深度思考模型
-GLM_MODEL=glm-4-plus                          # GLM 模型
-QWEN_TEXT_MODEL=qwen-plus                     # Qwen 文本模型
-QWEN_VL_MODEL=qwen-vl-max                     # Qwen 视觉模型
+DEEPSEEK_MODEL=deepseek-reasoner
+DEEPSEEK_NOTHINK_MODEL=DeepSeek-R1-0528
+GLM_MODEL=glm-4-plus
+QWEN_TEXT_MODEL=qwen-plus
+QWEN_VL_MODEL=qwen-vl-max
 
 # 爬虫配置
 CRAWLER_ENABLED=True
@@ -263,33 +295,20 @@ LOG_FILE=logs/app.log
 
 #### 3. 启动后端服务
 
+确保虚拟环境已激活，然后启动服务：
+
 ```bash
-# 确保在 backend 目录下
-
-# 创建虚拟环境（推荐）
-python -m venv venv
-
-# 激活虚拟环境
-# Windows
-venv\Scripts\activate
-# Linux/Mac
-source venv/bin/activate
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 启动服务
 python main.py
 ```
 
-**直接启动当前项目**
-
-```bash
-..\venv312\Scripts\activate
- python main.py
-```
-
 后端服务将在 `http://localhost:8000` 启动
+
+> **首次启动说明**：
+>
+> - 首次启动时会自动下载 Qwen3-ASR 语音识别模型（约 1.75GB）
+> - 模型将下载到 `backend/data/asr_model/` 目录
+> - 下载完成后会自动加载模型，这可能需要 1-2 分钟
+> - 后续启动将直接使用本地模型，无需重复下载
 
 #### 4. 启动前端应用
 
@@ -522,22 +541,74 @@ npm run preview
 
 **解决**:
 
+确保已激活虚拟环境并安装所有依赖：
+
 ```bash
+cd backend
+
+# 激活虚拟环境
+# Windows
+venv\Scripts\activate
+# Linux/Mac
+source venv/bin/activate
+
+# 安装依赖
 pip install -r requirements.txt
 ```
 
-### 2. 语音输入无法使用
+### 2. 虚拟环境相关问题
+
+**问题**: 提示 `pip` 或 `python` 命令找不到
+
+**解决**:
+
+确保正确激活了虚拟环境。在 Windows PowerShell 中，如果执行策略限制，可能需要：
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+**问题**: 安装依赖时速度很慢
+
+**解决**:
+
+使用国内镜像源加速：
+
+```bash
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+### 3. 环境变量配置问题
+
+**问题**: 启动时提示缺少配置项
+
+**解决**:
+
+1. 确保已创建 `.env` 文件：
+
+   ```bash
+   cd backend
+   copy .env.example .env  # Windows
+   cp .env.example .env    # Linux/Mac
+   ```
+
+2. 编辑 `.env` 文件，填写必要的配置项（特别是 `AI_API_KEY` 和 `SECRET_KEY`）
+
+3. 确保 `.env` 文件在 `backend` 目录下
+
+### 4. 语音输入无法使用
 
 **问题**: 点击麦克风无反应或识别失败
 
 **解决**:
 
 1. 检查浏览器是否授予麦克风权限
-2. 确认后端 ASR 服务正常运行
-3. 生产环境需使用 HTTPS
-4. 检查浏览器是否支持 Web Audio API
+2. 确认后端 ASR 服务正常运行（查看启动日志中是否显示 "ASR 模型加载完成"）
+3. 首次启动需要下载模型，请等待下载完成
+4. 生产环境需使用 HTTPS
+5. 检查浏览器是否支持 Web Audio API
 
-### 3. 语音识别返回繁体中文
+### 5. 语音识别返回繁体中文
 
 **问题**: 识别结果显示繁体字
 
@@ -545,7 +616,7 @@ pip install -r requirements.txt
 
 系统已集成 OpenCC 自动转换，无需手动处理。如仍有问题请检查后端日志。
 
-### 4. 前端无法连接后端
+### 6. 前端无法连接后端
 
 **问题**: `Network Error` 或 `CORS Error`
 
@@ -554,8 +625,9 @@ pip install -r requirements.txt
 - 确认后端服务已启动（http://localhost:8000）
 - 检查防火墙设置
 - 查看后端 CORS 配置
+- 确认前端配置的 API 地址正确
 
-### 5. 地图无法加载
+### 7. 地图无法加载
 
 **问题**: 地图瓦片加载失败
 
@@ -565,19 +637,18 @@ pip install -r requirements.txt
 - 当前使用高德地图瓦片（国内稳定）
 - 可在代码中切换其他瓦片服务
 
-### 6. 查询不到历史数据
+### 8. 查询不到历史数据
 
 **问题**: 选择历史年份无数据
 
 **解决**:
 
 ```bash
-# 运行数据导入脚本
-cd backend
+# 确保在 backend 目录下且虚拟环境已激活
 python data.py
 ```
 
-### 7. 数据库锁定错误
+### 9. 数据库锁定错误
 
 **问题**: `database is locked`
 
