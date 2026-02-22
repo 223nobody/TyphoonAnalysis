@@ -24,6 +24,260 @@
   --transition-bounce: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* ==================== 全局 Dropdown 菜单样式 ==================== */
+.ant-dropdown {
+  z-index: 99999 !important;
+}
+
+.ant-dropdown-menu {
+  z-index: 99999 !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.5) !important;
+  padding: 6px !important;
+  animation: dropdownFadeIn 0.2s ease-out !important;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.ant-dropdown-menu-item {
+  border-radius: 10px !important;
+  margin: 2px 0 !important;
+  padding: 10px 14px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: var(--text-secondary) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.ant-dropdown-menu-item::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.08)) !important;
+  opacity: 0 !important;
+  transition: opacity 0.2s ease !important;
+  border-radius: 10px !important;
+}
+
+.ant-dropdown-menu-item:hover {
+  background: transparent !important;
+  color: var(--text-primary) !important;
+  transform: translateX(4px) !important;
+}
+
+.ant-dropdown-menu-item:hover::before {
+  opacity: 1 !important;
+}
+
+.ant-dropdown-menu-item.ant-dropdown-menu-item-danger {
+  color: #EF4444 !important;
+}
+
+.ant-dropdown-menu-item.ant-dropdown-menu-item-danger:hover {
+  background: transparent !important;
+  color: #DC2626 !important;
+}
+
+.ant-dropdown-menu-item.ant-dropdown-menu-item-danger::before {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(248, 113, 113, 0.1)) !important;
+}
+
+.ant-dropdown-menu-item .anticon {
+  font-size: 14px !important;
+  margin-right: 10px !important;
+}
+
+.ant-dropdown-menu-divider {
+  margin: 4px 8px !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* ==================== 模态对话框样式 ==================== */
+.ant-modal {
+  z-index: 100000 !important;
+}
+
+.ant-modal-content {
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(32px) !important;
+  -webkit-backdrop-filter: blur(32px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 20px 60px rgba(99, 102, 241, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.6) !important;
+  animation: modalFadeIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.ant-modal-header {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+  padding: 20px 24px 16px !important;
+  border-radius: 20px 20px 0 0 !important;
+}
+
+.ant-modal-title {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.ant-modal-body {
+  padding: 20px 24px !important;
+}
+
+.ant-modal-footer {
+  background: transparent !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+  padding: 16px 24px 20px !important;
+  border-radius: 0 0 20px 20px !important;
+}
+
+.ant-modal-close {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  top: 14px !important;
+  right: 14px !important;
+  transition: all 0.2s ease !important;
+}
+
+.ant-modal-close:hover {
+  background: rgba(99, 102, 241, 0.1) !important;
+  color: var(--primary) !important;
+  transform: rotate(90deg) !important;
+}
+
+.ant-modal-close-x {
+  font-size: 14px !important;
+  line-height: 32px !important;
+}
+
+/* 确认对话框特殊样式 */
+.ant-modal-confirm {
+  z-index: 100000 !important;
+}
+
+.ant-modal-confirm-content {
+  font-size: 14px !important;
+  color: var(--text-secondary) !important;
+  line-height: 1.6 !important;
+  margin-top: 8px !important;
+}
+
+.ant-modal-confirm-btns {
+  margin-top: 20px !important;
+  gap: 8px !important;
+}
+
+.ant-modal-confirm-btns .ant-btn {
+  border-radius: 10px !important;
+  height: 38px !important;
+  padding: 0 20px !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.ant-modal-confirm-btns .ant-btn-default {
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  color: var(--text-secondary) !important;
+}
+
+.ant-modal-confirm-btns .ant-btn-default:hover {
+  border-color: var(--primary-light) !important;
+  background: #fff !important;
+  color: var(--primary) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15) !important;
+}
+
+.ant-modal-confirm-btns .ant-btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35) !important;
+}
+
+.ant-modal-confirm-btns .ant-btn-primary:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45) !important;
+}
+
+.ant-modal-confirm-btns .ant-btn-primary:active {
+  transform: translateY(0) !important;
+}
+
+.ant-modal-confirm-btns .ant-btn-dangerous {
+  background: linear-gradient(135deg, #EF4444 0%, #F87171 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35) !important;
+}
+
+.ant-modal-confirm-btns .ant-btn-dangerous:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45) !important;
+}
+
+/* 输入框样式优化 */
+.ant-input {
+  border-radius: 10px !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  padding: 10px 14px !important;
+  font-size: 14px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.ant-input:hover {
+  border-color: var(--primary-light) !important;
+}
+
+.ant-input:focus,
+.ant-input:focus-within {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12) !important;
+  background: #fff !important;
+}
+
+.ant-input-prefix {
+  color: var(--text-muted) !important;
+}
+
+.ant-input-show-count-suffix {
+  font-size: 12px !important;
+  color: var(--text-muted) !important;
+}
+
 /* ==================== 容器 ==================== */
 .ai-agent-container {
   width: 100%;
@@ -211,6 +465,202 @@
 
 .sidebar-content .ant-conversations-item-active::before {
   opacity: 1;
+}
+
+/* ==================== 自定义会话列表样式 ==================== */
+.conversations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.conversation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  transition: all var(--transition-smooth);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+}
+
+.conversation-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+  opacity: 0;
+  transition: opacity var(--transition-smooth);
+}
+
+.conversation-item:hover {
+  color: var(--text-primary);
+  transform: translateX(4px);
+}
+
+.conversation-item:hover::before {
+  opacity: 1;
+}
+
+.conversation-item.active {
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--primary);
+}
+
+.conversation-item.active::before {
+  opacity: 1;
+}
+
+.conversation-item-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+  position: relative;
+  z-index: 1;
+}
+
+.conversation-item-label {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+}
+
+.conversation-item-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.conversation-item.active .conversation-item-time {
+  color: var(--primary);
+  opacity: 0.7;
+}
+
+.conversation-item-menu {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: all var(--transition-fast);
+  position: relative;
+  z-index: 2;
+}
+
+.conversation-item:hover .conversation-item-menu,
+.conversation-item.active .conversation-item-menu {
+  opacity: 1;
+}
+
+.conversation-item-menu:hover {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--primary);
+}
+
+.conversation-item-menu.visible {
+  opacity: 1;
+}
+
+/* Dropdown 菜单样式 - 确保显示在最上层 */
+.conversation-item .ant-dropdown {
+  z-index: 9999 !important;
+}
+
+.conversation-item .ant-dropdown-menu {
+  min-width: 140px;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 9999 !important;
+}
+
+/* 确保下拉菜单的父容器有正确的定位 */
+.conversation-item {
+  position: relative;
+  z-index: 1;
+}
+
+.conversation-item.active {
+  z-index: 2;
+}
+
+/* 侧边栏内容区域确保正确的层级 */
+.sidebar-content {
+  position: relative;
+  z-index: 10;
+}
+
+/* 会话列表 */
+.conversations-list {
+  position: relative;
+}
+
+/* 右键菜单 */
+.context-menu {
+  background: var(--glass-bg-dark);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  padding: 6px;
+  min-width: 140px;
+  animation: contextMenuFadeIn 0.2s ease-out;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.context-menu-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.context-menu-item:hover {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--text-primary);
+}
+
+.context-menu-item .anticon {
+  font-size: 14px;
 }
 
 /* ==================== 主内容区 - 聊天区全屏，输入框悬浮 ==================== */
@@ -915,66 +1365,4 @@
   }
 }
 
-/* ==================== 暗色模式 ==================== */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --glass-bg: rgba(30, 41, 59, 0.8);
-    --glass-bg-dark: rgba(30, 41, 59, 0.92);
-    --glass-border: rgba(71, 85, 105, 0.5);
-    --text-primary: #F1F5F9;
-    --text-secondary: #94A3B8;
-    --text-muted: #64748B;
-    --bg-gradient: linear-gradient(135deg, #1E293B 0%, #0F172A 50%, #1E1B4B 100%);
-  }
 
-  .ai-agent-container::before {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(139, 92, 246, 0.25));
-  }
-
-  .ai-agent-container::after {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(99, 102, 241, 0.25));
-  }
-
-  .ai-agent-chat::before {
-    background: var(--glass-bg-dark);
-    color: var(--text-primary);
-  }
-
-  .ant-bubble[class*="start"] .ant-bubble-content {
-    background: rgba(51, 65, 85, 0.9) !important;
-    border-color: rgba(71, 85, 105, 0.5);
-  }
-
-  .prompts-section .ant-prompts-item {
-    background: rgba(51, 65, 85, 0.8);
-    border-color: rgba(71, 85, 105, 0.4);
-  }
-
-  .pill-button {
-    background: rgba(51, 65, 85, 0.8);
-    border-color: rgba(71, 85, 105, 0.4);
-    color: var(--text-secondary);
-  }
-
-  .input-wrapper .ant-sender {
-    background: rgba(30, 41, 59, 0.9);
-    border-color: rgba(71, 85, 105, 0.4);
-  }
-
-  .voice-input-button {
-    background: rgba(51, 65, 85, 0.8);
-    border-color: rgba(71, 85, 105, 0.4);
-  }
-
-  .reasoning-content {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15));
-  }
-
-  .sidebar-content .ant-conversations-item:hover {
-    background: rgba(71, 85, 105, 0.4);
-  }
-
-  .sidebar-content .ant-conversations-item-active {
-    background: rgba(99, 102, 241, 0.18);
-  }
-}

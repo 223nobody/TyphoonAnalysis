@@ -65,7 +65,6 @@ data/*.csv
 data/*.xlsx
 data/*.nc
 data/*.nc4
-backend/data/videos/
 
 # 模型文件
 model/*.pth

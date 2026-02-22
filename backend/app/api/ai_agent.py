@@ -765,6 +765,105 @@ async def create_session(
         raise HTTPException(status_code=500, detail=f"创建会话失败: {str(e)}")
 
 
+class RenameSessionRequest(BaseModel):
+    """重命名会话请求模型"""
+    title: str
+
+
+@router.delete("/ai-agent/sessions/{session_id}")
+async def delete_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    删除指定的对话会话
+    删除该会话下的所有历史记录
+    """
+    try:
+        logger.info(f"删除会话 - 用户ID: {current_user.id}, 会话ID: {session_id}")
+
+        # 查询该会话下的所有记录
+        stmt = select(AskHistory).where(
+            and_(
+                AskHistory.session_id == session_id,
+                AskHistory.user_id == current_user.id
+            )
+        )
+        result = await db.execute(stmt)
+        histories = result.scalars().all()
+
+        if not histories:
+            logger.warning(f"会话不存在或无权限删除 - 用户ID: {current_user.id}, 会话ID: {session_id}")
+            raise HTTPException(status_code=404, detail="会话不存在或无权限删除")
+
+        # 删除所有相关记录
+        for history in histories:
+            await db.delete(history)
+
+        await db.commit()
+        logger.info(f"会话删除成功 - 用户ID: {current_user.id}, 会话ID: {session_id}, 删除记录数: {len(histories)}")
+
+        return {"success": True, "message": "会话删除成功"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除会话失败 - 用户ID: {current_user.id}, 会话ID: {session_id}, 错误: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"删除会话失败: {str(e)}")
+
+
+@router.patch("/ai-agent/sessions/{session_id}")
+async def rename_session(
+    session_id: str,
+    request: RenameSessionRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    重命名指定的对话会话
+    修改该会话下第一条记录的问题内容作为会话标题
+    """
+    try:
+        if not request.title or not request.title.strip():
+            raise HTTPException(status_code=400, detail="会话名称不能为空")
+
+        title = request.title.strip()
+        if len(title) > 100:
+            title = title[:100]
+
+        logger.info(f"重命名会话 - 用户ID: {current_user.id}, 会话ID: {session_id}, 新名称: {title}")
+
+        # 查询该会话下最早的一条记录
+        stmt = select(AskHistory).where(
+            and_(
+                AskHistory.session_id == session_id,
+                AskHistory.user_id == current_user.id
+            )
+        ).order_by(AskHistory.created_at.asc()).limit(1)
+
+        result = await db.execute(stmt)
+        history = result.scalar_one_or_none()
+
+        if not history:
+            logger.warning(f"会话不存在或无权限重命名 - 用户ID: {current_user.id}, 会话ID: {session_id}")
+            raise HTTPException(status_code=404, detail="会话不存在或无权限重命名")
+
+        # 更新问题内容
+        history.question = title
+        await db.commit()
+
+        logger.info(f"会话重命名成功 - 用户ID: {current_user.id}, 会话ID: {session_id}")
+
+        return {"success": True, "message": "会话重命名成功", "title": title}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"重命名会话失败 - 用户ID: {current_user.id}, 会话ID: {session_id}, 错误: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"重命名会话失败: {str(e)}")
+
+
 @router.post("/ai-agent/ask-stream")
 async def ask_question_stream(
     request: AskRequest,
