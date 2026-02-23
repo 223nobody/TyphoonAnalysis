@@ -531,6 +531,23 @@ export const getAISessionHistory = async (sessionId) => {
 };
 
 /**
+ * 删除会话
+ * @param {string} sessionId - 会话ID
+ */
+export const deleteAISession = async (sessionId) => {
+  return apiClient.delete(`/ai-agent/sessions/${sessionId}`);
+};
+
+/**
+ * 重命名会话
+ * @param {string} sessionId - 会话ID
+ * @param {string} title - 新标题
+ */
+export const renameAISession = async (sessionId, title) => {
+  return apiClient.patch(`/ai-agent/sessions/${sessionId}`, { title });
+};
+
+/**
  * 获取热门问题列表
  */
 export const getAIQuestions = async () => {

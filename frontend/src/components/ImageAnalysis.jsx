@@ -13,6 +13,7 @@ import { marked } from "marked";
 marked.setOptions({
   async: false,
 });
+import html2pdf from "html2pdf.js";
 import {
   uploadImage,
   analyzeImage,
@@ -47,6 +48,9 @@ function ImageAnalysis() {
   const [videoDragOver, setVideoDragOver] = useState(false);
   const videoInputRef = useRef(null);
 
+  // PDF导出引用
+  const reportContentRef = useRef(null);
+
   const [videoAnalysisConfig, setVideoAnalysisConfig] = useState({
     analysisType: "comprehensive",
     extractFrames: true,
@@ -60,6 +64,244 @@ function ImageAnalysis() {
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
+  // 获取报告内容
+  const getReportContent = () => {
+    if (!videoResult) return "";
+    const aiAnalysis = videoResult.ai_analysis;
+    let reportContent = "";
+
+    if (aiAnalysis) {
+      if (typeof aiAnalysis === "string") {
+        reportContent = aiAnalysis;
+      } else if (aiAnalysis.description) {
+        const desc = aiAnalysis.description;
+        if (typeof desc === "string") {
+          reportContent = desc;
+        } else if (Array.isArray(desc)) {
+          reportContent = desc
+            .map((item) => {
+              if (typeof item === "string") return item;
+              if (item && item.text) return item.text;
+              return JSON.stringify(item);
+            })
+            .join("\n");
+        } else if (typeof desc === "object") {
+          reportContent = JSON.stringify(desc, null, 2);
+        } else {
+          reportContent = String(desc);
+        }
+      } else {
+        reportContent = JSON.stringify(aiAnalysis, null, 2);
+      }
+    }
+    return reportContent;
+  };
+
+  // 下载报告（Markdown格式）
+  const handleDownloadReport = () => {
+    const reportContent = getReportContent();
+    if (!reportContent) {
+      alert("暂无报告内容可下载");
+      return;
+    }
+
+    const blob = new Blob([reportContent], { type: "text/markdown" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `video_analysis_${videoResult.analysis_id}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
+  // 导出为PDF
+  const handleExportPDF = () => {
+    if (!reportContentRef.current) {
+      alert("暂无报告内容可导出");
+      return;
+    }
+
+    const timestamp = new Date().toISOString().slice(0, 10);
+
+    // PDF配置选项
+    const opt = {
+      margin: [15, 15, 15, 15],
+      filename: `视频分析报告_${videoResult.analysis_id}_${timestamp}.pdf`,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        letterRendering: true,
+        scrollY: 0,
+        scrollX: 0,
+        windowHeight: document.documentElement.scrollHeight,
+      },
+      jsPDF: {
+        unit: "mm",
+        format: "a4",
+        orientation: "portrait",
+      },
+      pagebreak: {
+        mode: ["avoid-all", "css", "legacy"],
+        before: ".page-break-before",
+        after: ".page-break-after",
+        avoid: ["h1", "h2", "h3", "h4", "h5", "h6", "table", "img"],
+      },
+    };
+
+    // 克隆报告内容以避免修改原始DOM
+    const element = reportContentRef.current.cloneNode(true);
+
+    // 移除所有高度限制和滚动条，确保完整内容可见
+    const contentSections = element.querySelectorAll(".content-text");
+    contentSections.forEach((section) => {
+      section.style.maxHeight = "none";
+      section.style.overflowY = "visible";
+      section.style.height = "auto";
+    });
+
+    // 添加PDF样式优化 - 紧凑格式
+    const style = document.createElement("style");
+    style.textContent = `
+      * {
+        font-family: "Microsoft YaHei", "SimSun", sans-serif !important;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      h1 {
+        page-break-after: avoid;
+        page-break-inside: avoid;
+        margin-top: 0.8em;
+        margin-bottom: 0.4em;
+        font-size: 1.8em;
+        color: #1a202c;
+      }
+      h2 {
+        page-break-after: avoid;
+        page-break-inside: avoid;
+        margin-top: 0.7em;
+        margin-bottom: 0.35em;
+        font-size: 1.5em;
+        color: #1a202c;
+      }
+      h3 {
+        page-break-after: avoid;
+        page-break-inside: avoid;
+        margin-top: 0.6em;
+        margin-bottom: 0.3em;
+        font-size: 1.3em;
+        color: #1a202c;
+      }
+      h4, h5, h6 {
+        page-break-after: avoid;
+        page-break-inside: avoid;
+        margin-top: 0.5em;
+        margin-bottom: 0.25em;
+        color: #1a202c;
+      }
+      p {
+        line-height: 1.5;
+        margin-top: 0.3em;
+        margin-bottom: 0.3em;
+        page-break-inside: avoid;
+      }
+      li {
+        line-height: 1.4;
+        margin-bottom: 0.2em;
+        page-break-inside: avoid;
+      }
+      table {
+        page-break-inside: avoid;
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0.5em 0;
+      }
+      table th, table td {
+        border: 1px solid #ddd;
+        padding: 6px 8px;
+        text-align: left;
+        line-height: 1.3;
+      }
+      img {
+        max-width: 100%;
+        page-break-inside: avoid;
+        display: block;
+        margin: 0.5em auto;
+      }
+      ul, ol {
+        page-break-inside: avoid;
+        margin: 0.3em 0;
+        padding-left: 1.5em;
+      }
+      .content-text {
+        max-height: none !important;
+        overflow-y: visible !important;
+        height: auto !important;
+      }
+      .meta-info {
+        page-break-after: avoid;
+        margin-bottom: 0.5em !important;
+        padding: 10px !important;
+      }
+      .meta-item {
+        margin-bottom: 0.3em !important;
+      }
+      blockquote {
+        margin: 0.4em 0;
+        padding-left: 1em;
+        border-left: 3px solid #ddd;
+      }
+      code {
+        padding: 0.1em 0.3em;
+        background: #f5f5f5;
+        border-radius: 3px;
+      }
+      pre {
+        margin: 0.4em 0;
+        padding: 0.5em;
+        background: #f5f5f5;
+        border-radius: 4px;
+        overflow-x: auto;
+      }
+      hr {
+        margin: 0.5em 0;
+        border: none;
+        border-top: 1px solid #ddd;
+      }
+    `;
+    element.insertBefore(style, element.firstChild);
+
+    // 显示加载提示
+    const loadingMsg = document.createElement("div");
+    loadingMsg.textContent = "正在生成PDF，请稍候...";
+    loadingMsg.style.cssText =
+      "position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 20px 40px; border-radius: 8px; z-index: 9999; font-size: 16px;";
+    document.body.appendChild(loadingMsg);
+
+    // 生成PDF
+    html2pdf()
+      .set(opt)
+      .from(element)
+      .save()
+      .then(() => {
+        console.log("PDF导出成功");
+        document.body.removeChild(loadingMsg);
+        alert("PDF导出成功！");
+      })
+      .catch((err) => {
+        console.error("PDF导出失败:", err);
+        document.body.removeChild(loadingMsg);
+        alert("PDF导出失败，请重试");
+      });
   };
 
   // ============ 图像分析处理函数 ============
@@ -347,33 +589,7 @@ function ImageAnalysis() {
   const renderVideoResult = () => {
     if (!videoResult) return null;
 
-    const aiAnalysis = videoResult.ai_analysis;
-    let reportContent = "";
-
-    if (aiAnalysis) {
-      if (typeof aiAnalysis === "string") {
-        reportContent = aiAnalysis;
-      } else if (aiAnalysis.description) {
-        const desc = aiAnalysis.description;
-        if (typeof desc === "string") {
-          reportContent = desc;
-        } else if (Array.isArray(desc)) {
-          reportContent = desc
-            .map((item) => {
-              if (typeof item === "string") return item;
-              if (item && item.text) return item.text;
-              return JSON.stringify(item);
-            })
-            .join("\n");
-        } else if (typeof desc === "object") {
-          reportContent = JSON.stringify(desc, null, 2);
-        } else {
-          reportContent = String(desc);
-        }
-      } else {
-        reportContent = JSON.stringify(aiAnalysis, null, 2);
-      }
-    }
+    const reportContent = getReportContent();
 
     const formattedTime = videoResult.created_at
       ? new Date(videoResult.created_at).toLocaleString("zh-CN", {
@@ -400,154 +616,172 @@ function ImageAnalysis() {
           <h3>📹 视频分析报告</h3>
           <div style={{ display: "flex", gap: "10px" }}>
             {reportContent && (
-              <button
-                className="btn"
-                onClick={() => {
-                  const blob = new Blob([reportContent], {
-                    type: "text/markdown",
-                  });
-                  const url = window.URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `video_analysis_${videoResult.analysis_id}.md`;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  window.URL.revokeObjectURL(url);
-                }}
-                style={{ padding: "8px 15px", fontSize: "14px" }}
-              >
-                📥 下载报告
-              </button>
+              <>
+                <button
+                  className="btn"
+                  onClick={handleDownloadReport}
+                  style={{ padding: "8px 15px", fontSize: "14px" }}
+                >
+                  📥 下载Markdown
+                </button>
+                <button
+                  className="btn"
+                  onClick={handleExportPDF}
+                  style={{
+                    padding: "8px 15px",
+                    fontSize: "14px",
+                    background:
+                      "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)",
+                  }}
+                >
+                  📄 导出PDF
+                </button>
+              </>
             )}
           </div>
         </div>
 
-        <div
-          style={{
-            marginBottom: "20px",
-            padding: "15px",
-            background: "#f9fafb",
-            borderRadius: "8px",
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "10px",
-          }}
-        >
-          <div>
-            <span style={{ fontWeight: 600, color: "#666" }}>🆔 分析ID:</span>
-            <span style={{ marginLeft: "8px" }}>{videoResult.analysis_id}</span>
+        {/* 报告内容容器 - 添加ref用于PDF导出 */}
+        <div ref={reportContentRef}>
+          <div
+            className="meta-info"
+            style={{
+              marginBottom: "20px",
+              padding: "15px",
+              background: "#f9fafb",
+              borderRadius: "8px",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "10px",
+            }}
+          >
+            <div className="meta-item">
+              <span style={{ fontWeight: 600, color: "#666" }}>🆔 分析ID:</span>
+              <span style={{ marginLeft: "8px" }}>
+                {videoResult.analysis_id}
+              </span>
+            </div>
+            <div className="meta-item">
+              <span style={{ fontWeight: 600, color: "#666" }}>
+                📊 分析类型:
+              </span>
+              <span style={{ marginLeft: "8px" }}>
+                {videoResult.analysis_type === "comprehensive" && "综合分析"}
+                {videoResult.analysis_type === "tracking" && "台风追踪"}
+                {videoResult.analysis_type === "intensity" && "强度评估"}
+                {videoResult.analysis_type === "structure" && "结构分析"}
+              </span>
+            </div>
+            <div className="meta-item">
+              <span style={{ fontWeight: 600, color: "#666" }}>📈 状态:</span>
+              <span
+                style={{
+                  marginLeft: "8px",
+                  fontWeight: "bold",
+                  color:
+                    videoResult.status === "completed"
+                      ? "#10b981"
+                      : videoResult.status === "processing"
+                        ? "#f59e0b"
+                        : "#ef4444",
+                }}
+              >
+                {videoResult.status === "completed"
+                  ? "分析完成"
+                  : videoResult.status === "processing"
+                    ? "分析中"
+                    : "分析失败"}
+              </span>
+            </div>
+            {videoResult.processing_time && (
+              <div className="meta-item">
+                <span style={{ fontWeight: 600, color: "#666" }}>
+                  ⏱️ 处理时间:
+                </span>
+                <span style={{ marginLeft: "8px" }}>
+                  {videoResult.processing_time.toFixed(2)}秒
+                </span>
+              </div>
+            )}
+            {formattedTime && (
+              <div className="meta-item">
+                <span style={{ fontWeight: 600, color: "#666" }}>
+                  🕐 分析时间:
+                </span>
+                <span style={{ marginLeft: "8px" }}>{formattedTime}</span>
+              </div>
+            )}
+            {videoResult.frame_count > 0 && (
+              <div className="meta-item">
+                <span style={{ fontWeight: 600, color: "#666" }}>
+                  🎞️ 分析帧数:
+                </span>
+                <span style={{ marginLeft: "8px" }}>
+                  {videoResult.frame_count} 帧
+                </span>
+              </div>
+            )}
+            {videoResult.user_id && (
+              <div className="meta-item">
+                <span style={{ fontWeight: 600, color: "#666" }}>
+                  👤 用户ID:
+                </span>
+                <span style={{ marginLeft: "8px" }}>{videoResult.user_id}</span>
+              </div>
+            )}
           </div>
-          <div>
-            <span style={{ fontWeight: 600, color: "#666" }}>📊 分析类型:</span>
-            <span style={{ marginLeft: "8px" }}>
-              {videoResult.analysis_type === "comprehensive" && "综合分析"}
-              {videoResult.analysis_type === "tracking" && "台风追踪"}
-              {videoResult.analysis_type === "intensity" && "强度评估"}
-              {videoResult.analysis_type === "structure" && "结构分析"}
-            </span>
-          </div>
-          <div>
-            <span style={{ fontWeight: 600, color: "#666" }}>📈 状态:</span>
-            <span
+
+          {reportContent ? (
+            <div className="content-section">
+              <div
+                className="content-text markdown-body"
+                style={{
+                  background: "white",
+                  padding: "20px",
+                  borderRadius: "8px",
+                  border: "1px solid #e5e7eb",
+                  maxHeight: "600px",
+                  overflowY: "auto",
+                  lineHeight: "1.6",
+                }}
+                dangerouslySetInnerHTML={{
+                  __html: (() => {
+                    try {
+                      return marked.parse(reportContent);
+                    } catch (e) {
+                      console.error("marked.parse error:", e);
+                      return `<pre>${reportContent}</pre>`;
+                    }
+                  })(),
+                }}
+              />
+            </div>
+          ) : videoResult.error ? (
+            <div
               style={{
-                marginLeft: "8px",
-                fontWeight: "bold",
-                color:
-                  videoResult.status === "completed"
-                    ? "#10b981"
-                    : videoResult.status === "processing"
-                      ? "#f59e0b"
-                      : "#ef4444",
+                padding: "15px",
+                background: "#fef2f2",
+                borderRadius: "8px",
+                color: "#ef4444",
               }}
             >
-              {videoResult.status === "completed"
-                ? "分析完成"
-                : videoResult.status === "processing"
-                  ? "分析中"
-                  : "分析失败"}
-            </span>
-          </div>
-          {videoResult.processing_time && (
-            <div>
-              <span style={{ fontWeight: 600, color: "#666" }}>
-                ⏱️ 处理时间:
-              </span>
-              <span style={{ marginLeft: "8px" }}>
-                {videoResult.processing_time.toFixed(2)}秒
-              </span>
+              <h4>❌ 分析失败</h4>
+              <p>{videoResult.error}</p>
             </div>
-          )}
-          {formattedTime && (
-            <div>
-              <span style={{ fontWeight: 600, color: "#666" }}>
-                🕐 分析时间:
-              </span>
-              <span style={{ marginLeft: "8px" }}>{formattedTime}</span>
-            </div>
-          )}
-          {videoResult.frame_count > 0 && (
-            <div>
-              <span style={{ fontWeight: 600, color: "#666" }}>
-                🎞️ 分析帧数:
-              </span>
-              <span style={{ marginLeft: "8px" }}>
-                {videoResult.frame_count} 帧
-              </span>
+          ) : (
+            <div
+              style={{
+                padding: "15px",
+                background: "#fef3c7",
+                borderRadius: "8px",
+                color: "#f59e0b",
+              }}
+            >
+              <h4>⚠️ 提示</h4>
+              <p>暂无分析内容</p>
             </div>
           )}
         </div>
-
-        {reportContent ? (
-          <div className="content-section">
-            <div
-              className="content-text markdown-body"
-              style={{
-                background: "white",
-                padding: "20px",
-                borderRadius: "8px",
-                border: "1px solid #e5e7eb",
-                maxHeight: "600px",
-                overflowY: "auto",
-                lineHeight: "1.6",
-              }}
-              dangerouslySetInnerHTML={{
-                __html: (() => {
-                  try {
-                    return marked.parse(reportContent);
-                  } catch (e) {
-                    console.error("marked.parse error:", e);
-                    return `<pre>${reportContent}</pre>`;
-                  }
-                })(),
-              }}
-            />
-          </div>
-        ) : videoResult.error ? (
-          <div
-            style={{
-              padding: "15px",
-              background: "#fef2f2",
-              borderRadius: "8px",
-              color: "#ef4444",
-            }}
-          >
-            <h4>❌ 分析失败</h4>
-            <p>{videoResult.error}</p>
-          </div>
-        ) : (
-          <div
-            style={{
-              padding: "15px",
-              background: "#fef3c7",
-              borderRadius: "8px",
-              color: "#f59e0b",
-            }}
-          >
-            <h4>⚠️ 提示</h4>
-            <p>暂无分析内容</p>
-          </div>
-        )}
       </div>
     );
   };

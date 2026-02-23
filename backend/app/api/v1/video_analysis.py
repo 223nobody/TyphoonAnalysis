@@ -2,13 +2,15 @@
 视频分析API路由 - 合并表设计
 提供视频上传并分析、查询等功能
 """
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, Dict, Any
 import logging
 
 from app.core.database import get_db
+from app.core.auth import get_current_user
 from app.models.video import VideoAnalysisResult
+from app.models.user import User
 from app.services.video.video_service import VideoService
 
 router = APIRouter(prefix="/video-analysis", tags=["视频分析"])
@@ -27,6 +29,7 @@ class VideoAnalysisResponse:
     ai_analysis: Optional[Dict[str, Any]]
     processing_time: Optional[float]
     error: Optional[str]
+    user_id: Optional[int]
 
 
 class AnalysisStatusResponse:
@@ -39,6 +42,7 @@ class AnalysisStatusResponse:
     error: Optional[str]
     created_at: Optional[str]
     processing_time: Optional[float]
+    user_id: Optional[int]
 
 
 # ========== API端点 ==========
@@ -49,10 +53,12 @@ async def analyze_video(
     analysis_type: str = Form("comprehensive"),
     extract_frames: bool = Form(True),
     frame_interval: int = Form(5),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     上传视频并立即分析（合并上传和分析流程）
+    需要用户登录
 
     Args:
         file: 视频文件
@@ -60,6 +66,7 @@ async def analyze_video(
         extract_frames: 是否提取关键帧
         frame_interval: 帧提取间隔（秒）
         db: 数据库会话
+        current_user: 当前登录用户
 
     Returns:
         分析结果
@@ -85,7 +92,7 @@ async def analyze_video(
                 detail=f"文件大小超过限制（最大500MB）"
             )
 
-        # 上传并分析视频
+        # 上传并分析视频，传入当前用户ID
         service = VideoService(db)
         result = await service.upload_and_analyze(
             filename=file.filename,
@@ -93,7 +100,8 @@ async def analyze_video(
             file_type=file.content_type,
             analysis_type=analysis_type,
             extract_frames=extract_frames,
-            frame_interval=frame_interval
+            frame_interval=frame_interval,
+            user_id=current_user.id
         )
 
         if not result.get("success"):
@@ -114,14 +122,17 @@ async def analyze_video(
 @router.get("/status/{analysis_id}")
 async def get_analysis_status(
     analysis_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     获取分析状态
+    用户只能访问自己的分析记录
 
     Args:
         analysis_id: 分析记录ID
         db: 数据库会话
+        current_user: 当前登录用户
 
     Returns:
         分析状态和结果
@@ -132,6 +143,13 @@ async def get_analysis_status(
 
         if not status:
             raise HTTPException(status_code=404, detail="分析记录不存在")
+
+        # 权限验证：用户只能访问自己的分析记录
+        if status.get("user_id") is not None and status.get("user_id") != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="无权访问此分析记录"
+            )
 
         return status
 
@@ -146,22 +164,29 @@ async def get_analysis_status(
 async def list_analyses(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    获取分析记录列表
+    获取当前用户的分析记录列表
+    只返回属于当前用户的分析记录
 
     Args:
         limit: 返回数量限制
         offset: 偏移量
         db: 数据库会话
+        current_user: 当前登录用户
 
     Returns:
         分析记录列表
     """
     try:
         service = VideoService(db)
-        result = await service.list_analyses(limit=limit, offset=offset)
+        result = await service.list_analyses(
+            limit=limit,
+            offset=offset,
+            user_id=current_user.id
+        )
 
         return {
             "success": True,
@@ -176,20 +201,37 @@ async def list_analyses(
 @router.delete("/{analysis_id}")
 async def delete_analysis(
     analysis_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     删除分析记录及其关联文件
+    用户只能删除自己的分析记录
 
     Args:
         analysis_id: 分析记录ID
         db: 数据库会话
+        current_user: 当前登录用户
 
     Returns:
         删除结果
     """
     try:
         service = VideoService(db)
+
+        # 先获取分析记录，检查权限
+        analysis = await service.get_analysis(analysis_id)
+        if not analysis:
+            raise HTTPException(status_code=404, detail="分析记录不存在")
+
+        # 权限验证：用户只能删除自己的分析记录
+        if analysis.user_id is not None and analysis.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="无权删除此分析记录"
+            )
+
+        # 执行删除
         success = await service.delete_analysis(analysis_id)
 
         if not success:

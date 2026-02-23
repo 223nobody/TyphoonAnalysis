@@ -141,6 +141,7 @@ function Header() {
     {
       key: "user-center",
       label: "用户中心",
+      icon: <UserOutlined />,
       onClick: handleAvatarClick,
     },
     {

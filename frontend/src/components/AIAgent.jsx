@@ -21,6 +21,9 @@ import {
   Space,
   Dropdown,
   Tooltip,
+  Modal,
+  Input,
+  Avatar,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -33,6 +36,10 @@ import {
   SettingOutlined,
   AudioOutlined,
   AudioMutedOutlined,
+  MoreOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  LogoutOutlined,
 } from "@ant-design/icons";
 import {
   createAISession,
@@ -42,6 +49,8 @@ import {
   askAIQuestion,
   askAIQuestionStream,
   transcribeAudio,
+  deleteAISession,
+  renameAISession,
 } from "../services/api";
 import "../styles/AIAgent.css";
 
@@ -51,7 +60,7 @@ const { Title, Text } = Typography;
  * 欢迎界面子组件
  * 包含欢迎信息和热门问题提示
  */
-const WelcomeSection = ({ questions, onQuestionClick }) => {
+const WelcomeSection = ({ questions, onQuestionClick, username }) => {
   const promptItems = useMemo(() => {
     return questions.map((q, index) => ({
       key: q.id || `q_${index}`,
@@ -64,7 +73,7 @@ const WelcomeSection = ({ questions, onQuestionClick }) => {
     <div className="welcome-container" role="region" aria-label="欢迎界面">
       <Welcome
         icon={<RobotOutlined style={{ fontSize: 48, color: "#1677ff" }} />}
-        title="您好，我是 AI 对话助手"
+        title={`Hi ${username}，我是你的 AI 对话助手`}
         description="我可以帮助您解答台风相关的问题，包括台风预测、历史数据分析、预警信息等。"
       />
       <div className="prompts-section">
@@ -92,6 +101,210 @@ const WelcomeSection = ({ questions, onQuestionClick }) => {
 };
 
 /**
+ * 会话项组件 - 支持悬浮菜单和右键菜单
+ */
+const ConversationItem = ({
+  session,
+  isActive,
+  onClick,
+  onDelete,
+  onRename,
+}) => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showMenuButton, setShowMenuButton] = useState(false);
+
+  const label = useMemo(() => {
+    return session.first_question.length > 30
+      ? session.first_question.substring(0, 30) + "..."
+      : session.first_question;
+  }, [session.first_question]);
+
+  // 处理删除 - 带确认提示
+  const handleDelete = useCallback(() => {
+    Modal.confirm({
+      title: (
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div
+            style={{
+              width: "32px",
+              height: "32px",
+              borderRadius: "8px",
+              background: "linear-gradient(135deg, #EF4444 0%, #F87171 100%)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3)",
+            }}
+          >
+            <DeleteOutlined style={{ color: "#fff", fontSize: "16px" }} />
+          </div>
+          <span style={{ fontSize: "16px", fontWeight: "600" }}>删除对话</span>
+        </div>
+      ),
+      content: (
+        <div style={{ padding: "8px 0" }}>
+          <p
+            style={{
+              fontSize: "14px",
+              color: "#64748B",
+              margin: "0 0 12px 0",
+              lineHeight: "1.6",
+            }}
+          >
+            确定要删除对话
+          </p>
+          <p
+            style={{
+              fontSize: "14px",
+              color: "#1E293B",
+              fontWeight: "500",
+              margin: "0",
+              padding: "10px 14px",
+              background: "rgba(99, 102, 241, 0.06)",
+              borderRadius: "8px",
+              border: "1px solid rgba(99, 102, 241, 0.1)",
+            }}
+          >
+            "{label}"
+          </p>
+          <p
+            style={{ fontSize: "13px", color: "#94A3B8", margin: "12px 0 0 0" }}
+          >
+            ⚠️ 此操作不可恢复，请谨慎操作
+          </p>
+        </div>
+      ),
+      okText: "确认删除",
+      okType: "danger",
+      cancelText: "取消",
+      okButtonProps: {
+        danger: true,
+        type: "primary",
+        style: {
+          background: "linear-gradient(135deg, #EF4444 0%, #F87171 100%)",
+          border: "none",
+          boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3)",
+        },
+      },
+      cancelButtonProps: {
+        style: {
+          borderRadius: "10px",
+          height: "38px",
+        },
+      },
+      centered: true,
+      width: 520,
+      onOk: () => {
+        onDelete(session.session_id);
+      },
+    });
+    setMenuOpen(false);
+  }, [session.session_id, label, onDelete]);
+
+  // 处理重命名
+  const handleRename = useCallback(() => {
+    onRename(session.session_id, session.first_question);
+    setMenuOpen(false);
+  }, [session.session_id, session.first_question, onRename]);
+
+  // 处理右键菜单
+  const handleContextMenu = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuOpen(true);
+  }, []);
+
+  // 菜单配置
+  const menuProps = {
+    items: [
+      {
+        key: "rename",
+        icon: <EditOutlined />,
+        label: "重命名",
+      },
+      {
+        key: "delete",
+        icon: <DeleteOutlined />,
+        label: "删除",
+        danger: true,
+      },
+    ],
+    onClick: ({ key }) => {
+      if (key === "rename") {
+        handleRename();
+      } else if (key === "delete") {
+        handleDelete();
+      }
+    },
+  };
+
+  // 处理鼠标离开整个会话项区域
+  const handleMouseLeave = useCallback(
+    (e) => {
+      // 检查鼠标是否移动到了下拉菜单上
+      const relatedTarget = e.relatedTarget;
+      const dropdownElement = e.currentTarget.querySelector(".ant-dropdown");
+
+      // 如果菜单是打开的，不隐藏按钮
+      if (menuOpen) {
+        return;
+      }
+
+      setShowMenuButton(false);
+    },
+    [menuOpen],
+  );
+
+  return (
+    <div
+      className={`conversation-item ${isActive ? "active" : ""}`}
+      onClick={() => onClick(session.session_id)}
+      onMouseEnter={() => setShowMenuButton(true)}
+      onMouseLeave={handleMouseLeave}
+      onContextMenu={handleContextMenu}
+      role="button"
+      tabIndex={0}
+      aria-label={`对话: ${label}`}
+      aria-current={isActive ? "true" : undefined}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          onClick(session.session_id);
+        }
+      }}
+    >
+      <div className="conversation-item-content">
+        <span className="conversation-item-label" title={label}>
+          {label}
+        </span>
+        <span className="conversation-item-time">
+          {new Date(session.created_at).toLocaleDateString()}
+        </span>
+      </div>
+      <Dropdown
+        menu={menuProps}
+        placement="bottomRight"
+        trigger={["click"]}
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        getPopupContainer={() => document.body}
+        autoAdjustOverflow={{ adjustX: 1, adjustY: 1 }}
+      >
+        <Button
+          type="text"
+          size="small"
+          icon={<MoreOutlined rotate={90} />}
+          className={`conversation-item-menu ${
+            showMenuButton || isActive || menuOpen ? "visible" : ""
+          }`}
+          onClick={(e) => e.stopPropagation()}
+          aria-label="更多操作"
+        />
+      </Dropdown>
+    </div>
+  );
+};
+
+/**
  * 侧边栏子组件
  * 提供会话历史和导航功能
  */
@@ -103,18 +316,9 @@ const Sidebar = ({
   onBack,
   collapsed,
   onToggleCollapse,
+  onDeleteSession,
+  onRenameSession,
 }) => {
-  const conversationItems = useMemo(() => {
-    return sessions.map((session) => ({
-      key: session.session_id,
-      label:
-        session.first_question.length > 30
-          ? session.first_question.substring(0, 30) + "..."
-          : session.first_question,
-      timestamp: new Date(session.created_at).toLocaleDateString(),
-    }));
-  }, [sessions]);
-
   return (
     <aside
       className={`ai-agent-sidebar ${collapsed ? "collapsed" : ""}`}
@@ -159,11 +363,18 @@ const Sidebar = ({
             >
               历史对话
             </Text>
-            <Conversations
-              items={conversationItems}
-              activeKey={currentSessionId}
-              onActiveChange={onSessionClick}
-            />
+            <div className="conversations-list">
+              {sessions.map((session) => (
+                <ConversationItem
+                  key={session.session_id}
+                  session={session}
+                  isActive={session.session_id === currentSessionId}
+                  onClick={onSessionClick}
+                  onDelete={onDeleteSession}
+                  onRename={onRenameSession}
+                />
+              ))}
+            </div>
           </div>
         </>
       )}
@@ -359,6 +570,7 @@ const MessageList = ({
                 src={userAvatar}
                 alt="用户头像"
                 onClick={onAvatarClick}
+                className="user-avatar-img"
                 style={{
                   width: 32,
                   height: 32,
@@ -428,6 +640,7 @@ const MessageList = ({
                 src={userAvatar}
                 alt="用户头像"
                 onClick={onAvatarClick}
+                className="user-avatar-img"
                 style={{
                   width: 32,
                   height: 32,
@@ -469,6 +682,14 @@ function AIAgent() {
   const [streamingMessageKey, setStreamingMessageKey] = useState(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const [userAvatar, setUserAvatar] = useState(null);
+  const [username, setUsername] = useState("223");
+
+  // 重命名对话框状态
+  const [renameModal, setRenameModal] = useState({
+    visible: false,
+    sessionId: null,
+    title: "",
+  });
 
   // 语音输入相关状态
   const [isRecording, setIsRecording] = useState(false);
@@ -699,9 +920,9 @@ function AIAgent() {
     }
   }, [navigate]);
 
-  // 获取当前登录用户头像
+  // 获取当前登录用户头像和用户名
   useEffect(() => {
-    const loadUserAvatar = () => {
+    const loadUserInfo = () => {
       try {
         const userStr = localStorage.getItem("user");
         if (userStr) {
@@ -709,13 +930,16 @@ function AIAgent() {
           if (userData?.avatar_url) {
             setUserAvatar(userData.avatar_url);
           }
+          if (userData?.username) {
+            setUsername(userData.username);
+          }
         }
       } catch (error) {
-        console.error("加载用户头像失败:", error);
+        console.error("加载用户信息失败:", error);
       }
     };
 
-    loadUserAvatar();
+    loadUserInfo();
   }, []);
 
   useEffect(() => {
@@ -984,6 +1208,13 @@ function AIAgent() {
     navigate("/user-center");
   }, [navigate]);
 
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    message.success("已退出登录");
+    navigate("/login");
+  }, [navigate]);
+
   const handleInputChange = useCallback((value) => {
     setInputText(value);
   }, []);
@@ -994,6 +1225,79 @@ function AIAgent() {
 
   const handleDeepThinkingToggle = useCallback(() => {
     setDeepThinking((prev) => !prev);
+  }, []);
+
+  // ==================== 会话管理功能 ====================
+
+  /**
+   * 删除会话
+   */
+  const handleDeleteSession = useCallback(
+    async (sessionId) => {
+      try {
+        await deleteAISession(sessionId);
+        message.success("会话已删除");
+
+        // 更新会话列表
+        setSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
+
+        // 如果删除的是当前会话，创建新会话
+        if (sessionId === currentSessionId) {
+          await handleNewChat();
+        }
+      } catch (error) {
+        console.error("删除会话失败:", error);
+        message.error("删除会话失败");
+      }
+    },
+    [currentSessionId, handleNewChat],
+  );
+
+  /**
+   * 打开重命名对话框
+   */
+  const handleRenameSession = useCallback((sessionId, currentTitle) => {
+    setRenameModal({
+      visible: true,
+      sessionId,
+      title: currentTitle,
+    });
+  }, []);
+
+  /**
+   * 确认重命名
+   */
+  const confirmRename = useCallback(async () => {
+    if (!renameModal.title.trim()) {
+      message.warning("会话名称不能为空");
+      return;
+    }
+
+    try {
+      await renameAISession(renameModal.sessionId, renameModal.title.trim());
+      message.success("重命名成功");
+
+      // 更新会话列表
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.session_id === renameModal.sessionId
+            ? { ...s, first_question: renameModal.title.trim() }
+            : s,
+        ),
+      );
+
+      setRenameModal({ visible: false, sessionId: null, title: "" });
+    } catch (error) {
+      console.error("重命名失败:", error);
+      message.error("重命名失败");
+    }
+  }, [renameModal]);
+
+  /**
+   * 取消重命名
+   */
+  const cancelRename = useCallback(() => {
+    setRenameModal({ visible: false, sessionId: null, title: "" });
   }, []);
 
   // ==================== 语音输入功能 ====================
@@ -1241,9 +1545,130 @@ function AIAgent() {
         onBack={handleBack}
         collapsed={sidebarCollapsed}
         onToggleCollapse={toggleSidebar}
+        onDeleteSession={handleDeleteSession}
+        onRenameSession={handleRenameSession}
       />
 
+      {/* 重命名对话框 */}
+      <Modal
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div
+              style={{
+                width: "32px",
+                height: "32px",
+                borderRadius: "8px",
+                background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 4px 12px rgba(99, 102, 241, 0.3)",
+              }}
+            >
+              <EditOutlined style={{ color: "#fff", fontSize: "16px" }} />
+            </div>
+            <span style={{ fontSize: "16px", fontWeight: "600" }}>
+              重命名对话
+            </span>
+          </div>
+        }
+        open={renameModal.visible}
+        onOk={confirmRename}
+        onCancel={cancelRename}
+        okText="确认"
+        cancelText="取消"
+        centered
+        width={520}
+        okButtonProps={{
+          type: "primary",
+          style: {
+            background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
+            border: "none",
+            boxShadow: "0 4px 12px rgba(99, 102, 241, 0.35)",
+          },
+        }}
+        cancelButtonProps={{
+          style: {
+            borderRadius: "10px",
+            height: "38px",
+          },
+        }}
+      >
+        <div style={{ marginBottom: "12px" }}>
+          <Text
+            type="secondary"
+            style={{
+              fontSize: "13px",
+              color: "#64748B",
+              lineHeight: "1.6",
+            }}
+          >
+            请输入新的对话名称
+          </Text>
+        </div>
+        <Input
+          placeholder="请输入新的对话名称..."
+          value={renameModal.title}
+          onChange={(e) =>
+            setRenameModal((prev) => ({ ...prev, title: e.target.value }))
+          }
+          onPressEnter={confirmRename}
+          maxLength={50}
+          showCount
+          allowClear
+          prefix={
+            <EditOutlined
+              style={{
+                color: "#94A3B8",
+                transition: "color 0.2s ease",
+              }}
+            />
+          }
+          style={{
+            borderRadius: "10px",
+          }}
+        />
+      </Modal>
+
       <main className="ai-agent-main" role="main">
+        {/* 右上角用户头像 */}
+        <div className="ai-agent-header-avatar">
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: "user-center",
+                  label: "用户中心",
+                  icon: <UserOutlined />,
+                  onClick: handleAvatarClick,
+                },
+                {
+                  type: "divider",
+                },
+                {
+                  key: "logout",
+                  label: "退出登录",
+                  icon: <LogoutOutlined />,
+                  onClick: handleLogout,
+                },
+              ],
+            }}
+            placement="bottomRight"
+            trigger={["hover"]}
+          >
+            <Avatar
+              src={userAvatar || undefined}
+              icon={!userAvatar && <UserOutlined />}
+              size={50}
+              style={{
+                cursor: "pointer",
+                background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                boxShadow: "0 4px 12px rgba(99, 102, 241, 0.35)",
+              }}
+            />
+          </Dropdown>
+        </div>
+
         <section
           className="ai-agent-chat"
           role="log"
@@ -1261,6 +1686,7 @@ function AIAgent() {
             <WelcomeSection
               questions={questions}
               onQuestionClick={handleQuestionClick}
+              username={username}
             />
           ) : (
             <MessageList

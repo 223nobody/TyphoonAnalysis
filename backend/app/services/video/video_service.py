@@ -36,7 +36,8 @@ class VideoService:
         file_type: str,
         analysis_type: str = "comprehensive",
         extract_frames: bool = True,
-        frame_interval: int = 5
+        frame_interval: int = 5,
+        user_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         上传视频并立即分析
@@ -48,6 +49,7 @@ class VideoService:
             analysis_type: 分析类型
             extract_frames: 是否提取帧
             frame_interval: 帧提取间隔
+            user_id: 执行分析的用户ID
 
         Returns:
             分析结果
@@ -66,18 +68,19 @@ class VideoService:
 
             logger.info(f"视频文件已保存: {file_path}, 大小: {len(file_data)} bytes")
 
-            # 2. 创建分析记录
+            # 2. 创建分析记录（包含user_id）
             analysis_result = VideoAnalysisResult(
                 filename=unique_filename,
                 analysis_type=analysis_type,
                 status="processing",
+                user_id=user_id,
                 created_at=datetime.now()
             )
             self.db.add(analysis_result)
             await self.db.commit()
             await self.db.refresh(analysis_result)
 
-            logger.info(f"分析记录已创建: analysis_id={analysis_result.id}")
+            logger.info(f"分析记录已创建: analysis_id={analysis_result.id}, user_id={user_id}")
 
             # 3. 调用AI服务分析视频
             logger.info(f"开始AI分析: {file_path}")
@@ -118,7 +121,8 @@ class VideoService:
                 "status": "completed",
                 "frame_count": analysis_result.frame_count,
                 "ai_analysis": ai_analysis,
-                "processing_time": analysis_result.processing_time
+                "processing_time": analysis_result.processing_time,
+                "user_id": analysis_result.user_id
             }
 
         except Exception as e:
@@ -179,13 +183,15 @@ class VideoService:
             } if analysis.status == "completed" else None,
             "error": analysis.error_message if analysis.status == "failed" else None,
             "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
-            "processing_time": analysis.processing_time
+            "processing_time": analysis.processing_time,
+            "user_id": analysis.user_id
         }
 
     async def list_analyses(
         self,
         limit: int = 20,
-        offset: int = 0
+        offset: int = 0,
+        user_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         获取分析记录列表
@@ -193,19 +199,27 @@ class VideoService:
         Args:
             limit: 返回数量限制
             offset: 偏移量
+            user_id: 用户ID（如果指定，则只返回该用户的记录）
 
         Returns:
             分析记录列表和总数
         """
+        # 构建查询条件
+        query = select(VideoAnalysisResult)
+        count_query = select(func.count(VideoAnalysisResult.id))
+
+        # 如果指定了user_id，添加过滤条件
+        if user_id is not None:
+            query = query.where(VideoAnalysisResult.user_id == user_id)
+            count_query = count_query.where(VideoAnalysisResult.user_id == user_id)
+
         # 获取总数
-        count_result = await self.db.execute(
-            select(func.count(VideoAnalysisResult.id))
-        )
+        count_result = await self.db.execute(count_query)
         total = count_result.scalar()
 
         # 获取列表
         result = await self.db.execute(
-            select(VideoAnalysisResult)
+            query
             .order_by(VideoAnalysisResult.created_at.desc())
             .offset(offset)
             .limit(limit)
@@ -224,7 +238,8 @@ class VideoService:
                     "status": a.status,
                     "frame_count": a.frame_count,
                     "created_at": a.created_at.isoformat() if a.created_at else None,
-                    "processing_time": a.processing_time
+                    "processing_time": a.processing_time,
+                    "user_id": a.user_id
                 }
                 for a in analyses
             ]
