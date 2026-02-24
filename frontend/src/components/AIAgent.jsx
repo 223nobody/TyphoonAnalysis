@@ -23,6 +23,7 @@ import {
   Tooltip,
   Modal,
   Input,
+  Avatar,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -38,6 +39,7 @@ import {
   MoreOutlined,
   EditOutlined,
   DeleteOutlined,
+  LogoutOutlined,
 } from "@ant-design/icons";
 import {
   createAISession,
@@ -58,7 +60,7 @@ const { Title, Text } = Typography;
  * 欢迎界面子组件
  * 包含欢迎信息和热门问题提示
  */
-const WelcomeSection = ({ questions, onQuestionClick }) => {
+const WelcomeSection = ({ questions, onQuestionClick, username }) => {
   const promptItems = useMemo(() => {
     return questions.map((q, index) => ({
       key: q.id || `q_${index}`,
@@ -71,7 +73,7 @@ const WelcomeSection = ({ questions, onQuestionClick }) => {
     <div className="welcome-container" role="region" aria-label="欢迎界面">
       <Welcome
         icon={<RobotOutlined style={{ fontSize: 48, color: "#1677ff" }} />}
-        title="您好，我是 AI 对话助手"
+        title={`Hi ${username}，我是你的 AI 对话助手`}
         description="我可以帮助您解答台风相关的问题，包括台风预测、历史数据分析、预警信息等。"
       />
       <div className="prompts-section">
@@ -568,6 +570,7 @@ const MessageList = ({
                 src={userAvatar}
                 alt="用户头像"
                 onClick={onAvatarClick}
+                className="user-avatar-img"
                 style={{
                   width: 32,
                   height: 32,
@@ -637,6 +640,7 @@ const MessageList = ({
                 src={userAvatar}
                 alt="用户头像"
                 onClick={onAvatarClick}
+                className="user-avatar-img"
                 style={{
                   width: 32,
                   height: 32,
@@ -678,6 +682,7 @@ function AIAgent() {
   const [streamingMessageKey, setStreamingMessageKey] = useState(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const [userAvatar, setUserAvatar] = useState(null);
+  const [username, setUsername] = useState("223");
 
   // 重命名对话框状态
   const [renameModal, setRenameModal] = useState({
@@ -915,9 +920,9 @@ function AIAgent() {
     }
   }, [navigate]);
 
-  // 获取当前登录用户头像
+  // 获取当前登录用户头像和用户名
   useEffect(() => {
-    const loadUserAvatar = () => {
+    const loadUserInfo = () => {
       try {
         const userStr = localStorage.getItem("user");
         if (userStr) {
@@ -925,13 +930,16 @@ function AIAgent() {
           if (userData?.avatar_url) {
             setUserAvatar(userData.avatar_url);
           }
+          if (userData?.username) {
+            setUsername(userData.username);
+          }
         }
       } catch (error) {
-        console.error("加载用户头像失败:", error);
+        console.error("加载用户信息失败:", error);
       }
     };
 
-    loadUserAvatar();
+    loadUserInfo();
   }, []);
 
   useEffect(() => {
@@ -1198,6 +1206,13 @@ function AIAgent() {
 
   const handleAvatarClick = useCallback(() => {
     navigate("/user-center");
+  }, [navigate]);
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    message.success("已退出登录");
+    navigate("/login");
   }, [navigate]);
 
   const handleInputChange = useCallback((value) => {
@@ -1616,6 +1631,44 @@ function AIAgent() {
       </Modal>
 
       <main className="ai-agent-main" role="main">
+        {/* 右上角用户头像 */}
+        <div className="ai-agent-header-avatar">
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: "user-center",
+                  label: "用户中心",
+                  icon: <UserOutlined />,
+                  onClick: handleAvatarClick,
+                },
+                {
+                  type: "divider",
+                },
+                {
+                  key: "logout",
+                  label: "退出登录",
+                  icon: <LogoutOutlined />,
+                  onClick: handleLogout,
+                },
+              ],
+            }}
+            placement="bottomRight"
+            trigger={["hover"]}
+          >
+            <Avatar
+              src={userAvatar || undefined}
+              icon={!userAvatar && <UserOutlined />}
+              size={50}
+              style={{
+                cursor: "pointer",
+                background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                boxShadow: "0 4px 12px rgba(99, 102, 241, 0.35)",
+              }}
+            />
+          </Dropdown>
+        </div>
+
         <section
           className="ai-agent-chat"
           role="log"
@@ -1633,6 +1686,7 @@ function AIAgent() {
             <WelcomeSection
               questions={questions}
               onQuestionClick={handleQuestionClick}
+              username={username}
             />
           ) : (
             <MessageList

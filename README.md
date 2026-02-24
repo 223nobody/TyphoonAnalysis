@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Python-3.9+-blue.svg" alt="Python 3.9+">
   <img src="https://img.shields.io/badge/React-18-61DAFB.svg" alt="React 18">
   <img src="https://img.shields.io/badge/FastAPI-0.109.0-009688.svg" alt="FastAPI">
-  <img src="https://img.shields.io/badge/Qwen3--ASR-0.6B-orange.svg" alt="Qwen3-ASR">
+  <img src="https://img.shields.io/badge/阿里云-NLS-orange.svg" alt="阿里云 NLS">
   <img src="https://img.shields.io/badge/Voice%20Input-Supported-success.svg" alt="Voice Input">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
 </p>
@@ -44,10 +44,11 @@
 
 ### 🎤 语音识别 (新增)
 
-- 集成 Qwen3-ASR 模型进行语音转文字
+- 集成阿里云 NLS (智能语音交互) 服务进行语音转文字
 - 支持中文、英文、粤语自动检测
 - 自动繁体转简体文本规范化
-- 实时录音与识别
+- 实时录音与流式识别
+- 支持多种音频格式 (WAV, MP3, PCM, M4A, OGG, WebM)
 - 单次录音最长 60 秒
 
 ### 🖼️ 图像分析
@@ -76,6 +77,14 @@
 
 ### 🕷️ 自动数据爬取
 
+#### 数据爬取流程
+
+![数据爬取时序图](backend/data/images/plantuml/数据爬取时序图.png)
+
+_图17: 数据爬取时序图，展示调度器定时触发CMA爬虫、公报爬虫、活跃台风爬虫，从中国气象局API获取数据并更新数据库的完整流程_
+
+#### 功能特点
+
 - 定时爬取中国气象局数据
 - 自动更新活跃台风信息
 - 历史数据补充
@@ -89,7 +98,21 @@
 - 多种 AI 模型可选
 - 报告导出（PDF/Word）
 
+## 📊 系统用例图
+
+![用例图](backend/data/images/plantuml/用例图.png)
+
+_图2: 台风分析系统用例图，展示普通用户和管理员可使用的全部功能，包括用户认证、台风查询、统计分析、智能预测、AI服务、预警管理、数据导出和系统管理等模块_
+
 ## 🏗️ 技术架构
+
+### 系统架构图
+
+![系统架构图](backend/data/images/plantuml/系统架构图.png)
+
+_图1: 台风分析系统整体架构图，展示前后端分离架构、数据库、AI服务、外部服务的整体关系_
+
+### 架构层次说明
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -112,7 +135,7 @@
                             ↓
 ┌─────────────────────────────────────────────────────────┐
 │                   AI 服务层 (AI Services)                │
-│  DeepSeek + GLM + Qwen + Qwen3-ASR                     │
+│  DeepSeek + GLM + Qwen + 阿里云 NLS                    │
 │  (通过 aiping.cn 统一接口)                             │
 └─────────────────────────────────────────────────────────┘
                             ↓
@@ -148,7 +171,7 @@ TyphoonAnalysis/
 │   │   ├── schemas/           # Pydantic模式
 │   │   └── services/          # 业务逻辑
 │   │       ├── ai/            # AI服务
-│   │       ├── asr/           # 语音识别服务 (新增)
+│       ├── asr/           # 语音识别服务 (阿里云 NLS)
 │   │       ├── crawler/       # 爬虫服务
 │   │       ├── image/         # 图像处理
 │   │       ├── lstm/          # LSTM预测
@@ -194,7 +217,7 @@ TyphoonAnalysis/
 
 - Python >= 3.10 (推荐 3.12)
 - pip >= 21.0
-- CUDA >= 11.7 (可选，用于 GPU 加速 ASR 和预测)
+- CUDA >= 11.7 (可选，用于 GPU 加速预测)
 
 **前端**:
 
@@ -303,12 +326,11 @@ python main.py
 
 后端服务将在 `http://localhost:8000` 启动
 
-> **首次启动说明**：
+> **首次启动说明**:
 >
-> - 首次启动时会自动下载 Qwen3-ASR 语音识别模型（约 1.75GB）
-> - 模型将下载到 `backend/data/asr_model/` 目录
-> - 下载完成后会自动加载模型，这可能需要 1-2 分钟
-> - 后续启动将直接使用本地模型，无需重复下载
+> - 确保已在 `.env` 文件中配置阿里云 NLS 参数（NLS_APPKEY, NLS_ACCESS_KEY_ID, NLS_ACCESS_KEY_SECRET）
+> - 阿里云 NLS 服务需要联网使用，无需下载本地模型
+> - 获取方式：登录 [阿里云智能语音交互控制台](https://nls-portal.console.aliyun.com/) 创建项目获取 AppKey
 
 #### 4. 启动前端应用
 
@@ -331,14 +353,39 @@ yarn dev
 
 #### 5. 访问应用
 
-- **前端界面**: http://localhost:5173
-- **后端 API 文档**: http://localhost:8000/docs
-- **ReDoc 文档**: http://localhost:8000/redoc
-- **健康检查**: http://localhost:8000/health
+- **前端界面**: http://www.223nobody.xyz/
+- **后端 API 文档**: http://www.223nobody.xyz/docs
+- **健康检查**: http://www.223nobody.xyz/health
 
 ## 📖 使用指南
 
+### 0. 用户认证
+
+#### 认证流程
+
+![用户认证流程图](backend/data/images/plantuml/用户认证流程图.png)
+
+_图3: 用户认证流程图，展示用户提交登录请求、验证用户名密码、生成JWT Token、前端存储Token的完整认证流程_
+
+#### 操作步骤
+
+1. 访问前端首页，点击"登录"
+2. 输入用户名和密码
+3. 系统验证身份信息
+4. 验证通过后生成JWT Token
+5. 前端存储Token，后续请求自动携带
+
+---
+
 ### 1. 台风路径可视化
+
+#### 功能流程
+
+![台风路径预测时序图](backend/data/images/plantuml/台风路径预测时序图.png)
+
+_图4: 台风路径预测时序图，展示用户选择台风后，系统查询历史路径、LSTM模型推理、返回预测结果的完整流程_
+
+#### 操作步骤
 
 1. 访问前端首页，点击"台风路径可视化"
 2. 在左侧面板选择年份（2000-2026）
@@ -357,6 +404,14 @@ yarn dev
 
 ### 3. AI 智能客服 (含语音输入)
 
+#### 对话流程
+
+![AI对话时序图](backend/data/images/plantuml/AI对话时序图.png)
+
+_图5: AI客服对话时序图，展示用户通过文字或语音输入问题，系统进行语音识别、匹配预设问题或调用AI模型流式响应的完整流程_
+
+#### 操作步骤
+
 1. 点击"AI 客服"进入对话界面
 2. 选择 AI 模型（DeepSeek/GLM/Qwen）
 3. 开启/关闭"深度思考"模式
@@ -370,7 +425,15 @@ yarn dev
 5. 查看 AI 回答和对话历史
 6. 可点击热门问题快速提问
 
-### 4. 图像分析
+### 4. 图像与视频分析
+
+#### 视频分析流程
+
+![视频分析时序图](backend/data/images/plantuml/视频分析时序图.png)
+
+_图6: 视频分析时序图，展示用户上传视频后，系统进行文件验证、关键帧提取、AI视觉分析、保存结果的完整流程_
+
+#### 图像分析操作步骤
 
 1. 进入"图像分析"面板
 2. 上传卫星云图（支持红外/可见光图像）
@@ -380,13 +443,83 @@ yarn dev
 
 ### 5. 台风预测
 
+#### 5.1 预测功能使用
+
 1. 进入"台风预测"面板
 2. 选择要预测的台风
 3. 设置预测时长（24/48/72 小时）
 4. 点击"开始预测"
 5. 查看预测路径和置信度
 
+#### 5.2 LSTM路径预测流程
+
+![LSTM路径预测流程图](backend/data/images/plantuml/LSTM路径预测流程图.png)
+
+_图7: LSTM路径预测流程图，展示从接收预测请求、数据预处理、LSTM编码器处理、多头预测输出到返回结果的完整算法流程_
+
+#### 5.3 预测模型说明
+
+本系统采用 **Transformer + LSTM** 混合架构的深度学习模型进行台风路径和强度预测，具有以下特点：
+
+- **模型架构**: Transformer 编码器 + LSTM 解码器
+- **输入特征**: 14维特征（位置、强度、移动速度、时间特征等）
+- **预测范围**: 支持 6-48 小时多步预测（每6小时一个预测点）
+- **置信度评估**: 提供每个预测点的置信度分数
+
+#### 5.4 模型训练结果
+
+以下图表展示了模型在历史台风数据上的训练和评估结果：
+
+**训练过程可视化**
+
+![训练历史](backend/training/results/training_history.png)
+
+_图8: 训练与验证损失曲线、学习率变化、路径误差和强度误差随训练轮次的变化_
+
+**按预测时间步的误差分析**
+
+![时间步误差](backend/training/results/time_step_errors.png)
+
+_图9: 不同预测时间步（6h/12h/18h/.../48h）的经纬度误差和路径误差分布_
+
+**预测结果分析**
+
+![预测分析](backend/training/results/prediction_analysis.png)
+
+_图10: 预测值与真实值的对比散点图、误差分布直方图和路径对比可视化_
+
+**置信度分析**
+
+![置信度分析](backend/training/results/confidence_analysis.png)
+
+_图11: 模型预测置信度的分布情况和按预测时间步的变化趋势_
+
+**数据探索可视化**
+
+![数据探索](backend/training/results/data_exploration.png)
+
+_图12: 训练数据的分布情况，包括台风路径分布、年度数量统计、强度分布等_
+
+#### 5.4 模型性能指标
+
+| 指标     | 说明                 | 典型值 |
+| -------- | -------------------- | ------ |
+| 路径 MAE | 平均路径误差（度）   | ~1.5°  |
+| 纬度 MAE | 纬度预测平均绝对误差 | ~0.8°  |
+| 经度 MAE | 经度预测平均绝对误差 | ~1.2°  |
+| 置信度   | 预测置信度均值       | ~0.85  |
+
+> 💡 **提示**: 模型训练代码和详细说明请参考 `backend/training/` 目录下的 Jupyter Notebook 文件。
+
 ### 6. 预警管理
+
+#### 预警生成流程
+
+![预警生成流程图](backend/data/images/plantuml/预警生成流程图.png)
+
+_图13: 台风预警生成流程图，展示系统从获取台风公报、解析内容、判断强度等级到生成不同级别预警（蓝/黄/橙/红）的完整流程_
+
+#### 操作步骤
 
 1. 进入"预警管理"面板
 2. 查看当前所有预警信息
@@ -473,6 +606,12 @@ yarn dev
 
 ## 🛠️ 开发指南
 
+### AI服务架构
+
+![AI服务工厂模式类图](backend/data/images/plantuml/AI服务工厂模式类图.png)
+
+_图15: AI服务工厂模式类图，展示AIServiceFactory、BaseAIService、DeepSeekService、QwenService、GLMService等类的继承和依赖关系_
+
 ### 后端开发
 
 ```bash
@@ -514,6 +653,12 @@ npm run preview
 详见: [fronted/README.md](fronted/README.md)
 
 ## 📊 数据说明
+
+### 数据库ER图
+
+![ER图](backend/data/images/plantuml/ER图.png)
+
+_图14: 台风分析系统数据库ER图，展示Typhoon、TyphoonPath、User、Prediction、ImageAnalysis等实体之间的关系_
 
 ### 台风强度等级
 
@@ -603,10 +748,12 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 **解决**:
 
 1. 检查浏览器是否授予麦克风权限
-2. 确认后端 ASR 服务正常运行（查看启动日志中是否显示 "ASR 模型加载完成"）
-3. 首次启动需要下载模型，请等待下载完成
-4. 生产环境需使用 HTTPS
-5. 检查浏览器是否支持 Web Audio API
+2. 确认后端 ASR 服务正常运行（访问 http://localhost:8000/api/asr/health 检查状态）
+3. 检查 `.env` 文件中 NLS_APPKEY 等配置是否正确
+4. 确认阿里云账号已开通语音识别服务
+5. 生产环境需使用 HTTPS
+6. 检查浏览器是否支持 Web Audio API
+7. 查看后端日志获取详细错误信息
 
 ### 5. 语音识别返回繁体中文
 
@@ -658,7 +805,13 @@ python data.py
 - 生产环境建议使用 PostgreSQL
 - 减少并发写入操作
 
-## 🔒 安全建议
+## 🚀 部署架构
+
+![部署架构图](backend/data/images/plantuml/部署架构图.png)
+
+_图16: 台风分析系统部署架构图，展示客户端层、网关层、应用服务层、数据存储层、AI服务层和外部数据源的完整部署方案_
+
+## �� 安全建议
 
 ### 开发环境
 
@@ -685,7 +838,7 @@ python data.py
 - 实现响应缓存
 - 启用 GZIP 压缩
 - 使用连接池
-- **ASR 模型预加载**: 启动时自动加载，避免首次请求延迟
+- **ASR 流式识别**: 实时音频流处理和识别，快速响应
 
 ### 前端优化
 
@@ -702,11 +855,12 @@ python data.py
 
 **新增功能**:
 
-- ✅ 语音识别功能（Qwen3-ASR 模型）
+- ✅ 语音识别功能（阿里云 NLS 服务）
 - ✅ AI 客服支持语音输入
 - ✅ 自动繁体转简体文本规范化
-- ✅ ASR 模型启动预加载优化
+- ✅ ASR 流式识别优化
 - ✅ 录音计时器实时显示
+- ✅ 支持多种音频格式（WAV, MP3, PCM, M4A, OGG, WebM）
 
 **优化改进**:
 
@@ -714,6 +868,7 @@ python data.py
 - ✅ 修复 React 闭包导致的计时器问题
 - ✅ 统一 API 调用封装
 - ✅ 更新项目文档
+- ✅ 使用 pydub 进行音频格式转换
 
 ### v2.0.0 (2026-01-13)
 
@@ -850,6 +1005,6 @@ python data.py
 
 - [前端文档](service/README.md)
 - [后端文档](backend/README.md)
-- [API 文档](http://localhost:8000/docs)
+- [API 文档](http://www.223nobody.xyz/docs)
 
 **🌟 如果这个项目对您有帮助，请给我们一个 Star！**

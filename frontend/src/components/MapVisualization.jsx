@@ -393,6 +393,12 @@ function MapVisualization({
     }
   }, [urlTyphoonId, listLoading, typhoons, selectedTyphoons, onTyphoonSelect]);
 
+  // 组件挂载时重置自动选中标志
+  useEffect(() => {
+    hasAutoSelectedActiveTyphoon.current = false;
+    console.log("[MapVisualization] 组件挂载，重置自动选中标志");
+  }, []);
+
   // 当年份变化时，重置活跃台风自动选中标志
   useEffect(() => {
     hasAutoSelectedActiveTyphoon.current = false;
@@ -432,17 +438,15 @@ function MapVisualization({
           `[MapVisualization] ✅ 台风列表加载成功，数量: ${data.items.length}`,
         );
         setTyphoons(data.items);
-        if (!filters.search || filters.search.trim() === "") {
-          setFilteredTyphoons(data.items);
-        }
+        // 总是更新 filteredTyphoons，确保列表显示正确
+        setFilteredTyphoons(data.items);
       } else if (data && Array.isArray(data)) {
         console.log(
           `[MapVisualization] ✅ 台风列表加载成功，数量: ${data.length}`,
         );
         setTyphoons(data);
-        if (!filters.search || filters.search.trim() === "") {
-          setFilteredTyphoons(data);
-        }
+        // 总是更新 filteredTyphoons，确保列表显示正确
+        setFilteredTyphoons(data);
       } else {
         console.error("[MapVisualization] API返回数据格式错误:", data);
         setListError("加载台风列表失败：数据格式错误");
@@ -470,10 +474,9 @@ function MapVisualization({
     const timer = setTimeout(() => {
       if (filters.search && filters.search.trim() !== "") {
         handleSearch();
-      } else {
-        // 如果没有搜索关键词，显示筛选后的台风列表
-        setFilteredTyphoons(typhoons);
       }
+      // 当搜索关键词为空时，不执行任何操作
+      // filteredTyphoons 会在 loadTyphoons 中自动更新
     }, 300); // 300ms 防抖延迟
 
     return () => clearTimeout(timer);

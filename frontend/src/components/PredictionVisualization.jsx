@@ -318,9 +318,9 @@ function PredictionVisualization() {
     const timer = setTimeout(() => {
       if (filters.search && filters.search.trim() !== "") {
         handleSearch();
-      } else {
-        setFilteredTyphoons(typhoons);
       }
+      // 当搜索关键词为空时，不执行任何操作
+      // filteredTyphoons 会在 loadTyphoons 中自动更新
     }, 300);
 
     return () => clearTimeout(timer);
@@ -379,14 +379,12 @@ function PredictionVisualization() {
 
       if (data && data.items && Array.isArray(data.items)) {
         setTyphoons(data.items);
-        if (!filters.search || filters.search.trim() === "") {
-          setFilteredTyphoons(data.items);
-        }
+        // 总是更新 filteredTyphoons，确保列表显示正确
+        setFilteredTyphoons(data.items);
       } else if (data && Array.isArray(data)) {
         setTyphoons(data);
-        if (!filters.search || filters.search.trim() === "") {
-          setFilteredTyphoons(data);
-        }
+        // 总是更新 filteredTyphoons，确保列表显示正确
+        setFilteredTyphoons(data);
       } else {
         setListError("加载台风列表失败：数据格式错误");
       }

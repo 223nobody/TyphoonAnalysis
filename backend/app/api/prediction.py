@@ -142,7 +142,8 @@ async def predict_path(
             historical_paths=paths,
             forecast_hours=forecast_hours,
             typhoon_id=normalized_id,  # 使用标准化ID
-            typhoon_name=typhoon_name
+            typhoon_name=typhoon_name,
+            use_ensemble=use_ensemble  # 集成预测开关
         )
         
         # 保存预测结果到数据库
@@ -165,6 +166,7 @@ async def predict_path(
                     "base_time": prediction_result.base_time.isoformat(),
                     "overall_confidence": prediction_result.overall_confidence,
                     "is_fallback": prediction_result.is_fallback,
+                    "use_ensemble": use_ensemble,  # 记录是否使用集成预测
                     "original_typhoon_id": typhoon_id  # 保存原始ID
                 }
             )

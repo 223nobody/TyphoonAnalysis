@@ -172,7 +172,8 @@ class TyphoonPredictor:
         historical_paths: List[PathData],
         forecast_hours: int = 48,
         typhoon_id: str = "",
-        typhoon_name: Optional[str] = None
+        typhoon_name: Optional[str] = None,
+        use_ensemble: bool = False
     ) -> PredictionResult:
         """
         执行台风路径预测
@@ -182,6 +183,7 @@ class TyphoonPredictor:
             forecast_hours: 预报时效 (12/24/48/72/120)
             typhoon_id: 台风编号
             typhoon_name: 台风名称
+            use_ensemble: 是否使用集成预测（多次预测取平均，提高准确性）
 
         Returns:
             PredictionResult: 预测结果对象
@@ -207,12 +209,51 @@ class TyphoonPredictor:
 
             # 4. 模型推理
             with torch.no_grad():
-                model_output = self.model(input_tensor)
-                
-                # TransformerLSTMModel: (mean, std, confidence)
-                predictions_mean, predictions_std, confidence = model_output
-                predictions = predictions_mean  # 使用均值作为预测值
-                model_name = "TransformerLSTM"
+                if use_ensemble:
+                    # 集成预测：多次推理取平均，启用Dropout增加随机性
+                    self.model.train()  # 启用Dropout
+                    ensemble_size = 10
+                    predictions_list = []
+                    predictions_std_list = []
+                    confidence_list = []
+                    
+                    for _ in range(ensemble_size):
+                        model_output = self.model(input_tensor)
+                        pred_mean, pred_std, conf = model_output
+                        predictions_list.append(pred_mean.cpu().numpy())
+                        predictions_std_list.append(pred_std.cpu().numpy())
+                        confidence_list.append(conf.cpu().numpy())
+                    
+                    self.model.eval()  # 恢复eval模式
+                    
+                    # 计算集成均值和标准差
+                    predictions_array = np.array(predictions_list)  # [ensemble, batch, pred_steps, features]
+                    predictions_std_array = np.array(predictions_std_list)
+                    confidence_array = np.array(confidence_list)
+                    
+                    # 集成均值
+                    predictions = np.mean(predictions_array, axis=0)
+                    predictions = torch.from_numpy(predictions).to(self.device)
+                    
+                    # 集成标准差（模型内部标准差 + 集成标准差）
+                    internal_std = np.mean(predictions_std_array, axis=0)
+                    ensemble_std = np.std(predictions_array, axis=0)
+                    predictions_std = np.sqrt(internal_std**2 + ensemble_std**2)
+                    predictions_std = torch.from_numpy(predictions_std).to(self.device)
+                    
+                    # 集成置信度
+                    confidence = np.mean(confidence_array, axis=0)
+                    confidence = torch.from_numpy(confidence).to(self.device)
+                    
+                    model_name = "TransformerLSTM_Ensemble"
+                    logger.info(f"集成预测完成: {ensemble_size}次推理")
+                else:
+                    # 单次预测
+                    self.model.eval()  # 确保eval模式
+                    model_output = self.model(input_tensor)
+                    predictions_mean, predictions_std, confidence = model_output
+                    predictions = predictions_mean  # 使用均值作为预测值
+                    model_name = "TransformerLSTM"
 
             # 5. 结果后处理
             predictions = predictions.cpu().numpy()
