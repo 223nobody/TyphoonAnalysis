@@ -587,6 +587,8 @@ export const askAIQuestion = async (
  * @param {string} question - 问题内容
  * @param {string} model - 模型类型 (deepseek/glm/qwen)
  * @param {boolean} deepThinking - 是否启用深度思考模式
+ * @param {string} graphResult - 知识图谱检索结果
+ * @param {Object} graphData - 知识图谱可视化数据（nodes, relationships等）
  * @param {Function} onChunk - 接收数据块的回调函数
  * @param {Function} onComplete - 完成时的回调函数
  * @param {Function} onError - 错误时的回调函数
@@ -596,6 +598,8 @@ export const askAIQuestionStream = async (
   question,
   model = "deepseek",
   deepThinking = false,
+  graphResult = "",
+  graphData = null,
   onChunk = null,
   onComplete = null,
   onError = null,
@@ -612,6 +616,8 @@ export const askAIQuestionStream = async (
       question: question,
       model: model,
       deep_thinking: deepThinking,
+      graph_result: graphResult,  // 知识图谱检索结果
+      graph_data: graphData,  // 知识图谱可视化数据
     }),
   });
 
@@ -889,6 +895,149 @@ export const getVideoAnalysisList = async (limit = 20, offset = 0) => {
  */
 export const deleteVideoAnalysis = async (analysisId) => {
   return apiClient.delete(`/video-analysis/${analysisId}`);
+};
+
+// ========== 知识图谱 API ==========
+
+/**
+ * 搜索台风（知识图谱）
+ * @param {Object} params - 搜索参数
+ * @param {string} params.query - 搜索查询
+ * @param {string} params.query_type - 查询类型 (exact, fuzzy, similarity, temporal)
+ * @param {number} params.year - 年份筛选
+ * @param {string} params.location - 地点筛选
+ * @param {number} params.limit - 返回数量限制
+ * @returns {Promise<Array>} 搜索结果列表
+ */
+export const searchTyphoonsKG = async (params) => {
+  return apiClient.post("/kg/search", params);
+};
+
+/**
+ * 查找相似台风（知识图谱）
+ * @param {Object} params - 查询参数
+ * @param {string} params.typhoon_id - 参考台风编号
+ * @param {string} params.location - 限定登陆地点
+ * @param {number} params.min_similarity - 最小相似度
+ * @param {number} params.limit - 返回数量
+ * @returns {Promise<Array>} 相似台风列表
+ */
+export const getSimilarTyphoonsKG = async (params) => {
+  return apiClient.post("/kg/similar", params);
+};
+
+/**
+ * 获取台风详情（知识图谱）
+ * @param {string} typhoonId - 台风编号
+ * @returns {Promise<Object>} 台风详情
+ */
+export const getTyphoonDetailKG = async (typhoonId) => {
+  return apiClient.get(`/kg/typhoon/${typhoonId}`);
+};
+
+/**
+ * 获取台风路径（知识图谱）
+ * @param {string} typhoonId - 台风编号
+ * @returns {Promise<Array>} 路径点列表
+ */
+export const getTyphoonPathKG = async (typhoonId) => {
+  return apiClient.get(`/kg/typhoon/${typhoonId}/path`);
+};
+
+/**
+ * 获取台风关系网络（知识图谱）
+ * @param {string} typhoonId - 台风编号
+ * @param {number} depth - 关系深度 (1-3)
+ * @returns {Promise<Object>} 关系网络数据
+ */
+export const getTyphoonRelationships = async (typhoonId, depth = 2) => {
+  return apiClient.get(`/kg/typhoon/${typhoonId}/relationships`, {
+    params: { depth }
+  });
+};
+
+/**
+ * 获取年度统计（知识图谱）
+ * @param {number} year - 年份
+ * @returns {Promise<Object>} 年度统计数据
+ */
+export const getYearlyStatisticsKG = async (year) => {
+  return apiClient.get("/kg/statistics/yearly", {
+    params: { year }
+  });
+};
+
+/**
+ * 获取强度分布统计（知识图谱）
+ * @param {number} year - 可选年份筛选
+ * @returns {Promise<Object>} 强度分布数据
+ */
+export const getIntensityStatisticsKG = async (year = null) => {
+  const params = year ? { year } : {};
+  return apiClient.get("/kg/statistics/intensity", { params });
+};
+
+/**
+ * 对比多个台风（知识图谱）
+ * @param {Array<string>} typhoonIds - 台风编号列表
+ * @returns {Promise<Object>} 对比结果
+ */
+export const compareTyphoonsKG = async (typhoonIds) => {
+  return apiClient.post("/kg/compare", {
+    typhoon_ids: typhoonIds
+  });
+};
+
+/**
+ * 知识图谱健康检查
+ * @returns {Promise<Object>} 服务状态
+ */
+export const checkKGHealth = async () => {
+  return apiClient.get("/kg/health");
+};
+
+/**
+ * 获取知识图谱配置信息
+ * @returns {Promise<Object>} 图谱配置（节点类型和关系类型配置）
+ */
+export const getGraphConfig = async () => {
+  return apiClient.get("/kg/config");
+};
+
+/**
+ * 知识图谱智能搜索（用于AIAgent）
+ * @param {string} query - 搜索查询字符串
+ * @param {number} limit - 返回数量限制
+ * @returns {Promise<Object>} 搜索结果
+ */
+export const searchKnowledgeGraph = async (query, limit = 20) => {
+  return apiClient.post("/kg/search", {
+    query,
+    limit,
+    include_relations: true,
+    include_paths: true,
+  });
+};
+
+/**
+ * GraphRAG LocalSearch（用于AIAgent知识检索）
+ * @param {string} query - 用户查询
+ * @param {Object} options - 可选参数
+ * @param {number} options.maxDepth - 遍历深度（默认2）
+ * @param {number} options.maxNodes - 最大节点数（默认50）
+ * @param {boolean} options.includePaths - 是否包含路径信息（默认true）
+ * @param {boolean} options.enableQualityCheck - 是否启用质量评估（默认true）
+ * @returns {Promise<Object>} GraphRAG检索结果
+ */
+export const graphRAGLocalSearch = async (query, options = {}) => {
+  return apiClient.post("/kg/graphrag/search", {
+    query,
+    max_depth: options.maxDepth || 2,
+    max_nodes: options.maxNodes || 50,
+    include_paths: options.includePaths !== false,
+    enable_quality_check: options.enableQualityCheck !== false,
+    relationship_types: options.relationshipTypes || null,
+  });
 };
 
 export default apiClient;

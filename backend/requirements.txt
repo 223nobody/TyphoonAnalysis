@@ -9,6 +9,9 @@ sqlalchemy==2.0.36
 alembic==1.13.0
 aiosqlite==0.19.0
 
+# Neo4j 图数据库
+neo4j==5.15.0
+
 # HTTP 请求
 httpx==0.26.0
 requests==2.31.0
@@ -25,14 +28,20 @@ opencv-python==4.10.0.84
 
 # AI 服务
 dashscope==1.14.0
-qwen-asr==0.0.6
 torch==2.6.0
 huggingface-hub==0.28.1
+
+# 阿里云语音识别 SDK
+# 从 GitHub 安装（宝塔部署时需要先执行: pip install git+https://github.com/aliyun/alibabacloud-nls-python-sdk.git）
+git+https://github.com/aliyun/alibabacloud-nls-python-sdk.git
 
 # 文本处理
 opencc-python-reimplemented==0.1.7
 beautifulsoup4==4.12.0
 lxml==5.3.0
+
+# 向量嵌入与语义搜索
+sentence-transformers==3.0.0
 
 # 云存储
 oss2==2.18.0

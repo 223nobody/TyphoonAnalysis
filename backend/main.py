@@ -9,7 +9,7 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
-from app.api import typhoon, prediction, analysis, report, crawler, statistics, export, alert, ai_agent, auth, user_stats, asr
+from app.api import typhoon, prediction, analysis, report, crawler, statistics, export, alert, ai_agent, auth, user_stats, asr, knowledge_graph
 from app.api.v1 import images, video_analysis
 from app.services.scheduler import start_scheduler, shutdown_scheduler
 
@@ -31,17 +31,17 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("数据库初始化完成")
 
-    # 预加载 ASR 模型（避免第一次请求时加载）
-    logger.info("正在预加载 ASR 语音识别模型...")
+    # 检查 ASR 配置
+    logger.info("正在检查 ASR 语音识别配置...")
     try:
-        from app.api.asr import get_asr_model
-        # 在后台线程中加载模型，避免阻塞启动
-        import asyncio
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, get_asr_model)
-        logger.info("ASR 模型预加载完成")
+        from app.api.asr import get_model_path, DEFAULT_LOCAL_MODEL_PATH
+        try:
+            model_path = get_model_path()
+            logger.info(f"本地 ASR 模型已配置: {model_path}")
+        except FileNotFoundError:
+            logger.warning(f"本地 ASR 模型未找到，请下载模型到: {DEFAULT_LOCAL_MODEL_PATH}")
     except Exception as e:
-        logger.warning(f"ASR 模型预加载失败（将在第一次请求时重试）: {e}")
+        logger.warning(f"ASR 配置检查失败: {e}")
 
     # 启动定时任务调度器（会自动执行启动时完整爬取）
     start_scheduler()
@@ -101,6 +101,7 @@ app.include_router(user_stats.router, prefix="/api")
 app.include_router(asr.router, prefix="/api")
 app.include_router(images.router, prefix="/api")
 app.include_router(video_analysis.router, prefix="/api")
+app.include_router(knowledge_graph.router, prefix="/api")
 
 
 @app.get("/")

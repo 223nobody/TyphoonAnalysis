@@ -6,12 +6,137 @@ ASR 语音识别 API 路由
 import os
 import tempfile
 import torch
+import re
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from datetime import datetime
 import logging
 import opencc
 from pathlib import Path
+
+
+# 中文数字转阿拉伯数字的映射
+CN_NUMBERS = {
+    '零': 0, '〇': 0, '一': 1, '二': 2, '两': 2, '三': 3, '四': 4,
+    '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+    '百': 100, '千': 1000, '万': 10000, '亿': 100000000
+}
+
+
+def chinese_to_number(cn_str):
+    """
+    将中文数字字符串转换为阿拉伯数字
+    例如："二零零零" -> 2000, "一百二十三" -> 123
+    """
+    if not cn_str:
+        return None
+    
+    # 处理纯单个数字的情况（如"二"）
+    if len(cn_str) == 1 and cn_str in CN_NUMBERS:
+        return CN_NUMBERS[cn_str]
+    
+    # 处理年份格式（如"二零零零"）- 纯数字字符序列
+    if all(c in '零〇一二三四五六七八九' for c in cn_str):
+        result = ''
+        for c in cn_str:
+            if c in CN_NUMBERS:
+                result += str(CN_NUMBERS[c])
+        return int(result) if result else None
+    
+    # 处理复杂数字（如"一百二十三"）
+    # 使用更简单的算法：从左到右解析
+    result = 0
+    current_section = 0  # 当前段（万以下）
+    current_num = 0  # 当前数字
+    
+    for i, char in enumerate(cn_str):
+        if char not in CN_NUMBERS:
+            continue
+        
+        digit = CN_NUMBERS[char]
+        
+        if digit >= 10:  # 是单位（十、百、千、万、亿）
+            if current_num == 0:
+                current_num = 1  # 处理"十"、"百"前面没有数字的情况
+            
+            if digit >= 10000:  # 万、亿
+                current_section += current_num
+                result += current_section * digit
+                current_section = 0
+                current_num = 0
+            else:  # 十、百、千
+                current_section += current_num * digit
+                current_num = 0
+        else:  # 是数字
+            current_num = current_num * 10 + digit if current_num > 0 else digit
+    
+    # 加上最后剩余的数字
+    result += current_section + current_num
+    
+    return result if result > 0 else None
+
+
+def convert_chinese_numbers_in_text(text):
+    """
+    在文本中查找并转换中文数字为阿拉伯数字
+    例如："二零零零年有哪些台风？" -> "2000年有哪些台风？"
+    """
+    if not text:
+        return text
+    
+    # 匹配中文数字序列（包括零一二三四五六七八九十百千万亿两〇）
+    # 优先匹配年份格式（连续的数字字符）
+    year_pattern = r'[零〇一二三四五六七八九]{2,}'
+    
+    def replace_year(match):
+        cn_num = match.group()
+        try:
+            num = chinese_to_number(cn_num)
+            if num is not None:
+                return str(num)
+        except:
+            pass
+        return cn_num
+    
+    # 先转换年份格式的数字
+    text = re.sub(year_pattern, replace_year, text)
+    
+    # 匹配复杂中文数字（如"一百二十三"）
+    # 匹配模式：数字+单位+数字... 或 单位+数字...
+    complex_pattern = r'(?:[一二两三四五六七八九]?[十百千万亿])+[一二两三四五六七八九]?|[一二两三四五六七八九][十百千万亿]'
+    
+    def replace_complex(match):
+        cn_num = match.group()
+        # 避免重复转换已经转换过的数字
+        if cn_num.isdigit():
+            return cn_num
+        try:
+            num = chinese_to_number(cn_num)
+            if num is not None:
+                return str(num)
+        except:
+            pass
+        return cn_num
+    
+    text = re.sub(complex_pattern, replace_complex, text)
+    
+    # 匹配单个中文数字（如"第三号"中的"三"）
+    # 使用负向前瞻和负向后瞻，避免重复替换已经转换过的数字
+    single_pattern = r'(?<![零〇一二两三四五六七八九])[一二两三四五六七八九](?![零〇一二两三四五六七八九])'
+    
+    def replace_single(match):
+        cn_num = match.group()
+        try:
+            num = chinese_to_number(cn_num)
+            if num is not None and num < 10:  # 只转换个位数
+                return str(num)
+        except:
+            pass
+        return cn_num
+    
+    text = re.sub(single_pattern, replace_single, text)
+    
+    return text
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +284,12 @@ async def transcribe(
         if text != text_simplified:
             logger.info(f"文本已转换: '{text}' -> '{text_simplified}'")
             text = text_simplified
+
+        # 中文数字转阿拉伯数字
+        text_with_numbers = convert_chinese_numbers_in_text(text)
+        if text != text_with_numbers:
+            logger.info(f"数字已转换: '{text}' -> '{text_with_numbers}'")
+            text = text_with_numbers
 
         processing_time = (datetime.now() - start_time).total_seconds()
 
