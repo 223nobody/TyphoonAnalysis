@@ -52,11 +52,12 @@ function AlertBanner() {
   }, []);
 
   // 关闭横幅
-  const handleClose = () => {
+  const handleClose = (e) => {
+    e.stopPropagation();
     setVisible(false);
   };
 
-  // 查看详情
+  // 查看详情 - 点击整个组件跳转
   const handleViewDetails = () => {
     navigate("/alert");
   };
@@ -68,6 +69,7 @@ function AlertBanner() {
 
   return (
     <div
+      onClick={handleViewDetails}
       style={{
         position: "relative",
         padding: "15px 20px",
@@ -82,6 +84,7 @@ function AlertBanner() {
         boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
         animation: "slideDown 0.3s ease-out",
         color: "white",
+        cursor: "pointer",
       }}
     >
       <div
@@ -132,30 +135,6 @@ function AlertBanner() {
         </div>
       </div>
       <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-        {hasBulletin && (
-          <button
-            onClick={handleViewDetails}
-            style={{
-              padding: "8px 16px",
-              background: "rgba(255, 255, 255, 0.2)",
-              color: "white",
-              border: "1px solid rgba(255, 255, 255, 0.3)",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontSize: "14px",
-              fontWeight: "500",
-              transition: "all 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.background = "rgba(255, 255, 255, 0.3)";
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = "rgba(255, 255, 255, 0.2)";
-            }}
-          >
-            查看详情
-          </button>
-        )}
         <button
           onClick={handleClose}
           style={{

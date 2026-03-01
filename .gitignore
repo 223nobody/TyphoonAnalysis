@@ -74,6 +74,8 @@ model/*.h5
 
 # ASR 本地模型（大文件，不提交到 Git）
 backend/data/asr_model/
+# sentence-model 本地模型（大文件，不提交到 Git）
+backend/data/sentence_model/
 *.safetensors
 
 # 临时文件

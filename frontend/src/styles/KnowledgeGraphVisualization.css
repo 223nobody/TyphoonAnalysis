@@ -1,0 +1,284 @@
+/**
+ * 知识图谱可视化界面样式（整合版）
+ * 包含原 KnowledgeGraphVisualization、KnowledgeGraphFilter 和 KnowledgeGraphCanvas 的样式
+ */
+
+/* ==================== 主容器样式 ==================== */
+.knowledge-graph-visualization {
+  padding: 16px;
+  background: #f5f7fa;
+  min-height: calc(100vh - 64px);
+}
+
+/* ==================== 筛选控制面板样式 ==================== */
+.kg-filter-card {
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.kg-filter-card .ant-card-head {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+}
+
+.kg-filter-card .ant-card-head-title {
+  color: white;
+}
+
+.filter-section {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.filter-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.filter-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.relationship-checkbox-group {
+  width: 100%;
+}
+
+.relationship-checkbox-group .ant-checkbox-wrapper {
+  margin-right: 0;
+}
+
+.relation-count {
+  margin-left: 4px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.slider-container {
+  display: flex;
+  align-items: center;
+}
+
+.slider-label {
+  white-space: nowrap;
+  font-size: 13px;
+  color: #666;
+}
+
+.slider-value {
+  margin-left: 8px;
+  min-width: 40px;
+  font-weight: 500;
+  color: #1890ff;
+}
+
+.search-depth-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.depth-label {
+  white-space: nowrap;
+  font-size: 13px;
+  color: #666;
+}
+
+/* ==================== 画布卡片样式 ==================== */
+.kg-canvas-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 600px;
+}
+
+.kg-canvas-card .ant-card-body {
+  padding: 0;
+  height: 100%;
+}
+
+/* ==================== 画布容器样式 ==================== */
+.kg-canvas-container {
+  position: relative;
+  width: 100%;
+  height: 600px;
+  background: #fafafa;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.kg-canvas-container.fullscreen {
+  height: 100vh;
+  border-radius: 0;
+  background: #ffffff;
+}
+
+.kg-canvas-loading,
+.kg-canvas-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kg-canvas-chart {
+  width: 100%;
+  height: 100%;
+}
+
+/* ==================== 工具栏样式 ==================== */
+.kg-canvas-toolbar {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 8px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ==================== 底部横向图例样式 ==================== */
+.kg-canvas-legend-horizontal {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: nowrap;
+}
+
+.legend-item-horizontal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.3s;
+  user-select: none;
+}
+
+.legend-item-horizontal:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.legend-item-horizontal.hidden {
+  opacity: 0.6;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+
+.legend-label {
+  font-size: 13px;
+  color: #555;
+  white-space: nowrap;
+  transition: all 0.3s;
+}
+
+.legend-stats {
+  display: flex;
+  align-items: center;
+  padding-left: 16px;
+  margin-left: 8px;
+  border-left: 1px solid #e8e8e8;
+}
+
+.stats-label {
+  font-size: 12px;
+  color: #666;
+  margin-left: 4px;
+}
+
+/* ==================== 页面标题样式（保留） ==================== */
+.kg-header-card {
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.kg-header-card .ant-card-body {
+  padding: 16px 24px;
+}
+
+.kg-title {
+  margin: 0 !important;
+  color: #333;
+}
+
+.kg-title .anticon {
+  margin-right: 8px;
+  color: #1890ff;
+}
+
+/* ==================== 响应式调整 ==================== */
+@media (max-width: 768px) {
+  .knowledge-graph-visualization {
+    padding: 8px;
+  }
+
+  .kg-header-card .ant-card-body {
+    padding: 12px 16px;
+  }
+
+  .kg-title {
+    font-size: 18px !important;
+  }
+
+  .kg-canvas-container {
+    height: 400px;
+  }
+
+  .kg-canvas-legend-horizontal {
+    bottom: 8px;
+    padding: 8px 12px;
+    gap: 12px;
+    flex-wrap: wrap;
+    max-width: 90%;
+  }
+
+  .legend-label {
+    font-size: 11px;
+  }
+
+  .legend-stats {
+    padding-left: 8px;
+    margin-left: 4px;
+  }
+
+  .slider-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .slider-container .ant-slider {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 8px;
+  }
+
+  .search-depth-container {
+    margin-top: 8px;
+  }
+}

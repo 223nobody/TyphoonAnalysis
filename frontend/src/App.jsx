@@ -26,6 +26,7 @@ import Login from "./components/Login";
 import Register from "./components/Register";
 import UserCenter from "./components/UserCenter";
 import History from "./components/History";
+import KnowledgeGraphVisualization from "./components/KnowledgeGraphVisualization";
 
 function AppContent() {
   const navigate = useNavigate();
@@ -79,6 +80,7 @@ function AppContent() {
     if (path === "/analysis") return "analysis";
     if (path === "/report") return "report";
     if (path === "/statistics") return "statistics";
+    if (path === "/knowledge-graph") return "knowledge-graph";
     if (path === "/alert") return "alert";
     return "visualization";
   };
@@ -98,6 +100,7 @@ function AppContent() {
     },
     { id: "analysis", label: "🖼️ 图像分析", path: "/analysis" },
     { id: "report", label: "📊 报告生成", path: "/report" },
+    { id: "knowledge-graph", label: "🕸️ 知识图谱", path: "/knowledge-graph" },
     { id: "statistics", label: "📈 统计分析", path: "/statistics" },
     { id: "alert", label: "🚨 预警中心", path: "/alert" },
   ];
@@ -211,6 +214,10 @@ function AppContent() {
                 }
               />
               <Route path="/alert" element={<AlertCenter />} />
+              <Route
+                path="/knowledge-graph"
+                element={<KnowledgeGraphVisualization />}
+              />
             </Routes>
           </div>
 

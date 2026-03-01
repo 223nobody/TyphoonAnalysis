@@ -68,6 +68,18 @@ class Settings(BaseSettings):
     IMAGES_DIR: str = "./data/images"
     MODELS_DIR: str = "./data/models"
 
+    # Neo4j 图数据库配置
+    NEO4J_URI: str = Field(default="bolt://localhost:7687", description="Neo4j Bolt连接URI")
+    NEO4J_USER: str = Field(default="neo4j", description="Neo4j用户名")
+    NEO4J_PASSWORD: str = Field(default="password", description="Neo4j密码")
+    NEO4J_MAX_CONNECTION_POOL_SIZE: int = Field(default=50, description="Neo4j连接池大小")
+    NEO4J_CONNECTION_TIMEOUT: int = Field(default=30, description="Neo4j连接超时(秒)")
+
+    # 知识图谱配置
+    KG_BATCH_SIZE: int = Field(default=500, description="知识图谱批量导入批次大小")
+    KG_SIMILARITY_THRESHOLD: float = Field(default=0.7, description="台风相似度阈值")
+    KG_MAX_PATH_DEPTH: int = Field(default=3, description="关系查询最大深度")
+
     # 阿里云OSS配置
     OSS_ACCESS_KEY_ID: str = Field(default="", description="阿里云OSS AccessKey ID")
     OSS_ACCESS_KEY_SECRET: str = Field(default="", description="阿里云OSS AccessKey Secret")

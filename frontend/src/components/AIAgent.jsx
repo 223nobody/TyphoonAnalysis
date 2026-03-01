@@ -51,7 +51,10 @@ import {
   transcribeAudio,
   deleteAISession,
   renameAISession,
+  searchKnowledgeGraph,
+  graphRAGLocalSearch,
 } from "../services/api";
+import KnowledgeGraphPanel from "./KnowledgeGraphPanel";
 import "../styles/AIAgent.css";
 
 const { Title, Text } = Typography;
@@ -696,6 +699,15 @@ function AIAgent() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [isTranscribing, setIsTranscribing] = useState(false);
 
+  // 知识检索相关状态
+  const [showKnowledgePanel, setShowKnowledgePanel] = useState(false);
+  const [knowledgeSearchResults, setKnowledgeSearchResults] = useState(null);
+  const [isSearchingKnowledge, setIsSearchingKnowledge] = useState(false);
+  const [graphContext, setGraphContext] = useState(null);
+  const [seedEntities, setSeedEntities] = useState([]);
+  const [traversalStats, setTraversalStats] = useState(null);
+  const [reasoningPaths, setReasoningPaths] = useState([]);
+
   const bubbleListRef = useRef(null);
   const chatEndRef = useRef(null);
   const isUserScrollingRef = useRef(false);
@@ -947,6 +959,115 @@ function AIAgent() {
     loadSessions();
   }, [initializeChat, loadSessions]);
 
+  /**
+   * 【优化】轻量级检索判断 - 更宽松的判断逻辑
+   * 支持更多台风相关查询场景
+   */
+  const shouldUseKnowledgeRetrieval = useCallback((question) => {
+    // 台风相关核心关键词
+    const typhoonKeywords = [
+      "台风", "飓风", "气旋", "热带风暴", "热带低压", "超强台风", "强台风",
+      "登陆", "路径", "风速", "气压", "强度", "风眼", "中心",
+    ];
+
+    // 常见台风名称（扩展列表）
+    const typhoonNames = [
+      "龙王", "山竹", "利奇马", "烟花", "灿都", "查特安", "榕树", "艾利", "桑达",
+      "圆规", "南川", "玛瑙", "妮亚图", "雷伊", "舒力基", "彩云", "小熊",
+      "查帕卡", "卢碧", "银河", "妮妲", "奥麦斯", "康森", "灿鸿", "浪卡",
+      "莫拉菲", "天鹅", "艾莎尼", "环高", "科罗旺", "杜鹃", "纳莎", "纳沙",
+      "天琴", "凤凰", "海鸥", "风神", "娜基莉", "夏浪", "麦德姆", "博罗依",
+      "浣熊", "桦加沙", "米娜", "塔巴", "琵琶", "蓝湖", "剑鱼", "玲玲",
+      "杨柳", "白鹿", "罗莎", "竹节草", "范斯高", "韦帕", "百合", "丹娜丝",
+      "木恩", "圣帕", "蝴蝶", "洛鞍", "银杏", "桃芝", "万宜", "天兔",
+    ];
+
+    // 地理位置关键词（扩展）
+    const locationKeywords = [
+      "广东", "福建", "浙江", "海南", "台湾", "香港", "澳门", "广西",
+      "江苏", "上海", "山东", "辽宁", "河北", "天津", "江西", "湖南",
+      "湖北", "安徽", "河南", "广州", "深圳", "厦门", "福州", "杭州",
+      "宁波", "温州", "海口", "三亚", "台北", "高雄", "南京", "苏州",
+      "青岛", "烟台", "威海",
+    ];
+
+    // 查询意图关键词
+    const intentKeywords = [
+      "哪些", "什么", "谁", "哪里", "什么时候", "多少", "多强",
+      "影响", "造成", "损失", "伤亡", "受灾", "对比", "比较",
+      "最强", "最弱", "最大", "最小", "最近", "最新",
+    ];
+
+    // 检查各类关键词
+    const hasTyphoonKeyword = typhoonKeywords.some((kw) => question.includes(kw));
+    const hasTyphoonName = typhoonNames.some((name) => question.includes(name));
+    const hasLocationKeyword = locationKeywords.some((kw) => question.includes(kw));
+    const hasIntentKeyword = intentKeywords.some((kw) => question.includes(kw));
+
+    // 时间模式（年份）
+    const hasYearPattern = /\b(19|20)\d{2}\b/.test(question);
+
+    // 台风编号模式（6位数字，如202401）
+    const hasTyphoonIdPattern = /\b(19|20)\d{4}\b/.test(question);
+
+    // 宽松的判断逻辑：满足任一条件即可触发知识检索
+    // 1. 包含台风关键词
+    // 2. 包含台风名称
+    // 3. 包含地点 + 年份/意图
+    // 4. 包含台风编号
+    return (
+      hasTyphoonKeyword ||
+      hasTyphoonName ||
+      hasTyphoonIdPattern ||
+      (hasLocationKeyword && (hasYearPattern || hasIntentKeyword))
+    );
+  }, []);
+
+  /**
+   * 构建混合上下文（GraphRAG + 传统搜索）- 用于graph_result字段
+   * 注意：提示词拼接已迁移到后端，前端只负责构建graph_result内容
+   */
+  const buildHybridContext = useCallback((graphRAGResult, fallbackResult) => {
+    let context = graphRAGResult.context_text || "";
+
+    if (
+      fallbackResult?.typhoons?.length > 0 ||
+      (Array.isArray(fallbackResult) && fallbackResult.length > 0)
+    ) {
+      context += "\n\n[补充检索结果]\n";
+      const items = fallbackResult?.typhoons || fallbackResult;
+      items.slice(0, 5).forEach((item, idx) => {
+        context += `${idx + 1}. ${item.name_cn || item.typhoon_id} (${item.year}年)\n`;
+      });
+    }
+
+    return context;
+  }, []);
+
+  /**
+   * 构建传统搜索上下文 - 用于graph_result字段
+   * 注意：提示词拼接已迁移到后端，前端只负责构建graph_result内容
+   */
+  const buildFallbackContext = useCallback((fallbackResult) => {
+    let context = "";
+
+    if (fallbackResult?.typhoons?.length > 0) {
+      context += "共检索到以下台风信息：\n";
+      fallbackResult.typhoons.slice(0, 10).forEach((item, idx) => {
+        context += `${idx + 1}. ${item.name_cn || item.typhoon_id} `;
+        context += `(${item.year}年, 最大风速${item.max_wind_speed}m/s)\n`;
+      });
+    } else if (Array.isArray(fallbackResult) && fallbackResult.length > 0) {
+      context += "共检索到以下台风信息：\n";
+      fallbackResult.slice(0, 10).forEach((item, idx) => {
+        context += `${idx + 1}. ${item.name_cn || item.typhoon_id} `;
+        context += `(${item.year}年, 最大风速${item.max_wind_speed}m/s)\n`;
+      });
+    }
+
+    return context;
+  }, []);
+
   const handleQuestionClick = useCallback(
     async (questionText) => {
       // 使用 ref 防止重复提交（比 state 更可靠，因为 ref 的更新是同步的）
@@ -977,6 +1098,160 @@ function AIAgent() {
       // 用户发送消息后，立即调用 scrollToBottomImmediate()，移除延迟逻辑
       scrollToBottomImmediate();
 
+      // 【优化】第一步：轻量级预判断
+      const needsKnowledge = shouldUseKnowledgeRetrieval(questionText);
+      let graphResult = ""; // 用于存储知识图谱检索结果，传递给后端
+      let graphRAGResult = null;
+
+      console.log("🔍 知识检索判断:", {
+        question: questionText,
+        needsKnowledge: needsKnowledge,
+      });
+
+      if (needsKnowledge) {
+        setIsSearchingKnowledge(true);
+        console.log("✅ 需要进行知识检索，开始调用GraphRAG...");
+
+        try {
+          console.log(
+            "📤 调用GraphRAG LocalSearch API: /api/kg/graphrag/search",
+          );
+          console.log("📋 请求参数:", {
+            query: questionText,
+            maxDepth: 2,
+            maxNodes: 50,
+            includePaths: true,
+            enableQualityCheck: true,
+          });
+
+          // 【优化】第二步：调用GraphRAG（后端统一处理实体识别和检索）
+          const startTime = Date.now();
+          graphRAGResult = await graphRAGLocalSearch(questionText, {
+            maxDepth: 2,
+            maxNodes: 50,
+            includePaths: true,
+            enableQualityCheck: true, // 启用质量评估
+          });
+          const endTime = Date.now();
+
+          console.log(`✅ GraphRAG检索完成，耗时: ${endTime - startTime}ms`);
+          console.log(
+            "📦 GraphRAG检索结果:",
+            JSON.stringify(graphRAGResult, null, 2),
+          );
+          console.log("📊 质量评分:", graphRAGResult?.quality_score);
+          console.log("📈 质量等级:", graphRAGResult?.quality_level);
+          console.log("🎯 种子实体:", graphRAGResult?.seed_entities);
+          console.log(
+            "🌐 子图节点数:",
+            graphRAGResult?.subgraph?.nodes?.length || 0,
+          );
+
+          // 【优化】第三步：根据后端返回的质量评估结果决定如何使用
+          // 质量等级与后端保持一致: high >= 0.7, medium >= 0.4, low < 0.4
+          if (graphRAGResult.quality_score >= 0.7 || graphRAGResult.quality_level === "high") {
+            // 高质量结果：使用GraphRAG上下文增强
+            console.log("✅ GraphRAG高质量结果，使用图谱上下文");
+
+            setGraphContext({
+              text: graphRAGResult.context_text,
+              structured: graphRAGResult.context_structured,
+              keywords:
+                graphRAGResult.seed_entities?.map((e) => e.entity_name) || [],
+              quality_level: graphRAGResult.quality_level,
+              quality_score: graphRAGResult.quality_score,
+            });
+
+            setKnowledgeSearchResults(graphRAGResult.subgraph);
+            setSeedEntities(graphRAGResult.seed_entities);
+            setTraversalStats(graphRAGResult.traversal_stats);
+            setReasoningPaths(graphRAGResult.reasoning_paths || []);
+            setShowKnowledgePanel(true);
+
+            // 保存graph_result，由后端拼接提示词
+            graphResult = graphRAGResult.context_text || "";
+            console.log("📝 GraphRAG上下文已保存，长度:", graphResult.length);
+          } else if (graphRAGResult.quality_score >= 0.4 || graphRAGResult.quality_level === "medium") {
+            // 中等质量：GraphRAG + 传统搜索混合
+            console.log("⚠️ GraphRAG中等质量，混合使用");
+
+            const fallbackResult = await searchKnowledgeGraph(questionText, 10);
+
+            // 构建混合的graph_result
+            const hybridContext = buildHybridContext(
+              graphRAGResult,
+              fallbackResult,
+            );
+            graphResult = hybridContext;
+
+            // 设置图谱上下文（使用GraphRAG结果）
+            setGraphContext({
+              text: graphRAGResult.context_text,
+              structured: graphRAGResult.context_structured,
+              keywords: graphRAGResult.seed_entities?.map((e) => e.entity_name) || [],
+              quality_level: graphRAGResult.quality_level,
+              quality_score: graphRAGResult.quality_score,
+            });
+
+            setSeedEntities(graphRAGResult.seed_entities);
+            setTraversalStats(graphRAGResult.traversal_stats);
+            setReasoningPaths(graphRAGResult.reasoning_paths || []);
+
+            // 仍然展示可视化，但标记为"部分结果"
+            setKnowledgeSearchResults(graphRAGResult.subgraph);
+            setShowKnowledgePanel(true);
+          } else {
+            // 低质量：降级到传统搜索
+            console.log("📉 GraphRAG质量低，降级到传统搜索");
+
+            const fallbackResult = await searchKnowledgeGraph(questionText, 20);
+
+            // 构建传统搜索的graph_result
+            graphResult = buildFallbackContext(fallbackResult);
+
+            // 可选：展示传统搜索结果
+            if (fallbackResult?.length > 0) {
+              setKnowledgeSearchResults({ typhoons: fallbackResult });
+              setShowKnowledgePanel(true);
+            }
+          }
+        } catch (error) {
+          console.error("❌ GraphRAG检索失败:", error);
+          console.error("错误详情:", error.message);
+          // 异常降级到传统搜索
+          try {
+            console.log("🔄 降级到传统搜索...");
+            const fallbackResult = await searchKnowledgeGraph(questionText, 20);
+            console.log("✅ 传统搜索结果:", fallbackResult);
+
+            // 构建传统搜索的graph_result
+            graphResult = buildFallbackContext(fallbackResult);
+
+            // 即使降级也要显示可视化
+            if (
+              fallbackResult?.length > 0 ||
+              fallbackResult?.typhoons?.length > 0
+            ) {
+              setKnowledgeSearchResults(
+                fallbackResult?.typhoons
+                  ? fallbackResult
+                  : { typhoons: fallbackResult },
+              );
+              setGraphContext({
+                text: "使用传统搜索结果",
+                keywords: [questionText],
+              });
+              setShowKnowledgePanel(true);
+              console.log("✅ 已显示传统搜索结果面板");
+            }
+          } catch (fallbackError) {
+            console.error("❌ 降级搜索也失败:", fallbackError);
+          }
+        } finally {
+          setIsSearchingKnowledge(false);
+        }
+      }
+
       const aiMessageKey = `ai_${Date.now()}`;
       const aiMessage = {
         key: aiMessageKey,
@@ -985,6 +1260,8 @@ function AIAgent() {
         reasoningContent: "",
         deepThinking: deepThinking, // 标记是否启用了深度思考模式
         timestamp: new Date().toISOString(),
+        hasKnowledgeContext:
+          needsKnowledge && (graphRAGResult?.quality_score >= 0.7 || graphRAGResult?.quality_level === "high"), // 标记是否使用了高质量知识上下文
       };
       setMessages((prev) => [...prev, aiMessage]);
       setStreamingMessageKey(aiMessageKey);
@@ -993,15 +1270,18 @@ function AIAgent() {
         console.log("📤 开始发送问题到后端（流式传输）...", {
           sessionId: currentSessionId,
           question: questionText,
+          graphResultLength: graphResult.length,
+          hasGraphResult: graphResult.length > 0 ? "有" : "无",
           model: selectedModel,
           deepThinking: deepThinking,
         });
 
         await askAIQuestionStream(
           currentSessionId,
-          questionText,
+          questionText, // 传递原始问题
           selectedModel,
           deepThinking,
+          graphResult, // 传递知识图谱检索结果
           (data) => {
             console.log("📥 收到流式数据块:", data);
 
@@ -1097,6 +1377,7 @@ function AIAgent() {
       loadSessions,
       navigate,
       scrollToBottomImmediate,
+      shouldUseKnowledgeRetrieval,
     ],
   );
 
@@ -1630,92 +1911,119 @@ function AIAgent() {
         />
       </Modal>
 
-      <main className="ai-agent-main" role="main">
-        {/* 右上角用户头像 */}
-        <div className="ai-agent-header-avatar">
-          <Dropdown
-            menu={{
-              items: [
-                {
-                  key: "user-center",
-                  label: "用户中心",
-                  icon: <UserOutlined />,
-                  onClick: handleAvatarClick,
-                },
-                {
-                  type: "divider",
-                },
-                {
-                  key: "logout",
-                  label: "退出登录",
-                  icon: <LogoutOutlined />,
-                  onClick: handleLogout,
-                },
-              ],
-            }}
-            placement="bottomRight"
-            trigger={["hover"]}
-          >
-            <Avatar
-              src={userAvatar || undefined}
-              icon={!userAvatar && <UserOutlined />}
-              size={50}
-              style={{
-                cursor: "pointer",
-                background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-                boxShadow: "0 4px 12px rgba(99, 102, 241, 0.35)",
-              }}
-            />
-          </Dropdown>
-        </div>
-
-        <section
-          className="ai-agent-chat"
-          role="log"
-          aria-live="polite"
-          aria-atomic="false"
+      {/* 主内容区域 - 包含聊天区和知识面板 */}
+      <div className="ai-agent-content-wrapper">
+        <main
+          className={`ai-agent-main ${showKnowledgePanel ? "with-knowledge-panel" : ""}`}
+          role="main"
         >
-          {loading ? (
-            <div className="loading-container">
-              <Spin size="large" />
-              <Text type="secondary" style={{ marginTop: 16 }}>
-                正在加载...
-              </Text>
-            </div>
-          ) : messages.length === 0 ? (
-            <WelcomeSection
-              questions={questions}
-              onQuestionClick={handleQuestionClick}
-              username={username}
-            />
-          ) : (
-            <MessageList
-              messages={messages}
-              bubbleListRef={bubbleListRef}
-              streamingMessageKey={streamingMessageKey}
-              chatEndRef={chatEndRef}
-              userAvatar={userAvatar}
-              onAvatarClick={handleAvatarClick}
-            />
-          )}
-        </section>
+          {/* 右上角用户头像 */}
+          <div className="ai-agent-header-avatar">
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: "user-center",
+                    label: "用户中心",
+                    icon: <UserOutlined />,
+                    onClick: handleAvatarClick,
+                  },
+                  {
+                    type: "divider",
+                  },
+                  {
+                    key: "logout",
+                    label: "退出登录",
+                    icon: <LogoutOutlined />,
+                    onClick: handleLogout,
+                  },
+                ],
+              }}
+              placement="bottomRight"
+              trigger={["hover"]}
+            >
+              <Avatar
+                src={userAvatar || undefined}
+                icon={!userAvatar && <UserOutlined />}
+                size={50}
+                style={{
+                  cursor: "pointer",
+                  background:
+                    "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                  boxShadow: "0 4px 12px rgba(99, 102, 241, 0.35)",
+                }}
+              />
+            </Dropdown>
+          </div>
 
-        <InputArea
-          inputText={inputText}
-          onInputChange={handleInputChange}
-          onSendMessage={handleSendMessage}
-          sending={sending}
-          selectedModel={selectedModel}
-          onModelChange={handleModelChange}
-          deepThinking={deepThinking}
-          onDeepThinkingToggle={handleDeepThinkingToggle}
-          isRecording={isRecording}
-          recordingTime={recordingTime}
-          isTranscribing={isTranscribing}
-          onStartRecording={startRecording}
-          onStopRecording={stopRecording}
+          <section
+            className="ai-agent-chat"
+            role="log"
+            aria-live="polite"
+            aria-atomic="false"
+          >
+            {loading ? (
+              <div className="loading-container">
+                <Spin size="large" />
+                <Text type="secondary" style={{ marginTop: 16 }}>
+                  正在加载...
+                </Text>
+              </div>
+            ) : messages.length === 0 ? (
+              <WelcomeSection
+                questions={questions}
+                onQuestionClick={handleQuestionClick}
+                username={username}
+              />
+            ) : (
+              <MessageList
+                messages={messages}
+                bubbleListRef={bubbleListRef}
+                streamingMessageKey={streamingMessageKey}
+                chatEndRef={chatEndRef}
+                userAvatar={userAvatar}
+                onAvatarClick={handleAvatarClick}
+              />
+            )}
+          </section>
+
+          <InputArea
+            inputText={inputText}
+            onInputChange={handleInputChange}
+            onSendMessage={handleSendMessage}
+            sending={sending}
+            selectedModel={selectedModel}
+            onModelChange={handleModelChange}
+            deepThinking={deepThinking}
+            onDeepThinkingToggle={handleDeepThinkingToggle}
+            isRecording={isRecording}
+            recordingTime={recordingTime}
+            isTranscribing={isTranscribing}
+            onStartRecording={startRecording}
+            onStopRecording={stopRecording}
+          />
+
+          {/* 知识检索指示器 */}
+          {isSearchingKnowledge && (
+            <div className="knowledge-search-indicator">
+              <Spin size="small" />
+              <span>正在检索知识图谱...</span>
+            </div>
+          )}
+        </main>
+
+        {/* 知识检索结果面板 - 放在内容区域内 */}
+        <KnowledgeGraphPanel
+          isVisible={showKnowledgePanel}
+          searchResults={knowledgeSearchResults}
+          graphContext={graphContext}
+          onClose={() => setShowKnowledgePanel(false)}
+          isLoading={isSearchingKnowledge}
+          seedEntities={seedEntities}
+          traversalStats={traversalStats}
+          reasoningPaths={reasoningPaths}
         />
-      </main>
+      </div>
     </div>
   );
 }

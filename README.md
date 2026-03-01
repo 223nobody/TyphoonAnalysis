@@ -37,10 +37,22 @@
 - 集成 DeepSeek、GLM、Qwen 等多个 AI 模型
 - 支持深度思考模式（DeepSeek-R1）
 - **语音输入支持** - 通过语音与 AI 交互
+- **GraphRAG 知识图谱增强** - 基于 Neo4j 的台风领域知识图谱检索
 - 台风专业知识问答
 - 对话历史记录管理
 - 热门问题快速回复
 - 模型自动降级和重试机制
+
+### 🕸️ 知识图谱与 GraphRAG（新增）
+
+- **Neo4j 知识图谱**: 构建台风领域知识图谱，包含台风、路径点、地理位置、时间、强度等级等实体类型
+- **GraphRAG LocalSearch**: 基于图结构的智能检索，支持多跳推理和实体关系遍历
+- **台风领域意图识别**: 支持12种意图类型（基本信息、路径查询、强度分析、影响评估等）
+- **动态 Prompt 构建**: 根据查询意图动态生成专用检索指令
+- **分层检索策略**: 先检索 depth=1 节点，再检索 depth=2 节点，确保结果完整性
+- **相关性排序**: 多维度评分（语义相似度、结构重要性、时效性、多样性）
+- **可视化展示**: 支持力导向/环形/网格三种布局，全屏筛选栏交互
+- **智能降级**: 检索质量低时自动降级到传统搜索
 
 ### 🎤 语音识别 (新增)
 
@@ -314,7 +326,6 @@ LOG_FILE=logs/app.log
 
 - 请将 `your-ai-api-key-here` 替换为您的实际 AI API 密钥
 - 请将 `your-secret-key-min-32-characters-long` 替换为至少 32 位的随机字符串
-- 可以从 [aiping.cn](https://aiping.cn) 获取 AI API 密钥
 
 #### 3. 启动后端服务
 
@@ -678,6 +689,33 @@ _图14: 台风分析系统数据库ER图，展示Typhoon、TyphoonPath、User、
 - **历史数据**: 2000 年至今
 - **数据准确性**: 官方权威数据
 
+### 知识图谱数据
+
+**实体类型**:
+| 实体类型 | 说明 | 属性示例 |
+|----------|------|----------|
+| Typhoon | 台风 | typhoon_id, name_cn, year, max_wind_speed |
+| PathPoint | 路径点 | sequence, lat, lon, pressure, wind_speed |
+| Location | 地理位置 | name, lat, lon, intensity |
+| Time | 时间节点 | year, total_typhoons, strongest_typhoon_id |
+| Intensity | 强度等级 | level, name_cn, wind_speed_min/max |
+
+**关系类型**:
+| 关系类型 | 说明 | 连接实体 |
+|----------|------|----------|
+| HAS_PATH_POINT | 拥有路径点 | Typhoon → PathPoint |
+| NEXT | 路径顺序 | PathPoint → PathPoint |
+| OCCURRED_IN | 发生时间 | Typhoon → Time |
+| LANDED_AT | 登陆地点 | Typhoon → Location |
+| REACHED_INTENSITY | 达到强度 | Typhoon → Intensity |
+| GENERATED_AT | 生成于 | Typhoon → Location |
+| DISSIPATED_AT | 消散于 | Typhoon → Location |
+| INTENSIFIED_TO | 增强为 | Typhoon → Intensity |
+| WEAKENED_TO | 减弱为 | Typhoon → Intensity |
+| SIMILAR_TO | 相似于 | Typhoon → Typhoon |
+| AFFECTED_AREA | 影响区域 | Typhoon → Location |
+| PASSED_NEAR | 经过附近 | Typhoon → Location |
+
 ## 🐛 常见问题
 
 ### 1. 后端启动失败
@@ -913,9 +951,10 @@ _图16: 台风分析系统部署架构图，展示客户端层、网关层、应
 - 🔲 国际化支持（多语言）
 - 🔲 数据可视化增强（3D 路径）
 - 🔲 台风影响范围预测
-- 🔲 历史台风相似度分析
 - 🔲 微信小程序版本
 - 🔲 Docker 容器化部署
+- 🔲 知识图谱自动构建与更新
+- 🔲 多模态知识图谱（融合卫星图像）
 
 ### 代码规范
 

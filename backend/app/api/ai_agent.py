@@ -102,6 +102,35 @@ def get_model_display_name(model_key: str, deep_thinking: bool = False) -> str:
     return model_names.get(model_key, model_key)
 
 
+def build_prompt_with_graph_result(question: str, graph_result: str) -> str:
+    """
+    拼接用户原始提问和知识图谱检索结果，形成完整的提示词
+    
+    Args:
+        question: 用户原始提问
+        graph_result: 知识图谱检索结果（GraphRAG返回的上下文）
+    
+    Returns:
+        拼接后的完整提示词
+    """
+    if not graph_result or not graph_result.strip():
+        # 如果没有图谱检索结果，直接返回原问题
+        return question
+    
+    prompt = f"问题：{question}\n\n"
+    prompt += "【回答要求】\n"
+    prompt += "1. 直接回答问题，基于知识图谱数据给出详细、完整的回答\n"
+    prompt += "2. 使用知识图谱中的具体数据（如风速、气压、时间、地点等）\n"
+    prompt += "3. 回答要专业、准确，包含足够的细节信息\n"
+    prompt += "4. 不要添加'预测具有不确定性'等免责声明\n"
+    prompt += "5. 如果涉及多个实体（如多个台风），请分别说明\n\n"
+    prompt += "【知识图谱检索数据】\n"
+    prompt += graph_result
+    prompt += "\n\n请基于以上知识图谱数据，给出详细、专业的回答。"
+    
+    return prompt
+
+
 class QuestionResponse(BaseModel):
     """问题响应模型"""
     id: int
@@ -119,6 +148,7 @@ class AskRequest(BaseModel):
     question: str
     model: str = "deepseek"  # 模型选择：deepseek, glm, qwen
     deep_thinking: bool = False  # 是否启用深度思考模式
+    graph_result: str = ""  # 知识图谱检索结果（GraphRAG返回的上下文）
 
 
 class AskResponse(BaseModel):
@@ -932,6 +962,10 @@ async def ask_question_stream(
 
                 logger.info(f"未找到预设问题，开始调用AI服务（流式） - 用户选择模型: {request.model}, 深度思考: {request.deep_thinking}, 问题: {request.question}")
 
+                # 拼接提示词：原始问题 + 知识图谱检索结果
+                enhanced_prompt = build_prompt_with_graph_result(request.question, request.graph_result)
+                logger.info(f"拼接后的提示词长度: {len(enhanced_prompt)}")
+
                 if request.deep_thinking:
                     actual_model_name = settings.DEEPSEEK_MODEL_THINKING
                     actual_model_key = "deepseek"
@@ -970,11 +1004,11 @@ async def ask_question_stream(
                         "qwen": ["deepseek", "glm"]
                     }
 
-                # 调用流式 AI 服务
+                # 调用流式 AI 服务，使用拼接后的提示词
                 stream_generator, success = await call_ai_service_with_retry(
                     actual_model_key,
                     actual_model_name,
-                    request.question,
+                    enhanced_prompt,  # 使用拼接后的提示词
                     max_retries=2,
                     use_thinking_config=request.deep_thinking,
                     stream=True
@@ -998,7 +1032,7 @@ async def ask_question_stream(
                         stream_generator, success = await call_ai_service_with_retry(
                             fallback_key,
                             fallback_name,
-                            request.question,
+                            enhanced_prompt,  # 使用拼接后的提示词
                             max_retries=1,
                             use_thinking_config=False,
                             stream=True
@@ -1070,6 +1104,7 @@ async def ask_question_stream(
                 history = AskHistory(
                     session_id=request.session_id,
                     question=request.question,
+                    graph_result=request.graph_result if request.graph_result else None,  # 保存知识图谱检索结果
                     answer=full_answer,
                     reasoning_content=reasoning_content if request.deep_thinking else None,
                     is_ai_generated=is_ai_generated,

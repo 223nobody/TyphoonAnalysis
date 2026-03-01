@@ -18,39 +18,44 @@
 - **智能预测可视化** - AI 预测路径与置信度展示
 - **多维度数据分析** - ECharts 图表统计与对比
 - **AI 智能客服** - 集成多模型对话系统，**支持语音输入**
+- **GraphRAG 知识图谱** - 基于 Neo4j 的台风领域知识检索与可视化
 - **图像智能分析** - 卫星云图 AI 识别
 - **响应式设计** - 适配多种屏幕尺寸
 
 ## 技术栈
 
 ### 核心框架
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| React | 18.x | UI 框架 |
-| Vite | 5.0 | 构建工具 |
-| React Router | 7.x | 路由管理 |
-| Axios | 1.6 | HTTP 客户端 |
+
+| 技术         | 版本 | 用途        |
+| ------------ | ---- | ----------- |
+| React        | 18.x | UI 框架     |
+| Vite         | 5.0  | 构建工具    |
+| React Router | 7.x  | 路由管理    |
+| Axios        | 1.6  | HTTP 客户端 |
 
 ### UI 组件库
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| Ant Design | 6.x | 基础组件库 |
-| Ant Design X | 2.x | AI 对话组件 |
-| Ant Design Charts | 2.x | 统计图表 |
+
+| 技术              | 版本 | 用途        |
+| ----------------- | ---- | ----------- |
+| Ant Design        | 6.x  | 基础组件库  |
+| Ant Design X      | 2.x  | AI 对话组件 |
+| Ant Design Charts | 2.x  | 统计图表    |
 
 ### 可视化技术
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| Leaflet | 1.9 | 地图可视化 |
-| React-Leaflet | 4.2 | React 地图组件 |
-| ECharts | 6.0 | 数据图表 |
-| D3.js | 7.x | 高级可视化 |
+
+| 技术          | 版本 | 用途           |
+| ------------- | ---- | -------------- |
+| Leaflet       | 1.9  | 地图可视化     |
+| React-Leaflet | 4.2  | React 地图组件 |
+| ECharts       | 6.0  | 数据图表       |
+| D3.js         | 7.x  | 高级可视化     |
 
 ### 音频处理
-| 技术 | 用途 |
-|------|------|
+
+| 技术          | 用途           |
+| ------------- | -------------- |
 | Web Audio API | 浏览器音频录制 |
-| MediaRecorder | 媒体流录制 |
+| MediaRecorder | 媒体流录制     |
 
 ## 项目结构
 
@@ -67,6 +72,8 @@ fronted/
 │   │   ├── AvatarUpload.jsx          # 头像上传
 │   │   ├── Header.jsx                # 页面头部导航
 │   │   ├── ImageAnalysis.jsx         # 图像分析
+│   │   ├── KnowledgeGraphPanel.jsx   # 知识图谱检索面板 (GraphRAG)
+│   │   ├── KnowledgeGraphVisualization.jsx  # 知识图谱可视化
 │   │   ├── Login.jsx                 # 登录页面
 │   │   ├── MapVisualization.jsx      # 地图可视化
 │   │   ├── Prediction.jsx            # 台风预测
@@ -83,6 +90,7 @@ fronted/
 │   │   └── taifeng.gif        # 台风动画
 │   ├── services/              # API 服务层
 │   │   ├── api.js             # API 调用封装 (含 ASR 接口)
+│   │   ├── knowledgeGraphConfig.js  # 知识图谱配置 (节点/关系类型定义)
 │   │   ├── ossConfig.js       # OSS 配置
 │   │   ├── ossUploadService.js # OSS 上传服务
 │   │   └── ossUtils.js        # OSS 工具函数
@@ -94,6 +102,8 @@ fronted/
 │   │   ├── AvatarUpload.css   # 头像上传样式
 │   │   ├── Header.css         # 头部样式
 │   │   ├── ImageAnalysis.css  # 图像分析样式
+│   │   ├── KnowledgeGraphPanel.css  # 知识图谱面板样式
+│   │   ├── KnowledgeGraphVisualization.css  # 知识图谱可视化样式
 │   │   ├── MapVisualization.css # 地图可视化样式
 │   │   ├── ReportGeneration.css # 报告生成样式
 │   │   ├── StatisticsPanel.css  # 统计分析样式
@@ -117,6 +127,7 @@ fronted/
 基于 Leaflet 的交互式地图，支持多台风路径叠加显示。
 
 **功能特性**:
+
 - 实时路径绘制与动画
 - 强度等级颜色编码
 - 风速大小映射
@@ -141,17 +152,18 @@ fronted/
 AI 预测路径可视化，展示未来 24/48/72 小时预测结果。
 
 **功能特性**:
+
 - 点击路径点触发预测
 - 红色虚线预测路径
 - 预测点强度可视化
 - 置信度展示
 - 预测结果面板
 
-### 3. AI 智能客服 (含语音输入)
+### 3. AI 智能客服 (含语音输入与 GraphRAG)
 
-**组件**: `AIAgent.jsx`
+**组件**: `AIAgent.jsx`, `KnowledgeGraphPanel.jsx`
 
-集成多模型 AI 对话系统，**支持语音输入功能**。
+集成多模型 AI 对话系统，**支持语音输入功能**和 **GraphRAG 知识图谱增强检索**。
 
 **模型支持**:
 | 模型 | 特点 | 深度思考 |
@@ -162,42 +174,88 @@ AI 预测路径可视化，展示未来 24/48/72 小时预测结果。
 | Qwen | 多模态 | - |
 
 **功能**:
+
 - 实时对话交互
 - **语音输入**: 点击麦克风图标进行语音输入
+- **GraphRAG 知识图谱检索**: 基于 Neo4j 的智能检索与可视化
 - 会话历史管理
 - 热门问题推荐
 - 模型自动降级
 
+#### 3.1 GraphRAG 知识图谱功能
+
+**意图识别**:
+支持12种台风领域查询意图：
+
+- 基本信息查询、路径查询、强度查询
+- 影响评估、对比分析、统计查询
+- 预测查询、历史查询、防御措施
+- 生成消散查询、相似台风查询、时间范围查询
+
+**知识图谱可视化** (`KnowledgeGraphPanel.jsx`):
+
+- **三种布局模式**: 力导向布局、环形布局、网格布局
+- **全屏筛选栏**: 顶部关系类型筛选、底部节点类型筛选
+- **种子实体高亮**: 检索起点实体特殊标记
+- **遍历统计**: 显示节点数、关系数、检索深度
+
+**关系类型** (12种):
+
+- `HAS_PATH_POINT`: 拥有路径点
+- `NEXT`: 路径顺序
+- `OCCURRED_IN`: 发生时间
+- `LANDED_AT`: 登陆地点
+- `REACHED_INTENSITY`: 达到强度
+- `GENERATED_AT`: 生成于
+- `DISSIPATED_AT`: 消散于
+- `INTENSIFIED_TO`: 增强为
+- `WEAKENED_TO`: 减弱为
+- `SIMILAR_TO`: 相似于
+- `AFFECTED_AREA`: 影响区域
+- `PASSED_NEAR`: 经过附近
+
+**使用方式**:
+
+1. 在 AI 客服对话框输入台风相关问题（如"2023年登陆广东的台风有哪些"）
+2. 系统自动识别意图并检索知识图谱
+3. 右侧面板展示检索到的知识图谱子图
+4. 可切换布局模式、筛选关系/节点类型
+5. 点击节点查看详细信息
+
 #### 语音输入功能详解
 
 **使用方式**:
+
 1. 点击输入框右侧的麦克风图标
 2. 开始说话，系统实时显示录音时长
 3. 再次点击或等待 60 秒自动停止
 4. 语音自动转换为文字并发送
 
 **技术实现**:
+
 - 使用 Web Audio API 进行音频采集
 - 录制格式: WAV (16kHz, 16bit, 单声道)
 - 后端使用 Qwen3-ASR 模型进行识别
 - 支持中文、英文、粤语自动检测
 
 **API 接口**:
+
 ```javascript
 // 语音识别
-import { transcribeAudio } from '../services/api';
+import { transcribeAudio } from "../services/api";
 
 const handleVoiceInput = async (audioBlob) => {
   try {
-    const result = await transcribeAudio(audioBlob, 'auto');
-    console.log('识别结果:', result.text);
+    const result = await transcribeAudio(audioBlob, "auto");
+    console.log("识别结果:", result.text);
   } catch (error) {
-    console.error('语音识别失败:', error);
+    console.error("语音识别失败:", error);
   }
 };
 ```
 
 **界面展示**:
+
 - 录音按钮带脉冲动画效果
 - 实时显示录音时长 (00:00 - 00:60)
 - 录音状态视觉反馈
@@ -209,6 +267,7 @@ const handleVoiceInput = async (audioBlob) => {
 卫星云图智能分析。
 
 **分析模式**:
+
 - **基础模式** - 快速特征提取
 - **高级模式** - 详细结构分析
 - **OpenCV 模式** - 传统算法
@@ -221,6 +280,7 @@ const handleVoiceInput = async (audioBlob) => {
 多维度数据统计与可视化。
 
 **图表类型**:
+
 - 年度趋势折线图
 - 月度分布柱状图
 - 强度等级饼图
@@ -299,29 +359,34 @@ export const getTyphoonById = async (id) => { ... }
 // AI 对话
 export const sendChatMessage = async (message, model) => { ... }
 
-// 语音识别 (新增)
+// 语音识别
 export const transcribeAudio = async (audioBlob, language) => { ... }
 export const checkASRHealth = async () => { ... }
+
+// GraphRAG 知识图谱 (新增)
+export const graphRAGLocalSearch = async (query, options) => { ... }
+export const linkEntities = async (query, options) => { ... }
+export const getTyphoonRelationships = async (typhoonId, depth) => { ... }
 ```
 
 ### ASR 语音识别 API
 
 **接口列表**:
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/asr/transcribe` | POST | 语音转文字 |
-| `/api/asr/health` | GET | 服务健康检查 |
-| `/api/asr/languages` | GET | 支持语言列表 |
+| 接口                  | 方法 | 说明         |
+| --------------------- | ---- | ------------ |
+| `/api/asr/transcribe` | POST | 语音转文字   |
+| `/api/asr/health`     | GET  | 服务健康检查 |
+| `/api/asr/languages`  | GET  | 支持语言列表 |
 
 **使用示例**:
 
 ```javascript
-import { transcribeAudio } from './services/api';
+import { transcribeAudio } from "./services/api";
 
 // 录制音频后调用
 const audioBlob = await recordAudio();
-const result = await transcribeAudio(audioBlob, 'auto');
+const result = await transcribeAudio(audioBlob, "auto");
 console.log(result.text); // 输出识别文字
 ```
 
@@ -332,6 +397,7 @@ console.log(result.text); // 输出识别文字
 **文件**: `src/components/AIAgent.jsx`
 
 **主要功能**:
+
 - 多模型 AI 对话
 - 语音输入支持
 - 会话管理
@@ -374,7 +440,7 @@ const stopRecording = async () => {
 }
 
 .recording-time {
-  font-family: 'SF Mono', Monaco, monospace;
+  font-family: "SF Mono", Monaco, monospace;
   font-size: 13px;
 }
 ```
@@ -428,12 +494,12 @@ src/
 
 ## 浏览器兼容性
 
-| 浏览器 | 最低版本 | 说明 |
-|--------|----------|------|
-| Chrome | 80+ | 完全支持 |
-| Firefox | 75+ | 完全支持 |
-| Safari | 14+ | 完全支持 |
-| Edge | 80+ | 完全支持 |
+| 浏览器  | 最低版本 | 说明     |
+| ------- | -------- | -------- |
+| Chrome  | 80+      | 完全支持 |
+| Firefox | 75+      | 完全支持 |
+| Safari  | 14+      | 完全支持 |
+| Edge    | 80+      | 完全支持 |
 
 **注意**: 语音输入功能需要浏览器支持 Web Audio API 和 MediaRecorder API。
 
@@ -442,6 +508,7 @@ src/
 ### Q: 语音输入无法使用？
 
 A: 请检查：
+
 1. 浏览器是否授予麦克风权限
 2. 后端 ASR 服务是否正常运行
 3. 是否使用 HTTPS (生产环境必需)
@@ -449,6 +516,7 @@ A: 请检查：
 ### Q: 语音识别准确率低？
 
 A: 建议：
+
 1. 在安静环境下使用
 2. 说话清晰、语速适中
 3. 使用标准普通话
@@ -466,6 +534,14 @@ A: 主要支持中文（简体）、英文、粤语，自动检测语言。
 A: 检查网络连接，确保能访问 Leaflet CDN。
 
 ## 更新日志
+
+### v1.2.0 (2026-03-02)
+
+- 新增 GraphRAG 知识图谱功能
+- 支持12种台风领域意图识别
+- 实现力导向/环形/网格三种图谱布局
+- 全屏模式支持关系/节点类型筛选
+- 集成 Neo4j 知识图谱检索
 
 ### v1.1.0 (2026-02-12)
 

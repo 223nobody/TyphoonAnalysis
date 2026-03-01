@@ -707,6 +707,16 @@
 }
 
 /* ==================== 主内容区 - 聊天区全屏，输入框悬浮 ==================== */
+.ai-agent-content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+
 .ai-agent-main {
   flex: 1;
   display: flex;
@@ -715,8 +725,11 @@
   position: relative;
   z-index: 1;
   padding: 0;
-  /* 根据侧边栏状态调整宽度 */
-  transition: margin-left 0.3s ease;
+  transition: flex 0.3s ease;
+}
+
+.ai-agent-main.with-knowledge-panel {
+  /* 当知识面板显示时，主区域保持flex:1，与面板并排 */
 }
 
 /* 右上角用户头像 */
@@ -1540,5 +1553,203 @@
 
   .ant-bubble {
     max-width: 88%;
+  }
+}
+
+/* ==================== 知识图谱检索面板 ==================== */
+/* 注意: 主要样式已移至 KnowledgeGraphPanel.css */
+
+/* 知识检索指示器 */
+.knowledge-search-indicator {
+  position: fixed;
+  bottom: 160px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  background: var(--glass-bg-dark);
+  backdrop-filter: blur(var(--blur-amount));
+  -webkit-backdrop-filter: blur(var(--blur-amount));
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: var(--glass-shadow);
+  z-index: 50;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.knowledge-search-indicator span {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* GraphRAG新增样式 */
+
+/* 面板头部右侧 */
+.knowledge-graph-panel .panel-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.knowledge-graph-panel .stats-tag {
+  font-size: 12px;
+}
+
+/* 种子实体 */
+.knowledge-graph-panel .knowledge-seed-entities {
+  margin-bottom: 16px;
+}
+
+.knowledge-graph-panel .knowledge-seed-entities h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.knowledge-graph-panel .seed-entity-card {
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--glass-border);
+}
+
+.knowledge-graph-panel .seed-entity-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.knowledge-graph-panel .seed-entity-info .entity-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.knowledge-graph-panel .seed-entity-info .entity-score {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* 遍历统计 */
+.knowledge-graph-panel .knowledge-traversal-stats {
+  margin-bottom: 16px;
+}
+
+.knowledge-graph-panel .knowledge-traversal-stats h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.knowledge-graph-panel .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.knowledge-graph-panel .stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-inner);
+  border: 1px solid var(--glass-border);
+}
+
+.knowledge-graph-panel .stat-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.knowledge-graph-panel .stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* 推理路径 */
+.knowledge-graph-panel .knowledge-reasoning-paths {
+  margin-bottom: 16px;
+}
+
+.knowledge-graph-panel .knowledge-reasoning-paths h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.knowledge-graph-panel .reasoning-path-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+}
+
+.knowledge-graph-panel .path-number {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.knowledge-graph-panel .path-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* 响应式调整 */
+@media (max-width: 1200px) {
+  .knowledge-graph-panel {
+    width: 350px;
+  }
+}
+
+@media (max-width: 768px) {
+  .knowledge-graph-panel {
+    width: 100%;
+    right: -100%;
+    top: auto;
+    bottom: 0;
+    height: 60vh;
+    border-left: none;
+    border-top: 1px solid var(--glass-border);
+    border-radius: 24px 24px 0 0;
+  }
+
+  .knowledge-graph-panel.visible {
+    right: 0;
+  }
+
+  .knowledge-search-indicator {
+    bottom: 140px;
   }
 }
