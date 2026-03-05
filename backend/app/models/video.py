@@ -2,7 +2,7 @@
 视频分析相关数据库模型
 精简设计 - 只保留核心字段
 """
-from sqlalchemy import Column, Integer, String, DateTime, Text, Float, JSON, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, Float, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -23,7 +23,7 @@ class VideoAnalysisResult(Base):
     status = Column(String(20), default="pending", comment="分析状态：pending/processing/completed/failed")
 
     # AI分析结果
-    ai_analysis = Column(JSON, nullable=True, comment="AI分析结果JSON")
+    ai_analysis = Column(Text, nullable=True, comment="AI分析结果Markdown文本")
     frame_count = Column(Integer, default=0, comment="提取的帧数")
 
     # 用户信息 - 关联用户表

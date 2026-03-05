@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     DEEPSEEK_MODEL_THINKING: str = Field(default="", description="DeepSeek模型名称（深度思考模式）")
     QWEN_TEXT_MODEL: str = Field(default="", description="Qwen文本生成模型")
     QWEN_VL_MODEL: str = Field(default="qwen-vl-max-latest", description="Qwen视觉语言模型")
+    QWEN_ASR_MODEL_PATH: str = Field(default="", description="Qwen ASR模型本地路径")
     GLM_MODEL: str = Field(default="", description="GLM模型名称")
 
 
