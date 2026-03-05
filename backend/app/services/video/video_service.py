@@ -107,7 +107,7 @@ class VideoService:
                 }
 
             # 分析成功，更新记录
-            ai_analysis = ai_result.get("ai_analysis", {})
+            ai_analysis = ai_result.get("ai_analysis", "")
             analysis_result.status = "completed"
             analysis_result.ai_analysis = ai_analysis
             analysis_result.frame_count = ai_result.get("frame_count", 0)
@@ -177,10 +177,8 @@ class VideoService:
             "filename": analysis.filename,
             "status": analysis.status,
             "analysis_type": analysis.analysis_type,
-            "result": {
-                "ai_analysis": analysis.ai_analysis,
-                "frame_count": analysis.frame_count
-            } if analysis.status == "completed" else None,
+            "ai_analysis": analysis.ai_analysis if analysis.status == "completed" else None,
+            "frame_count": analysis.frame_count if analysis.status == "completed" else None,
             "error": analysis.error_message if analysis.status == "failed" else None,
             "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
             "processing_time": analysis.processing_time,

@@ -26,7 +26,7 @@ class VideoAnalysisResponse:
     analysis_type: str
     status: str
     frame_count: int
-    ai_analysis: Optional[Dict[str, Any]]
+    ai_analysis: Optional[str]
     processing_time: Optional[float]
     error: Optional[str]
     user_id: Optional[int]
@@ -38,7 +38,8 @@ class AnalysisStatusResponse:
     filename: str
     status: str
     analysis_type: str
-    result: Optional[Dict[str, Any]]
+    ai_analysis: Optional[str]
+    frame_count: Optional[int]
     error: Optional[str]
     created_at: Optional[str]
     processing_time: Optional[float]

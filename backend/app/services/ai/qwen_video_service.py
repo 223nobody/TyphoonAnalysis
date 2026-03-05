@@ -404,16 +404,45 @@ class BailianVideoService:
             else:
                 ai_content = str(result)
             
+            # 处理内容格式：如果是列表，提取所有 text 字段
+            if isinstance(ai_content, list):
+                texts = []
+                for item in ai_content:
+                    if isinstance(item, dict) and "text" in item:
+                        texts.append(item["text"])
+                    elif isinstance(item, str):
+                        texts.append(item)
+                ai_content = "\n".join(texts)
+            elif isinstance(ai_content, dict):
+                # 如果是字典，尝试提取 text 或 description
+                if "text" in ai_content:
+                    ai_content = ai_content["text"]
+                elif "description" in ai_content:
+                    desc = ai_content["description"]
+                    if isinstance(desc, list):
+                        texts = []
+                        for item in desc:
+                            if isinstance(item, dict) and "text" in item:
+                                texts.append(item["text"])
+                            elif isinstance(item, str):
+                                texts.append(item)
+                        ai_content = "\n".join(texts)
+                    else:
+                        ai_content = str(desc)
+                else:
+                    ai_content = str(ai_content)
+            
+            # 确保最终是字符串
+            if not isinstance(ai_content, str):
+                ai_content = str(ai_content)
+            
             processing_time = (datetime.now() - start_time).total_seconds()
             
             return {
                 "success": True,
                 "analysis_type": analysis_type,
                 "frame_count": len(frames),
-                "ai_analysis": {
-                    "description": ai_content,
-                    "parsed": True
-                },
+                "ai_analysis": ai_content,
                 "raw_response": result,
                 "processing_time": processing_time,
                 "model_used": self.model
