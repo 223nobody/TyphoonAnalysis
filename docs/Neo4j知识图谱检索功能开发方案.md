@@ -93,7 +93,6 @@
 │  基础关系                                                    │
 │  (:Typhoon)-[:LANDED_AT]->(:Location)       登陆地点        │
 │  (:Typhoon)-[:OCCURRED_IN]->(:Time)         发生时间        │
-│  (:Typhoon)-[:REACHED_INTENSITY]->(:Intensity) 达到强度     │
 │  (:Typhoon)-[:HAS_PATH_POINT]->(:PathPoint) 路径点         │
 │  (:PathPoint)-[:NEXT]->(:PathPoint)          路径顺序        │
 ├─────────────────────────────────────────────────────────────┤
@@ -101,7 +100,7 @@
 │  (:Typhoon)-[:GENERATED_AT]->(:Location)    生成位置        │
 │  (:Typhoon)-[:DISSIPATED_AT]->(:Location)   消散位置        │
 ├─────────────────────────────────────────────────────────────┤
-│  扩展关系 - 强度变化                                         │
+│  扩展关系 - 强度变化（包含达到强度的语义）                   │
 │  (:Typhoon)-[:INTENSIFIED_TO]->(:Intensity) 强度增强        │
 │  (:Typhoon)-[:WEAKENED_TO]->(:Intensity)    强度减弱        │
 ├─────────────────────────────────────────────────────────────┤
@@ -192,17 +191,17 @@
 | wind_speed_min | float  | 最小风速 m/s |
 | wind_speed_max | float  | 最大风速 m/s |
 
-**时间信息说明**：由于一个台风在生命周期中可能经历多个强度等级，时间信息存储在 `REACHED_INTENSITY` **关系**上，而不是节点上。
+**时间信息说明**：由于一个台风在生命周期中可能经历多个强度等级，时间信息存储在 `INTENSIFIED_TO` 和 `WEAKENED_TO` **关系**上，而不是节点上。
 
-#### REACHED_INTENSITY 关系属性
+#### INTENSIFIED_TO / WEAKENED_TO 关系属性
 
 | 属性           | 类型     | 说明                     |
 | -------------- | -------- | ------------------------ |
-| start_time     | datetime | 达到该强度的开始时间     |
-| end_time       | datetime | 维持该强度的结束时间     |
-| duration_hours | float    | 维持该强度的时长（小时） |
-| point_count    | integer  | 该强度下的路径点数量     |
-| max_wind_speed | float    | 该强度期间的最大风速     |
+| from_level     | string   | 原强度等级               |
+| to_level       | string   | 目标强度等级             |
+| change_time    | datetime | 强度变化时间             |
+| wind_speed_change | float | 风速变化值               |
+| pressure_change | float   | 气压变化值               |
 
 #### LANDED_AT 关系属性
 

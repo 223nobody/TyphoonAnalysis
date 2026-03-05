@@ -763,10 +763,10 @@ const KnowledgeGraphPanel = ({
   };
 
   /**
-   * 渲染底部水平图例（非全屏模式）
+   * 渲染底部水平图例（全屏模式）
    */
   const renderLegend = () => {
-    if (isFullscreen) return null;
+    if (!isFullscreen) return null;
 
     return (
       <div className="kg-panel-legend-horizontal">
@@ -1066,7 +1066,7 @@ const KnowledgeGraphPanel = ({
                 {renderEntityTypeFilterBar()}
               </div>
 
-              {/* 底部水平图例（非全屏模式） */}
+              {/* 底部水平图例（全屏模式） */}
               {renderLegend()}
             </Card>
 

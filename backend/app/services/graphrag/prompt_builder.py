@@ -675,12 +675,12 @@ class TyphoonPromptBuilder:
                 "expansion": ["基本信息", "概况", "简介"]
             },
             TyphoonIntentType.PATH_QUERY: {
-                "relations": ["HAS_PATH_POINT", "NEXT", "LANDED_AT", "PASSED_NEAR"],
+                "relations": ["HAS_PATH_POINT", "NEXT", "LANDED_AT", "AFFECTED_AREA"],
                 "attributes": ["lat", "lon", "moving_speed", "moving_direction", "distance_from_genesis"],
                 "expansion": ["路径", "轨迹", "移动路线", "经过"]
             },
             TyphoonIntentType.INTENSITY_QUERY: {
-                "relations": ["REACHED_INTENSITY", "INTENSIFIED_TO", "WEAKENED_TO", "HAS_INTENSITY"],
+                "relations": ["INTENSIFIED_TO", "WEAKENED_TO", "HAS_INTENSITY"],
                 "attributes": ["max_wind_speed", "min_pressure", "peak_intensity", "wind_speed", "pressure"],
                 "expansion": ["强度", "风速", "气压", "等级"]
             },
@@ -705,12 +705,12 @@ class TyphoonPromptBuilder:
                 "expansion": ["预测", "预报", "未来", "趋势"]
             },
             TyphoonIntentType.COMPARISON_QUERY: {
-                "relations": ["SIMILAR_TO", "HAS_PATH_POINT", "REACHED_INTENSITY"],
+                "relations": ["SIMILAR_TO", "HAS_PATH_POINT", "INTENSIFIED_TO", "WEAKENED_TO"],
                 "attributes": ["max_wind_speed", "min_pressure", "duration_hours", "total_distance_km"],
                 "expansion": ["对比", "比较", "相似", "差异"]
             },
             TyphoonIntentType.STATISTICS_QUERY: {
-                "relations": ["OCCURRED_IN", "LANDED_AT", "REACHED_INTENSITY"],
+                "relations": ["OCCURRED_IN", "LANDED_AT", "INTENSIFIED_TO", "WEAKENED_TO"],
                 "attributes": ["year", "max_wind_speed", "landfall_count", "total_typhoons"],
                 "expansion": ["统计", "数量", "排名", "历史"]
             },

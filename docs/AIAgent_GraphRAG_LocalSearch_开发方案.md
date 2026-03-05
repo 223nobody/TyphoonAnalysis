@@ -1260,16 +1260,15 @@ force: {
 }
 ```
 
-**关系类型支持**:
+**关系类型支持** (11种):
 - HAS_PATH_POINT: 拥有路径点
 - NEXT: 路径顺序
 - OCCURRED_IN: 发生时间
 - LANDED_AT: 登陆地点
-- REACHED_INTENSITY: 达到强度
 - GENERATED_AT: 生成于
 - DISSIPATED_AT: 消散于
-- INTENSIFIED_TO: 增强为
-- WEAKENED_TO: 减弱为
+- INTENSIFIED_TO: 增强为（包含达到强度的语义）
+- WEAKENED_TO: 减弱为（包含达到强度的语义）
 - SIMILAR_TO: 相似于
 - AFFECTED_AREA: 影响区域
 - PASSED_NEAR: 经过附近
@@ -1280,7 +1279,7 @@ force: {
 
 **功能特性**:
 - 5种节点类型定义：台风、路径点、地理位置、时间、强度等级
-- 12种关系类型定义
+- 11种关系类型定义
 - 6种强度等级配置（TD/TS/STS/TY/STY/SuperTY）
 - 节点属性字段定义
 - 关系属性字段定义

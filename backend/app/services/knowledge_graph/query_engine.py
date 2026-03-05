@@ -11,7 +11,7 @@
 
 严格按照知识图谱开发文档定义的节点类型和关系类型:
 节点类型: Typhoon, PathPoint, Location, Time, Intensity
-关系类型: HAS_PATH_POINT, NEXT, OCCURRED_IN, LANDED_AT, REACHED_INTENSITY
+关系类型: HAS_PATH_POINT, NEXT, OCCURRED_IN, LANDED_AT, INTENSIFIED_TO, WEAKENED_TO
 """
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
@@ -475,7 +475,8 @@ class KnowledgeGraphQueryEngine:
             MATCH (t:Typhoon {typhoon_id: $typhoon_id})
             OPTIONAL MATCH (t)-[:OCCURRED_IN]->(tm:Time)
             OPTIONAL MATCH (t)-[:LANDED_AT]->(l:Location)
-            OPTIONAL MATCH (t)-[:REACHED_INTENSITY]->(i:Intensity)
+            OPTIONAL MATCH (t)-[:INTENSIFIED_TO]->(i:Intensity)
+            OPTIONAL MATCH (t)-[:WEAKENED_TO]->(i2:Intensity)
             OPTIONAL MATCH (t)-[:HAS_PATH_POINT]->(p:PathPoint)
             RETURN t.typhoon_id as typhoon_id,
                    t.name_cn as name_cn,
@@ -491,8 +492,8 @@ class KnowledgeGraphQueryEngine:
                    t.end_lon as end_lon,
                    tm.is_peak_season as is_peak_season,
                    collect(DISTINCT l.name) as landfall_locations,
-                   i.level as intensity_level,
-                   i.name_cn as intensity_name,
+                   coalesce(i.level, i2.level) as intensity_level,
+                   coalesce(i.name_cn, i2.name_cn) as intensity_name,
                    collect(p {.*}) as path_points
         """
 
@@ -554,7 +555,8 @@ class KnowledgeGraphQueryEngine:
         cypher = """
             MATCH (t:Typhoon)-[:OCCURRED_IN]->(y:Time)
             OPTIONAL MATCH (t)-[:LANDED_AT]->(l:Location)
-            OPTIONAL MATCH (t)-[:REACHED_INTENSITY]->(i:Intensity)
+            OPTIONAL MATCH (t)-[:INTENSIFIED_TO]->(i:Intensity)
+            OPTIONAL MATCH (t)-[:WEAKENED_TO]->(i2:Intensity)
             WHERE 1=1
             """
 

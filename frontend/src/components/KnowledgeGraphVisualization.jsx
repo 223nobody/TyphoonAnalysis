@@ -56,18 +56,16 @@ const RELATIONSHIP_TYPES = [
   { type: "NEXT", label: "路径顺序", color: "#4ecdc4" },
   { type: "OCCURRED_IN", label: "发生时间", color: "#45b7d1" },
   { type: "LANDED_AT", label: "登陆地点", color: "#96ceb4" },
-  { type: "REACHED_INTENSITY", label: "达到强度", color: "#ffeaa7" },
   // 扩展关系 - 台风生命周期
   { type: "GENERATED_AT", label: "生成于", color: "#74b9ff" },
   { type: "DISSIPATED_AT", label: "消散于", color: "#a29bfe" },
-  // 扩展关系 - 强度变化
+  // 扩展关系 - 强度变化（INTENSIFIED_TO 和 WEAKENED_TO 已包含达到强度的语义）
   { type: "INTENSIFIED_TO", label: "增强为", color: "#fd79a8" },
   { type: "WEAKENED_TO", label: "减弱为", color: "#fdcb6e" },
   // 扩展关系 - 相似性
   { type: "SIMILAR_TO", label: "相似于", color: "#6c5ce7" },
-  // 扩展关系 - 地理影响
+  // 扩展关系 - 地理影响（AFFECTED_AREA 包含经过附近的语义）
   { type: "AFFECTED_AREA", label: "影响区域", color: "#e17055" },
-  { type: "PASSED_NEAR", label: "经过附近", color: "#00b894" },
 ];
 
 // 布局选项
@@ -87,7 +85,7 @@ const KnowledgeGraphVisualization = () => {
 
   // ===== 可视化设置状态（修改后实时同步到图表）=====
   const [selectedRelationships, setSelectedRelationships] = useState(
-    RELATIONSHIP_TYPES.map((r) => r.type)
+    RELATIONSHIP_TYPES.map((r) => r.type),
   );
   const [layout, setLayout] = useState("force");
   const [nodeLimit, setNodeLimit] = useState(1000);
@@ -203,9 +201,8 @@ const KnowledgeGraphVisualization = () => {
         ...link,
         type: relType,
         relation: relConfig.label || relType,
-        lineStyle: {
-          color: relConfig.color || "#999",
-        },
+        // 不在这里设置 lineStyle，在 updateChart 中统一设置
+        // 这样可以确保 curveness 等属性正确应用
       };
     });
   };
@@ -280,7 +277,9 @@ const KnowledgeGraphVisualization = () => {
   // ===== 搜索深度变化时自动重新加载数据 =====
   useEffect(() => {
     if (currentTyphoonId) {
-      console.log(`搜索深度变化为 ${searchDepth}，重新加载台风 ${currentTyphoonId}`);
+      console.log(
+        `搜索深度变化为 ${searchDepth}，重新加载台风 ${currentTyphoonId}`,
+      );
       loadTyphoonData(currentTyphoonId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -305,14 +304,14 @@ const KnowledgeGraphVisualization = () => {
 
     if (hiddenEntityTypes.length > 0) {
       const visibleNodes = filteredData.nodes.filter(
-        (node) => !hiddenEntityTypes.includes(node.category)
+        (node) => !hiddenEntityTypes.includes(node.category),
       );
       const visibleNodeIds = new Set(visibleNodes.map((n) => n.id));
       filteredData = {
         nodes: visibleNodes,
         links: filteredData.links.filter(
           (link) =>
-            visibleNodeIds.has(link.source) && visibleNodeIds.has(link.target)
+            visibleNodeIds.has(link.source) && visibleNodeIds.has(link.target),
         ),
       };
       console.log("updateChart - 隐藏类型后数据:", filteredData);
@@ -325,7 +324,7 @@ const KnowledgeGraphVisualization = () => {
     }
 
     const typhoonNodes = filteredData.nodes.filter(
-      (n) => n.category === NodeType.TYPHOON
+      (n) => n.category === NodeType.TYPHOON,
     );
     let centerNodeId = null;
     if (typhoonNodes.length > 0) {
@@ -349,16 +348,80 @@ const KnowledgeGraphVisualization = () => {
       };
     });
 
-    const chartLinks = filteredData.links.map((link) => {
+    // 处理关系数据，支持同一对节点之间的多条关系显示
+    // 使用 Map 来统计同一 source-target-type 对的关系数量
+    // 注意：即使 source-target 相同，不同类型（增强/减弱）的关系也应该分开显示
+    const linkGroups = new Map();
+    filteredData.links.forEach((link, index) => {
+      // 分组键包含 source、target 和 type，确保不同类型关系分开显示
+      const key = `${link.source}-${link.target}-${link.type}`;
+      if (!linkGroups.has(key)) {
+        linkGroups.set(key, []);
+      }
+      linkGroups.get(key).push({ ...link, originalIndex: index });
+    });
+
+    // 调试：检查是否有同一 source-target 但不同类型（INTENSIFIED_TO vs WEAKENED_TO）的关系
+    const debugSourceTarget = new Map();
+    filteredData.links.forEach((link) => {
+      const key = `${link.source}-${link.target}`;
+      if (!debugSourceTarget.has(key)) {
+        debugSourceTarget.set(key, []);
+      }
+      debugSourceTarget.get(key).push(link.type);
+    });
+    const multiTypePairs = Array.from(debugSourceTarget.entries()).filter(
+      ([key, types]) => new Set(types).size > 1,
+    );
+    if (multiTypePairs.length > 0) {
+      console.log("同一 source-target 对但有不同类型的关系:", multiTypePairs);
+    }
+
+    const chartLinks = filteredData.links.map((link, index) => {
       const relConfig = RELATIONSHIP_TYPE_CONFIG[link.type] || {};
+      // 使用包含 type 的键来获取分组
+      const key = `${link.source}-${link.target}-${link.type}`;
+      const group = linkGroups.get(key);
+      const groupIndex = group.findIndex((l) => l.originalIndex === index);
+      const totalInGroup = group.length;
+
+      // 计算曲率：同一对节点之间的多条关系使用不同的曲率，使其分开显示
+      // 基础曲率 0.2，每条额外的关系增加 0.15 的曲率，正负交替
+      let curveness = 0.2;
+      if (totalInGroup > 1) {
+        // 多条关系时，使用不同的曲率值
+        const offset = Math.ceil(groupIndex / 2) * 0.2;
+        curveness = groupIndex % 2 === 0 ? 0.2 + offset : -(0.2 + offset);
+      }
+
       return {
+        ...link,
         source: link.source,
         target: link.target,
         relation: relConfig.label || link.type,
         value: link.properties || {},
-        ...link,
+        // 添加唯一 ID，避免 ECharts 合并
+        id: `${link.source}-${link.target}-${link.type}-${index}`,
+        // 设置曲率，使多条关系分开显示
+        // 注意：lineStyle 放在最后，确保覆盖 link 中可能存在的 lineStyle
+        lineStyle: {
+          color: relConfig.color || "#999",
+          curveness: curveness,
+        },
       };
     });
+
+    // 调试：检查最终生成的 chartLinks
+    console.log("生成的 chartLinks 数量:", chartLinks.length);
+    console.log(
+      "前5条关系:",
+      chartLinks.slice(0, 5).map((l) => ({
+        source: l.source,
+        target: l.target,
+        type: l.type,
+        curveness: l.lineStyle?.curveness,
+      })),
+    );
 
     const getLayoutConfig = () => {
       const baseConfig = {
@@ -384,22 +447,26 @@ const KnowledgeGraphVisualization = () => {
             width: 4,
           },
         },
-        lineStyle: {
-          color: "source",
-          curveness: 0.2,
-          width: 2,
-          opacity: 0.7,
-        },
+        // 注意：不在 baseConfig 中设置 lineStyle，让每条关系使用自己的 lineStyle
+        // lineStyle 已在 chartLinks 中为每条关系单独设置
         edgeLabel: {
           show: true,
           formatter: (params) => {
             try {
-              return params?.data?.relation || params?.relation || "";
+              const relation = params?.data?.relation || params?.relation || "";
+              const properties =
+                params?.data?.value || params?.data?.properties || {};
+              // 如果有时间信息，显示在标签中
+              if (properties && properties.change_time) {
+                const timeStr = properties.change_time.substring(0, 10); // 只显示日期部分
+                return `${relation}\n${timeStr}`;
+              }
+              return relation;
             } catch (e) {
               return "";
             }
           },
-          fontSize: 10,
+          fontSize: 9,
           color: "#666",
         },
         edgeSymbol: ["circle", "arrow"],
@@ -434,12 +501,7 @@ const KnowledgeGraphVisualization = () => {
             fontWeight: "normal",
             color: "#333",
           },
-          lineStyle: {
-            color: "source",
-            curveness: 0.1,
-            width: 1.5,
-            opacity: 0.6,
-          },
+          // 不在 circular 布局中设置 lineStyle，使用每条关系自己的 lineStyle
           edgeLabel: {
             show: false,
           },
@@ -465,12 +527,7 @@ const KnowledgeGraphVisualization = () => {
             fontWeight: "normal",
             color: "#333",
           },
-          lineStyle: {
-            color: "source",
-            curveness: 0,
-            width: 1.2,
-            opacity: 0.5,
-          },
+          // 不在 grid 布局中设置 lineStyle，使用每条关系自己的 lineStyle
           edgeLabel: {
             show: false,
           },
@@ -522,16 +579,16 @@ const KnowledgeGraphVisualization = () => {
     // 应用关系类型过滤
     if (filters.relationshipTypes && filters.relationshipTypes.length > 0) {
       const actualRelationshipTypes = new Set(
-        data.links.map((link) => link.type)
+        data.links.map((link) => link.type),
       );
 
       const matchedTypes = filters.relationshipTypes.filter((type) =>
-        actualRelationshipTypes.has(type)
+        actualRelationshipTypes.has(type),
       );
 
       if (matchedTypes.length > 0) {
         resultLinks = data.links.filter((link) =>
-          matchedTypes.includes(link.type)
+          matchedTypes.includes(link.type),
         );
 
         const relatedNodeIds = new Set();
@@ -542,23 +599,32 @@ const KnowledgeGraphVisualization = () => {
 
         // 始终保留台风节点
         const typhoonNodes = data.nodes.filter(
-          (n) => n.category === NodeType.TYPHOON
+          (n) => n.category === NodeType.TYPHOON,
         );
         typhoonNodes.forEach((n) => relatedNodeIds.add(n.id));
 
-        resultNodes = data.nodes.filter((node) =>
-          relatedNodeIds.has(node.id)
-        );
+        resultNodes = data.nodes.filter((node) => relatedNodeIds.has(node.id));
       }
     }
 
     // 应用节点数量限制
-    if (filters.nodeLimit && filters.nodeLimit > 0 && resultNodes.length > filters.nodeLimit) {
+    if (
+      filters.nodeLimit &&
+      filters.nodeLimit > 0 &&
+      resultNodes.length > filters.nodeLimit
+    ) {
       // 优先保留台风节点，然后按类型排序保留其他节点
-      const typhoonNodes = resultNodes.filter((n) => n.category === NodeType.TYPHOON);
-      const otherNodes = resultNodes.filter((n) => n.category !== NodeType.TYPHOON);
+      const typhoonNodes = resultNodes.filter(
+        (n) => n.category === NodeType.TYPHOON,
+      );
+      const otherNodes = resultNodes.filter(
+        (n) => n.category !== NodeType.TYPHOON,
+      );
 
-      const remainingSlots = Math.max(0, filters.nodeLimit - typhoonNodes.length);
+      const remainingSlots = Math.max(
+        0,
+        filters.nodeLimit - typhoonNodes.length,
+      );
       const limitedOtherNodes = otherNodes.slice(0, remainingSlots);
 
       resultNodes = [...typhoonNodes, ...limitedOtherNodes];
@@ -567,7 +633,8 @@ const KnowledgeGraphVisualization = () => {
       const remainingNodeIds = new Set(resultNodes.map((n) => n.id));
       resultLinks = resultLinks.filter(
         (link) =>
-          remainingNodeIds.has(link.source) && remainingNodeIds.has(link.target)
+          remainingNodeIds.has(link.source) &&
+          remainingNodeIds.has(link.target),
       );
     }
 
@@ -720,7 +787,11 @@ const KnowledgeGraphVisualization = () => {
             <Tooltip title={isFullscreen ? "退出全屏" : "全屏显示"}>
               <Button
                 icon={
-                  isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />
+                  isFullscreen ? (
+                    <FullscreenExitOutlined />
+                  ) : (
+                    <FullscreenOutlined />
+                  )
                 }
                 onClick={handleFullscreen}
                 size="small"
@@ -825,7 +896,7 @@ const KnowledgeGraphVisualization = () => {
           <Row gutter={16} align="middle">
             <Col flex="auto">
               <Input.Search
-                placeholder="输入节点名称搜索..."
+                placeholder="输入节点名称搜索...(支持台风中文名或编号 2601或202601)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onSearch={handleSearch}
@@ -882,7 +953,11 @@ const KnowledgeGraphVisualization = () => {
             <Tooltip title={isFullscreen ? "退出全屏" : "全屏显示"}>
               <Button
                 icon={
-                  isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />
+                  isFullscreen ? (
+                    <FullscreenExitOutlined />
+                  ) : (
+                    <FullscreenOutlined />
+                  )
                 }
                 onClick={toggleFullscreen}
                 size="small"
@@ -946,7 +1021,7 @@ const KnowledgeGraphVisualization = () => {
             {ENTITY_TYPES.map((type) => {
               const isHidden = hiddenEntityTypes.includes(type.type);
               const count = graphData.nodes.filter(
-                (n) => n.category === type.type
+                (n) => n.category === type.type,
               ).length;
               return (
                 <div

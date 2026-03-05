@@ -14,7 +14,8 @@
 - NEXT: 路径点顺序关系
 - OCCURRED_IN: 台风-时间关系
 - LANDED_AT: 台风-地点关系
-- REACHED_INTENSITY: 台风-强度关系
+- INTENSIFIED_TO: 台风-强度增强关系（包含达到强度的语义）
+- WEAKENED_TO: 台风-强度减弱关系（包含达到强度的语义）
 """
 from enum import Enum
 from typing import List, Optional, Dict, Any
@@ -39,13 +40,12 @@ class RelationshipType(str, Enum):
     NEXT = "NEXT"
     OCCURRED_IN = "OCCURRED_IN"
     LANDED_AT = "LANDED_AT"
-    REACHED_INTENSITY = "REACHED_INTENSITY"
 
     # 扩展关系 - 台风生命周期
     GENERATED_AT = "GENERATED_AT"  # 生成位置
     DISSIPATED_AT = "DISSIPATED_AT"  # 消散位置
 
-    # 扩展关系 - 强度变化
+    # 扩展关系 - 强度变化（INTENSIFIED_TO 和 WEAKENED_TO 已包含达到强度的语义）
     INTENSIFIED_TO = "INTENSIFIED_TO"  # 增强到某强度
     WEAKENED_TO = "WEAKENED_TO"  # 减弱到某强度
 
@@ -53,8 +53,7 @@ class RelationshipType(str, Enum):
     SIMILAR_TO = "SIMILAR_TO"  # 相似台风
 
     # 扩展关系 - 地理影响
-    AFFECTED_AREA = "AFFECTED_AREA"  # 影响区域
-    PASSED_NEAR = "PASSED_NEAR"  # 经过附近
+    AFFECTED_AREA = "AFFECTED_AREA"  # 影响区域（包含经过附近的语义，距离<100km）
 
 
 class IntensityLevel(str, Enum):
@@ -196,7 +195,7 @@ class IntensityProperties(BaseModel):
     # 风速范围
     wind_speed_min: float = Field(..., ge=0, description="最小风速 m/s")
     wind_speed_max: float = Field(..., ge=0, description="最大风速 m/s")
-    # 注意：时间信息存储在 REACHED_INTENSITY 关系上，因为每个台风达到强度的时间不同
+    # 注意：时间信息存储在 INTENSIFIED_TO 和 WEAKENED_TO 关系上，因为每个台风达到强度的时间不同
 
 
 class GraphNode(BaseModel):
@@ -237,10 +236,11 @@ class LifecycleRelationshipProperties(BaseModel):
 
 
 class IntensityChangeProperties(BaseModel):
-    """强度变化关系属性模型"""
+    """强度变化关系属性模型 - 支持同一台风多次变化到同一强度"""
     from_level: str = Field(..., description="原强度等级")
     to_level: str = Field(..., description="目标强度等级")
     change_time: datetime = Field(..., description="变化时间")
+    change_sequence: Optional[datetime] = Field(default=None, description="变化序列标识（用于区分同一台风-强度对的多条关系）")
     wind_speed_change: Optional[float] = Field(default=None, description="风速变化")
     pressure_change: Optional[float] = Field(default=None, description="气压变化")
 
@@ -320,11 +320,6 @@ RELATIONSHIP_TYPE_CONFIG = {
         "color": "#96ceb4",
         "description": "台风与登陆地点的关系"
     },
-    RelationshipType.REACHED_INTENSITY: {
-        "label": "达到强度",
-        "color": "#ffeaa7",
-        "description": "台风与强度等级的关系"
-    },
     # 扩展关系 - 台风生命周期
     RelationshipType.GENERATED_AT: {
         "label": "生成于",
@@ -357,12 +352,7 @@ RELATIONSHIP_TYPE_CONFIG = {
     RelationshipType.AFFECTED_AREA: {
         "label": "影响区域",
         "color": "#e17055",
-        "description": "台风影响的地理区域"
-    },
-    RelationshipType.PASSED_NEAR: {
-        "label": "经过附近",
-        "color": "#00b894",
-        "description": "台风经过某地附近"
+        "description": "台风影响的地理区域（包含经过附近的语义）"
     }
 }
 
@@ -442,7 +432,6 @@ def validate_relationship(
         (NodeType.PATH_POINT, NodeType.PATH_POINT, RelationshipType.NEXT),
         (NodeType.TYPHOON, NodeType.TIME, RelationshipType.OCCURRED_IN),
         (NodeType.TYPHOON, NodeType.LOCATION, RelationshipType.LANDED_AT),
-        (NodeType.TYPHOON, NodeType.INTENSITY, RelationshipType.REACHED_INTENSITY),
         # 扩展关系 - 台风生命周期
         (NodeType.TYPHOON, NodeType.LOCATION, RelationshipType.GENERATED_AT),
         (NodeType.TYPHOON, NodeType.LOCATION, RelationshipType.DISSIPATED_AT),
@@ -453,6 +442,5 @@ def validate_relationship(
         (NodeType.TYPHOON, NodeType.TYPHOON, RelationshipType.SIMILAR_TO),
         # 扩展关系 - 地理影响
         (NodeType.TYPHOON, NodeType.LOCATION, RelationshipType.AFFECTED_AREA),
-        (NodeType.TYPHOON, NodeType.LOCATION, RelationshipType.PASSED_NEAR),
     }
     return (source_type, target_type, relationship_type) in valid_relationships

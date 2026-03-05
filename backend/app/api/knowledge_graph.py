@@ -433,7 +433,7 @@ async def get_typhoon_relationships(
             // 基础关系 - 这些关系在基础数据导入时就会创建
             OPTIONAL MATCH (t)-[r1:HAS_PATH_POINT]->(pp:PathPoint)
             OPTIONAL MATCH (t)-[r2:LANDED_AT]->(l:Location)
-            OPTIONAL MATCH (t)-[r3:REACHED_INTENSITY]->(i:Intensity)
+            // REACHED_INTENSITY 关系已移除，使用 INTENSIFIED_TO 和 WEAKENED_TO 代替
             OPTIONAL MATCH (t)-[r4:OCCURRED_IN]->(tm:Time)
             // 扩展关系 - 使用动态关系类型查询，避免Neo4j警告
             // 生成位置关系 (如果存在)
@@ -443,11 +443,10 @@ async def get_typhoon_relationships(
             OPTIONAL MATCH (t)-[r7]->(dis_loc:Location)
             WHERE type(r7) = 'DISSIPATED_AT'
             // 强度增强关系 (如果存在)
-            OPTIONAL MATCH (t)-[r8]->(int_up:Intensity)
-            WHERE type(r8) = 'INTENSIFIED_TO'
-            // 强度减弱关系 (如果存在)
-            OPTIONAL MATCH (t)-[r9]->(int_down:Intensity)
-            WHERE type(r9) = 'WEAKENED_TO'
+            // 强度增强关系 (如果存在) - 收集所有关系，不只是节点
+            OPTIONAL MATCH (t)-[r8:INTENSIFIED_TO]->(int_up:Intensity)
+            // 强度减弱关系 (如果存在) - 收集所有关系，不只是节点
+            OPTIONAL MATCH (t)-[r9:WEAKENED_TO]->(int_down:Intensity)
             // 相似性关系 (如果存在)
             OPTIONAL MATCH (t)-[r10]->(sim_t:Typhoon)
             WHERE type(r10) = 'SIMILAR_TO'
@@ -465,18 +464,19 @@ async def get_typhoon_relationships(
             """
         
         base_cypher += """
-            WITH t, pp, l, i, tm, gen_loc, dis_loc, int_up, int_down, sim_t, aff_loc, pass_loc"""
-        
+            WITH t, pp, l, tm, gen_loc, dis_loc, int_up, int_down, sim_t, aff_loc, pass_loc, r8, r9"""
+
         if depth >= 2:
             base_cypher += ", pp2"
-        
+
         base_cypher += """
-            RETURN 
+            RETURN
                 t as typhoon_node,
                 // 节点集合
                 [p IN collect(DISTINCT pp) WHERE p IS NOT NULL] as path_points,
                 [loc IN collect(DISTINCT l) WHERE loc IS NOT NULL] as locations,
-                [int IN collect(DISTINCT i) WHERE int IS NOT NULL] as intensities,
+                // 强度节点从 intensified 和 weakened 中收集
+                [int IN collect(DISTINCT int_up) + collect(DISTINCT int_down) WHERE int IS NOT NULL] as intensities,
                 [time IN collect(DISTINCT tm) WHERE time IS NOT NULL] as times,
                 [gen IN collect(DISTINCT gen_loc) WHERE gen IS NOT NULL] as gen_locations,
                 [dis IN collect(DISTINCT dis_loc) WHERE dis IS NOT NULL] as dis_locations,
@@ -488,19 +488,19 @@ async def get_typhoon_relationships(
                 // 基础关系
                 [r IN collect(DISTINCT {start: t.typhoon_id, rel: 'HAS_PATH_POINT', end: CASE WHEN pp IS NOT NULL AND pp.typhoon_id IS NOT NULL AND pp.sequence IS NOT NULL THEN pp.typhoon_id + '_pp_' + pp.sequence ELSE NULL END}) WHERE r.end IS NOT NULL] as has_path_rels,
                 [r IN collect(DISTINCT {start: t.typhoon_id, rel: 'LANDED_AT', end: CASE WHEN l IS NOT NULL AND l.name IS NOT NULL THEN 'location_' + l.name ELSE NULL END}) WHERE r.end IS NOT NULL] as landed_rels,
-                [r IN collect(DISTINCT {start: t.typhoon_id, rel: 'REACHED_INTENSITY', end: CASE WHEN i IS NOT NULL AND i.level IS NOT NULL THEN 'intensity_' + i.level ELSE NULL END}) WHERE r.end IS NOT NULL] as intensity_rels,
+
                 [r IN collect(DISTINCT {start: t.typhoon_id, rel: 'OCCURRED_IN', end: CASE WHEN tm IS NOT NULL AND tm.year IS NOT NULL THEN 'time_' + tm.year ELSE NULL END}) WHERE r.end IS NOT NULL] as time_rels,
                 // 扩展关系 - 生命周期
                 [r IN collect(DISTINCT {start: t.typhoon_id, rel: 'GENERATED_AT', end: CASE WHEN gen_loc IS NOT NULL AND gen_loc.name IS NOT NULL THEN 'location_' + gen_loc.name ELSE NULL END}) WHERE r.end IS NOT NULL] as generated_rels,
                 [r IN collect(DISTINCT {start: t.typhoon_id, rel: 'DISSIPATED_AT', end: CASE WHEN dis_loc IS NOT NULL AND dis_loc.name IS NOT NULL THEN 'location_' + dis_loc.name ELSE NULL END}) WHERE r.end IS NOT NULL] as dissipated_rels,
-                // 扩展关系 - 强度变化
-                [r IN collect(DISTINCT {start: t.typhoon_id, rel: 'INTENSIFIED_TO', end: CASE WHEN int_up IS NOT NULL AND int_up.level IS NOT NULL THEN 'intensity_' + int_up.level ELSE NULL END}) WHERE r.end IS NOT NULL] as intensified_rels,
-                [r IN collect(DISTINCT {start: t.typhoon_id, rel: 'WEAKENED_TO', end: CASE WHEN int_down IS NOT NULL AND int_down.level IS NOT NULL THEN 'intensity_' + int_down.level ELSE NULL END}) WHERE r.end IS NOT NULL] as weakened_rels,
+                // 扩展关系 - 强度变化（包含时间戳，支持多条关系）
+                // 注意：不使用 DISTINCT，确保同一 source-target 但不同时间的关系都能返回
+                [r IN collect({start: t.typhoon_id, rel: 'INTENSIFIED_TO', end: CASE WHEN int_up IS NOT NULL AND int_up.level IS NOT NULL THEN 'intensity_' + int_up.level ELSE NULL END, change_time: r8.change_time}) WHERE r.end IS NOT NULL] as intensified_rels,
+                [r IN collect({start: t.typhoon_id, rel: 'WEAKENED_TO', end: CASE WHEN int_down IS NOT NULL AND int_down.level IS NOT NULL THEN 'intensity_' + int_down.level ELSE NULL END, change_time: r9.change_time}) WHERE r.end IS NOT NULL] as weakened_rels,
                 // 扩展关系 - 相似性
                 [r IN collect(DISTINCT {start: t.typhoon_id, rel: 'SIMILAR_TO', end: CASE WHEN sim_t IS NOT NULL AND sim_t.typhoon_id IS NOT NULL THEN sim_t.typhoon_id ELSE NULL END}) WHERE r.end IS NOT NULL] as similar_rels,
-                // 扩展关系 - 地理影响
-                [r IN collect(DISTINCT {start: t.typhoon_id, rel: 'AFFECTED_AREA', end: CASE WHEN aff_loc IS NOT NULL AND aff_loc.name IS NOT NULL THEN 'location_' + aff_loc.name ELSE NULL END}) WHERE r.end IS NOT NULL] as affected_rels,
-                [r IN collect(DISTINCT {start: t.typhoon_id, rel: 'PASSED_NEAR', end: CASE WHEN pass_loc IS NOT NULL AND pass_loc.name IS NOT NULL THEN 'location_' + pass_loc.name ELSE NULL END}) WHERE r.end IS NOT NULL] as passed_rels
+                // 扩展关系 - 地理影响（AFFECTED_AREA 包含经过附近的语义，已移除 PASSED_NEAR）
+                [r IN collect(DISTINCT {start: t.typhoon_id, rel: 'AFFECTED_AREA', end: CASE WHEN aff_loc IS NOT NULL AND aff_loc.name IS NOT NULL THEN 'location_' + aff_loc.name ELSE NULL END}) WHERE r.end IS NOT NULL] as affected_rels
         """
 
         if depth >= 2:
@@ -539,10 +539,18 @@ async def get_typhoon_relationships(
                 )
             return node_id
 
-        def add_link(source_id: str, rel_type_str: str, target_id: str):
+        def add_link(source_id: str, rel_type_str: str, target_id: str, properties: dict = None):
             if not source_id or not target_id or source_id == target_id:
                 return
-            link_key = f"{source_id}-{rel_type_str}-{target_id}"
+            # 对于强度变化关系，使用 change_time 来区分多条关系
+            unique_suffix = ""
+            if properties and 'change_time' in properties and properties['change_time']:
+                # 使用 change_time 作为唯一标识的一部分
+                change_time = properties['change_time']
+                if hasattr(change_time, 'to_native'):
+                    change_time = change_time.to_native()
+                unique_suffix = f"-{change_time}"
+            link_key = f"{source_id}-{rel_type_str}-{target_id}{unique_suffix}"
             if link_key not in link_keys:
                 try:
                     rel = RelationshipType(rel_type_str)
@@ -551,7 +559,7 @@ async def get_typhoon_relationships(
                         source=source_id,
                         target=target_id,
                         type=rel,
-                        properties={}
+                        properties=properties or {}
                     ))
                 except ValueError:
                     pass
@@ -629,11 +637,15 @@ async def get_typhoon_relationships(
 
         for rel_data in record.get("intensified_rels", []):
             if rel_data and rel_data.get("start") and rel_data.get("end"):
-                add_link(rel_data["start"], rel_data["rel"], rel_data["end"])
+                # 传递时间戳属性，支持同一对节点之间的多条关系
+                properties = {"change_time": rel_data.get("change_time")} if rel_data.get("change_time") else {}
+                add_link(rel_data["start"], rel_data["rel"], rel_data["end"], properties)
 
         for rel_data in record.get("weakened_rels", []):
             if rel_data and rel_data.get("start") and rel_data.get("end"):
-                add_link(rel_data["start"], rel_data["rel"], rel_data["end"])
+                # 传递时间戳属性，支持同一对节点之间的多条关系
+                properties = {"change_time": rel_data.get("change_time")} if rel_data.get("change_time") else {}
+                add_link(rel_data["start"], rel_data["rel"], rel_data["end"], properties)
 
         for rel_data in record.get("similar_rels", []):
             if rel_data and rel_data.get("start") and rel_data.get("end"):
@@ -643,9 +655,7 @@ async def get_typhoon_relationships(
             if rel_data and rel_data.get("start") and rel_data.get("end"):
                 add_link(rel_data["start"], rel_data["rel"], rel_data["end"])
 
-        for rel_data in record.get("passed_rels", []):
-            if rel_data and rel_data.get("start") and rel_data.get("end"):
-                add_link(rel_data["start"], rel_data["rel"], rel_data["end"])
+        # PASSED_NEAR 关系已移除，AFFECTED_AREA 已包含经过附近的语义
 
         return GraphData(
             typhoon_id=typhoon_id,
@@ -669,7 +679,7 @@ async def get_yearly_statistics(year: int = Query(..., ge=1949, le=2100, descrip
         cypher = """
             MATCH (t:Typhoon {year: $year})
             OPTIONAL MATCH (t)-[:LANDED_AT]->(l:Location)
-            OPTIONAL MATCH (t)-[:REACHED_INTENSITY]->(i:Intensity)
+            // REACHED_INTENSITY 关系已移除，使用台风节点的 peak_intensity 字段
             RETURN count(t) as total_typhoons,
                    count(l) as total_landfalls,
                    avg(t.max_wind_speed) as avg_max_wind,
@@ -712,15 +722,27 @@ async def get_intensity_statistics(year: Optional[int] = Query(default=None, ge=
     """
     try:
         cypher = """
-            MATCH (t:Typhoon)-[:REACHED_INTENSITY]->(i:Intensity)
+            // REACHED_INTENSITY 关系已移除，使用台风节点的 peak_intensity 字段
+            MATCH (t:Typhoon)
         """
 
         if year:
             cypher += " WHERE t.year = $year"
 
         cypher += """
-            RETURN i.level as intensity_level,
-                   i.name_cn as intensity_name,
+            WITH t, t.peak_intensity as intensity_name
+            WITH CASE intensity_name
+                WHEN '热带低压' THEN 'TD'
+                WHEN '热带风暴' THEN 'TS'
+                WHEN '强热带风暴' THEN 'STS'
+                WHEN '台风' THEN 'TY'
+                WHEN '强台风' THEN 'STY'
+                WHEN '超强台风' THEN 'SuperTY'
+                ELSE 'TD'
+            END as intensity_level,
+            intensity_name, t
+            RETURN intensity_level,
+                   intensity_name,
                    count(t) as count,
                    avg(t.max_wind_speed) as avg_wind_speed
             ORDER BY count DESC

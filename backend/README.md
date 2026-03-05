@@ -283,17 +283,16 @@ NLS_URL=wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1
 | Time      | 时间节点 | year, total_typhoons, is_peak_season                    |
 | Intensity | 强度等级 | level, name_cn, wind_speed_min/max                      |
 
-**知识图谱关系类型**:
+**知识图谱关系类型** (11种):
 
 - `HAS_PATH_POINT` - 拥有路径点
 - `NEXT` - 路径顺序
 - `OCCURRED_IN` - 发生时间
 - `LANDED_AT` - 登陆地点
-- `REACHED_INTENSITY` - 达到强度
 - `GENERATED_AT` - 生成于
 - `DISSIPATED_AT` - 消散于
-- `INTENSIFIED_TO` - 增强为
-- `WEAKENED_TO` - 减弱为
+- `INTENSIFIED_TO` - 增强为（包含达到强度的语义）
+- `WEAKENED_TO` - 减弱为（包含达到强度的语义）
 - `SIMILAR_TO` - 相似于
 - `AFFECTED_AREA` - 影响区域
 - `PASSED_NEAR` - 经过附近

@@ -19,7 +19,8 @@
 - (:PathPoint)-[:NEXT]->(:PathPoint)
 - (:Typhoon)-[:OCCURRED_IN]->(:Time)
 - (:Typhoon)-[:LANDED_AT]->(:Location)
-- (:Typhoon)-[:REACHED_INTENSITY]->(:Intensity)
+- (:Typhoon)-[:INTENSIFIED_TO]->(:Intensity) - 强度增强
+- (:Typhoon)-[:WEAKENED_TO]->(:Intensity) - 强度减弱
 """
 import asyncio
 import sys
@@ -591,84 +592,11 @@ class FullDataImporterV2:
         logger.info(f"✅ 登陆数据导入完成，成功导入 {imported} 条登陆关系")
 
     async def _create_intensity_relationships(self):
-        """建立台风与强度等级的关系，包含时间信息"""
+        """建立台风与强度等级的关系（通过强度变化关系 INTENSIFIED_TO 和 WEAKENED_TO）"""
         logger.info("建立台风与强度等级的关系...")
-
-        # 首先为每个台风计算各个强度等级的时间范围
-        query_calc_times = """
-        MATCH (t:Typhoon)-[:HAS_PATH_POINT]->(p:PathPoint)
-        WHERE p.wind_speed > 0
-        WITH t, p,
-            CASE
-                WHEN p.wind_speed >= 51.0 THEN 'SuperTY'
-                WHEN p.wind_speed >= 41.5 THEN 'STY'
-                WHEN p.wind_speed >= 32.7 THEN 'TY'
-                WHEN p.wind_speed >= 24.5 THEN 'STS'
-                WHEN p.wind_speed >= 17.2 THEN 'TS'
-                ELSE 'TD'
-            END as intensity_level
-        WITH t, intensity_level,
-             min(p.timestamp) as start_time,
-             max(p.timestamp) as end_time,
-             count(p) as point_count,
-             max(p.wind_speed) as max_wind_in_level
-        RETURN t.typhoon_id as typhoon_id, intensity_level,
-               start_time, end_time, point_count, max_wind_in_level
-        ORDER BY t.typhoon_id, start_time
-        """
-
-        try:
-            # 获取所有台风的强度时间数据
-            intensity_times = await neo4j_client.run(query_calc_times)
-            logger.info(f"📊 计算出 {len(intensity_times)} 条台风-强度时间记录")
-
-            # 按台风分组处理
-            typhoon_intensities = {}
-            for record in intensity_times:
-                typhoon_id = record['typhoon_id']
-                if typhoon_id not in typhoon_intensities:
-                    typhoon_intensities[typhoon_id] = []
-                typhoon_intensities[typhoon_id].append({
-                    'intensity_level': record['intensity_level'],
-                    'start_time_epoch': int(record['start_time'].to_native().timestamp() * 1000) if hasattr(record['start_time'], 'to_native') else 0,
-                    'end_time_epoch': int(record['end_time'].to_native().timestamp() * 1000) if hasattr(record['end_time'], 'to_native') else 0,
-                    'point_count': record['point_count'],
-                    'max_wind_in_level': record['max_wind_in_level']
-                })
-
-            # 批量创建关系
-            total_relationships = 0
-            for typhoon_id, intensities in typhoon_intensities.items():
-                query_create = """
-                MATCH (t:Typhoon {typhoon_id: $typhoon_id})
-                UNWIND $intensities as intensity_data
-                MATCH (i:Intensity {level: intensity_data.intensity_level})
-                MERGE (t)-[r:REACHED_INTENSITY]->(i)
-                SET r.start_time = datetime({epochMillis: intensity_data.start_time_epoch}),
-                    r.end_time = datetime({epochMillis: intensity_data.end_time_epoch}),
-                    r.duration_hours = duration.inSeconds(
-                        datetime({epochMillis: intensity_data.start_time_epoch}),
-                        datetime({epochMillis: intensity_data.end_time_epoch})
-                    ) / 3600.0,
-                    r.point_count = intensity_data.point_count,
-                    r.max_wind_speed = intensity_data.max_wind_in_level
-                RETURN count(r) as created
-                """
-
-                try:
-                    result = await neo4j_client.run(query_create, {
-                        'typhoon_id': typhoon_id,
-                        'intensities': intensities
-                    })
-                    total_relationships += len(intensities)
-                except Exception as e:
-                    logger.error(f"创建台风 {typhoon_id} 的强度关系失败: {e}")
-
-            logger.info(f"✅ 已建立 {total_relationships} 个强度关系（含时间信息）")
-        except Exception as e:
-            logger.error(f"❌ 强度关系建立失败: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
+        # 强度变化关系由 _create_intensity_change_relationships 统一处理
+        # 该方法保留用于兼容性，实际逻辑已合并到强度变化关系中
+        logger.info("⏭️ 强度关系将通过 _create_intensity_change_relationships 统一创建")
 
     async def _update_time_node_stats(self):
         """更新时间节点统计信息"""
@@ -777,7 +705,8 @@ class FullDataImporterV2:
         """建立强度变化关系"""
         logger.info("建立强度变化关系...")
 
-        # 查询台风的强度变化序列
+        # 查询台风的强度变化序列（只创建增强关系）
+        # 使用 CREATE 代替 MERGE，允许同一台风-强度对之间有多条关系（不同时间点）
         query = """
         MATCH (t:Typhoon)-[:HAS_PATH_POINT]->(p:PathPoint)
         WHERE p.intensity_level IS NOT NULL
@@ -785,7 +714,26 @@ class FullDataImporterV2:
         WITH t,
              collect({level: p.intensity_level, time: p.timestamp, wind: p.wind_speed, pressure: p.pressure}) as points
         WITH t, points,
-             [i in range(0, size(points)-2) WHERE points[i].level <> points[i+1].level | {
+             [i in range(0, size(points)-2)
+              WHERE points[i].level <> points[i+1].level
+                AND CASE points[i].level
+                    WHEN 'TD' THEN 1
+                    WHEN 'TS' THEN 2
+                    WHEN 'STS' THEN 3
+                    WHEN 'TY' THEN 4
+                    WHEN 'STY' THEN 5
+                    WHEN 'SuperTY' THEN 6
+                    ELSE 0
+                    END <
+                    CASE points[i+1].level
+                    WHEN 'TD' THEN 1
+                    WHEN 'TS' THEN 2
+                    WHEN 'STS' THEN 3
+                    WHEN 'TY' THEN 4
+                    WHEN 'STY' THEN 5
+                    WHEN 'SuperTY' THEN 6
+                    ELSE 0
+                    END | {
                  from_level: points[i].level,
                  to_level: points[i+1].level,
                  change_time: points[i+1].time,
@@ -797,12 +745,14 @@ class FullDataImporterV2:
         UNWIND changes as change
         WITH t, change
         MATCH (i:Intensity {level: change.to_level})
-        MERGE (t)-[r:INTENSIFIED_TO]->(i)
+        // 使用 CREATE 代替 MERGE，允许同一台风多次增强到同一强度（不同时间点）
+        CREATE (t)-[r:INTENSIFIED_TO]->(i)
         SET r.from_level = change.from_level,
             r.to_level = change.to_level,
             r.change_time = change.change_time,
             r.wind_speed_change = change.wind_change,
-            r.pressure_change = change.pressure_change
+            r.pressure_change = change.pressure_change,
+            r.change_sequence = change.change_time  // 用于区分同一台风-强度对的多条关系
         RETURN count(r) as created
         """
 
@@ -812,6 +762,7 @@ class FullDataImporterV2:
             logger.info(f"✅ 已建立 {created} 个强度增强关系")
 
             # 同样创建减弱关系（反向）
+            # 使用 CREATE 代替 MERGE，允许同一台风-强度对之间有多条关系（不同时间点）
             query_weaken = """
             MATCH (t:Typhoon)-[:HAS_PATH_POINT]->(p:PathPoint)
             WHERE p.intensity_level IS NOT NULL
@@ -850,12 +801,14 @@ class FullDataImporterV2:
             UNWIND changes as change
             WITH t, change
             MATCH (i:Intensity {level: change.to_level})
-            MERGE (t)-[r:WEAKENED_TO]->(i)
+            // 使用 CREATE 代替 MERGE，允许同一台风多次减弱到同一强度（不同时间点）
+            CREATE (t)-[r:WEAKENED_TO]->(i)
             SET r.from_level = change.from_level,
                 r.to_level = change.to_level,
                 r.change_time = change.change_time,
                 r.wind_speed_change = change.wind_change,
-                r.pressure_change = change.pressure_change
+                r.pressure_change = change.pressure_change,
+                r.change_sequence = change.change_time  // 用于区分同一台风-强度对的多条关系
             RETURN count(r) as created
             """
 
@@ -912,9 +865,10 @@ class FullDataImporterV2:
         logger.info("建立地理影响关系...")
 
         # 获取主要城市/地区列表（从登陆数据中提取）
+        # 兼容 Neo4j 4.0 语法
         query_major_locations = """
-        MATCH (l:Location)
-        WITH l, count{(l)<-[:LANDED_AT]-()} as landfall_count
+        MATCH (l:Location)<-[:LANDED_AT]-(t:Typhoon)
+        WITH l, count(t) as landfall_count
         WHERE landfall_count > 0
         RETURN l.name as name, l.lat as lat, l.lon as lon
         """
@@ -956,32 +910,9 @@ class FullDataImporterV2:
                 })
                 total_affected += result[0]['created'] if result else 0
 
-                # 创建经过附近关系（更近的距离，50km内）
-                query_passed = """
-                MATCH (t:Typhoon)-[:HAS_PATH_POINT]->(p:PathPoint)
-                WITH t, p,
-                     2 * 6371 * asin(sqrt(
-                        sin(radians(p.lat - $lat)/2)^2 +
-                        cos(radians($lat)) * cos(radians(p.lat)) *
-                        sin(radians(p.lon - $lon)/2)^2
-                     )) as distance_km
-                WHERE distance_km < 50
-                WITH t, min(distance_km) as min_dist, min(p.timestamp) as first_pass
-                MERGE (loc:Location {name: $name})
-                MERGE (t)-[r:PASSED_NEAR]->(loc)
-                SET r.min_distance_km = min_dist,
-                    r.passed_at = first_pass
-                RETURN count(r) as created
-                """
+                # PASSED_NEAR 关系已移除，AFFECTED_AREA 已包含经过附近的语义（距离<100km）
 
-                result_passed = await neo4j_client.run(query_passed, {
-                    'name': loc['name'],
-                    'lat': loc['lat'],
-                    'lon': loc['lon']
-                })
-                total_passed += result_passed[0]['created'] if result_passed else 0
-
-            logger.info(f"✅ 已建立 {total_affected} 个影响区域关系, {total_passed} 个经过附近关系")
+            logger.info(f"✅ 已建立 {total_affected} 个影响区域关系")
 
         except Exception as e:
             logger.error(f"❌ 地理影响关系建立失败: {e}")

@@ -398,9 +398,10 @@ class GraphRAGEngine:
         }
     
     VALID_RELATIONSHIP_TYPES = {
-        "LANDED_AT", "AFFECTED_AREA", "HAS_PATH_POINT", "REACHED_INTENSITY",
+        "LANDED_AT", "AFFECTED_AREA", "HAS_PATH_POINT",
         "OCCURRED_IN", "GENERATED_AT", "DISSIPATED_AT", "INTENSIFIED_TO",
-        "WEAKENED_TO", "SIMILAR_TO", "PASSED_NEAR", "NEXT", "HAS_INTENSITY"
+        "WEAKENED_TO", "SIMILAR_TO", "NEXT", "HAS_INTENSITY"
+        # PASSED_NEAR 已移除，AFFECTED_AREA 已包含经过附近的语义
     }
     
     async def _get_node_neighbors(

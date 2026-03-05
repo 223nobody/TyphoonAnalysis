@@ -699,18 +699,17 @@ _图14: 台风分析系统数据库ER图，展示Typhoon、TyphoonPath、User、
 | Time | 时间节点 | year, total_typhoons, strongest_typhoon_id |
 | Intensity | 强度等级 | level, name_cn, wind_speed_min/max |
 
-**关系类型**:
+**关系类型** (11种):
 | 关系类型 | 说明 | 连接实体 |
 |----------|------|----------|
 | HAS_PATH_POINT | 拥有路径点 | Typhoon → PathPoint |
 | NEXT | 路径顺序 | PathPoint → PathPoint |
 | OCCURRED_IN | 发生时间 | Typhoon → Time |
 | LANDED_AT | 登陆地点 | Typhoon → Location |
-| REACHED_INTENSITY | 达到强度 | Typhoon → Intensity |
 | GENERATED_AT | 生成于 | Typhoon → Location |
 | DISSIPATED_AT | 消散于 | Typhoon → Location |
-| INTENSIFIED_TO | 增强为 | Typhoon → Intensity |
-| WEAKENED_TO | 减弱为 | Typhoon → Intensity |
+| INTENSIFIED_TO | 增强为（包含达到强度的语义） | Typhoon → Intensity |
+| WEAKENED_TO | 减弱为（包含达到强度的语义） | Typhoon → Intensity |
 | SIMILAR_TO | 相似于 | Typhoon → Typhoon |
 | AFFECTED_AREA | 影响区域 | Typhoon → Location |
 | PASSED_NEAR | 经过附近 | Typhoon → Location |

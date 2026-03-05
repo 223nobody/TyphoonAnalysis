@@ -132,7 +132,6 @@ class DataValidator:
             {"type": "NEXT", "name": "路径点顺序关系"},
             {"type": "OCCURRED_IN", "name": "台风-时间关系"},
             {"type": "LANDED_AT", "name": "台风-登陆地点关系"},
-            {"type": "REACHED_INTENSITY", "name": "台风-强度关系"},
             # 扩展关系
             {"type": "GENERATED_AT", "name": "生成位置关系"},
             {"type": "DISSIPATED_AT", "name": "消散位置关系"},
@@ -297,15 +296,17 @@ class DataValidator:
                 rel_query = """
                     MATCH (t:Typhoon {typhoon_id: $typhoon_id})
                     OPTIONAL MATCH (t)-[:OCCURRED_IN]->(tm:Time)
-                    OPTIONAL MATCH (t)-[:REACHED_INTENSITY]->(i:Intensity)
-                    RETURN tm.year as time_year, i.level as intensity_level
+                    OPTIONAL MATCH (t)-[:INTENSIFIED_TO]->(i:Intensity)
+                    OPTIONAL MATCH (t)-[:WEAKENED_TO]->(i2:Intensity)
+                    RETURN tm.year as time_year, i.level as intensified_level, i2.level as weakened_level
                 """
                 rel_result = await neo4j_client.run(rel_query, {"typhoon_id": typhoon_id})
 
                 if rel_result:
                     rel = rel_result[0]
-                    if rel["time_year"] and rel["intensity_level"]:
-                        logger.info(f"      时间关系: {rel['time_year']}, 强度关系: {rel['intensity_level']}")
+                    intensity_info = rel["intensified_level"] or rel["weakened_level"] or "无强度变化记录"
+                    if rel["time_year"]:
+                        logger.info(f"      时间关系: {rel['time_year']}, 强度变化: {intensity_info}")
 
             except Exception as e:
                 self.validation_results["errors"].append(

@@ -50,22 +50,20 @@ class EnhancedGraphRetriever:
         "HAS_PATH_POINT": 1.0,
         "LANDED_AT": 1.0,
         "AFFECTED_AREA": 0.9,
-        "REACHED_INTENSITY": 0.9,
-        
-        # 时间空间关系
+
+        # 时间空间关系（AFFECTED_AREA 已包含经过附近的语义，PASSED_NEAR 已移除）
         "OCCURRED_IN": 0.8,
         "GENERATED_AT": 0.8,
         "DISSIPATED_AT": 0.8,
-        "PASSED_NEAR": 0.7,
-        
-        # 强度变化关系
-        "INTENSIFIED_TO": 0.7,
-        "WEAKENED_TO": 0.7,
+
+        # 强度变化关系（INTENSIFIED_TO 和 WEAKENED_TO 包含达到强度的语义）
+        "INTENSIFIED_TO": 0.85,
+        "WEAKENED_TO": 0.85,
         "HAS_INTENSITY": 0.7,
-        
+
         # 路径顺序关系
         "NEXT": 0.6,
-        
+
         # 相似性关系
         "SIMILAR_TO": 0.5,
     }
@@ -107,17 +105,17 @@ class EnhancedGraphRetriever:
     # 意图到关系类型的映射
     INTENT_RELATION_MAPPING = {
         TyphoonIntentType.BASIC_INFO: ["OCCURRED_IN", "GENERATED_AT", "DISSIPATED_AT"],
-        TyphoonIntentType.PATH_QUERY: ["HAS_PATH_POINT", "NEXT", "PASSED_NEAR", "LANDED_AT"],
-        TyphoonIntentType.INTENSITY_QUERY: ["REACHED_INTENSITY", "INTENSIFIED_TO", "WEAKENED_TO", "HAS_INTENSITY"],
+        TyphoonIntentType.PATH_QUERY: ["HAS_PATH_POINT", "NEXT", "AFFECTED_AREA", "LANDED_AT"],
+        TyphoonIntentType.INTENSITY_QUERY: ["INTENSIFIED_TO", "WEAKENED_TO", "HAS_INTENSITY"],
         TyphoonIntentType.TIME_QUERY: ["OCCURRED_IN", "GENERATED_AT", "DISSIPATED_AT"],
         TyphoonIntentType.LANDFALL_QUERY: ["LANDED_AT", "AFFECTED_AREA"],
         TyphoonIntentType.IMPACT_QUERY: ["AFFECTED_AREA", "LANDED_AT"],
-        TyphoonIntentType.AFFECTED_AREA_QUERY: ["AFFECTED_AREA", "PASSED_NEAR", "LANDED_AT"],
+        TyphoonIntentType.AFFECTED_AREA_QUERY: ["AFFECTED_AREA", "LANDED_AT"],
         TyphoonIntentType.PREDICTION_QUERY: ["HAS_PATH_POINT", "SIMILAR_TO"],
-        TyphoonIntentType.COMPARISON_QUERY: ["SIMILAR_TO", "HAS_PATH_POINT", "REACHED_INTENSITY"],
+        TyphoonIntentType.COMPARISON_QUERY: ["SIMILAR_TO", "HAS_PATH_POINT", "INTENSIFIED_TO", "WEAKENED_TO"],
         TyphoonIntentType.SIMILAR_QUERY: ["SIMILAR_TO"],
-        TyphoonIntentType.STATISTICS_QUERY: ["OCCURRED_IN", "LANDED_AT", "REACHED_INTENSITY"],
-        TyphoonIntentType.RANKING_QUERY: ["REACHED_INTENSITY", "OCCURRED_IN"],
+        TyphoonIntentType.STATISTICS_QUERY: ["OCCURRED_IN", "LANDED_AT", "INTENSIFIED_TO", "WEAKENED_TO"],
+        TyphoonIntentType.RANKING_QUERY: ["INTENSIFIED_TO", "WEAKENED_TO", "OCCURRED_IN"],
     }
     
     def __init__(self, neo4j_client):

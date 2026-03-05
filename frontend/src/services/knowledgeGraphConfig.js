@@ -1,36 +1,34 @@
 /**
  * 知识图谱配置模块
  * 严格按照知识图谱开发文档定义节点类型、关系类型及其属性
- * 
+ *
  * 节点类型 (5种):
  * - Typhoon: 台风节点
  * - PathPoint: 路径点节点
  * - Location: 地理位置节点
  * - Time: 时间节点
  * - Intensity: 强度等级节点
- * 
- * 关系类型 (12种):
- * 基础关系 (5个):
+ *
+ * 关系类型 (11种):
+ * 基础关系 (4个):
  * - HAS_PATH_POINT: 台风-路径点关系
  * - NEXT: 路径点顺序关系
  * - OCCURRED_IN: 台风-时间关系
  * - LANDED_AT: 台风-地点关系
- * - REACHED_INTENSITY: 台风-强度关系
- * 
+ *
  * 扩展关系 - 台风生命周期 (2个):
  * - GENERATED_AT: 生成位置
  * - DISSIPATED_AT: 消散位置
- * 
+ *
  * 扩展关系 - 强度变化 (2个):
- * - INTENSIFIED_TO: 强度增强
- * - WEAKENED_TO: 强度减弱
- * 
+ * - INTENSIFIED_TO: 强度增强（包含达到强度的语义）
+ * - WEAKENED_TO: 强度减弱（包含达到强度的语义）
+ *
  * 扩展关系 - 相似性 (1个):
  * - SIMILAR_TO: 相似台风
- * 
+ *
  * 扩展关系 - 地理影响 (2个):
- * - AFFECTED_AREA: 影响区域
- * - PASSED_NEAR: 经过附近
+ * - AFFECTED_AREA: 影响区域（包含经过附近的语义）
  */
 
 export const NodeType = {
@@ -47,18 +45,16 @@ export const RelationshipType = {
   NEXT: 'NEXT',
   OCCURRED_IN: 'OCCURRED_IN',
   LANDED_AT: 'LANDED_AT',
-  REACHED_INTENSITY: 'REACHED_INTENSITY',
   // 扩展关系 - 台风生命周期
   GENERATED_AT: 'GENERATED_AT',
   DISSIPATED_AT: 'DISSIPATED_AT',
-  // 扩展关系 - 强度变化
+  // 扩展关系 - 强度变化（INTENSIFIED_TO 和 WEAKENED_TO 已包含达到强度的语义）
   INTENSIFIED_TO: 'INTENSIFIED_TO',
   WEAKENED_TO: 'WEAKENED_TO',
   // 扩展关系 - 相似性
   SIMILAR_TO: 'SIMILAR_TO',
-  // 扩展关系 - 地理影响
+  // 扩展关系 - 地理影响（AFFECTED_AREA 包含经过附近的语义）
   AFFECTED_AREA: 'AFFECTED_AREA',
-  PASSED_NEAR: 'PASSED_NEAR',
 };
 
 export const IntensityLevel = {
@@ -186,7 +182,7 @@ export const NODE_TYPE_CONFIG = {
       { key: 'name_cn', label: '中文名称', type: 'string' },
       { key: 'wind_speed_min', label: '最小风速(m/s)', type: 'number' },
       { key: 'wind_speed_max', label: '最大风速(m/s)', type: 'number' },
-      // 注意：时间信息在 REACHED_INTENSITY 关系上
+      // 注意：时间信息在 INTENSIFIED_TO 和 WEAKENED_TO 关系上
     ],
   },
 };
@@ -231,21 +227,6 @@ export const RELATIONSHIP_TYPE_CONFIG = {
       { key: 'intensity', label: '登陆强度', type: 'string' },
     ],
   },
-  [RelationshipType.REACHED_INTENSITY]: {
-    type: RelationshipType.REACHED_INTENSITY,
-    label: '达到强度',
-    color: '#ffeaa7',
-    description: '台风与强度等级的关系',
-    sourceType: NodeType.TYPHOON,
-    targetType: NodeType.INTENSITY,
-    fields: [
-      { key: 'start_time', label: '开始时间', type: 'datetime' },
-      { key: 'end_time', label: '结束时间', type: 'datetime' },
-      { key: 'duration_hours', label: '持续时长(小时)', type: 'number' },
-      { key: 'point_count', label: '路径点数量', type: 'number' },
-      { key: 'max_wind_speed', label: '该强度最大风速(m/s)', type: 'number' },
-    ],
-  },
   // 扩展关系 - 台风生命周期
   [RelationshipType.GENERATED_AT]: {
     type: RelationshipType.GENERATED_AT,
@@ -275,18 +256,19 @@ export const RELATIONSHIP_TYPE_CONFIG = {
       { key: 'description', label: '描述', type: 'string' },
     ],
   },
-  // 扩展关系 - 强度变化
+  // 扩展关系 - 强度变化（支持同一台风多次变化到同一强度）
   [RelationshipType.INTENSIFIED_TO]: {
     type: RelationshipType.INTENSIFIED_TO,
     label: '增强为',
     color: '#fd79a8',
-    description: '台风强度增强',
+    description: '台风强度增强（支持多次增强到同一强度）',
     sourceType: NodeType.TYPHOON,
     targetType: NodeType.INTENSITY,
     fields: [
       { key: 'from_level', label: '原强度等级', type: 'string' },
       { key: 'to_level', label: '目标强度等级', type: 'string' },
       { key: 'change_time', label: '变化时间', type: 'datetime' },
+      { key: 'change_sequence', label: '变化序列', type: 'datetime' },
       { key: 'wind_speed_change', label: '风速变化', type: 'number' },
       { key: 'pressure_change', label: '气压变化', type: 'number' },
     ],
@@ -295,13 +277,14 @@ export const RELATIONSHIP_TYPE_CONFIG = {
     type: RelationshipType.WEAKENED_TO,
     label: '减弱为',
     color: '#fdcb6e',
-    description: '台风强度减弱',
+    description: '台风强度减弱（支持多次减弱到同一强度）',
     sourceType: NodeType.TYPHOON,
     targetType: NodeType.INTENSITY,
     fields: [
       { key: 'from_level', label: '原强度等级', type: 'string' },
       { key: 'to_level', label: '目标强度等级', type: 'string' },
       { key: 'change_time', label: '变化时间', type: 'datetime' },
+      { key: 'change_sequence', label: '变化序列', type: 'datetime' },
       { key: 'wind_speed_change', label: '风速变化', type: 'number' },
       { key: 'pressure_change', label: '气压变化', type: 'number' },
     ],
@@ -322,29 +305,18 @@ export const RELATIONSHIP_TYPE_CONFIG = {
       { key: 'temporal_similarity', label: '时间模式相似度', type: 'number' },
     ],
   },
-  // 扩展关系 - 地理影响
+  // 扩展关系 - 地理影响（AFFECTED_AREA 包含经过附近的语义，距离<100km）
   [RelationshipType.AFFECTED_AREA]: {
     type: RelationshipType.AFFECTED_AREA,
     label: '影响区域',
     color: '#e17055',
-    description: '台风影响的地理区域',
+    description: '台风影响的地理区域（包含经过附近的语义）',
     sourceType: NodeType.TYPHOON,
     targetType: NodeType.LOCATION,
     fields: [
       { key: 'impact_level', label: '影响级别', type: 'string' },
       { key: 'min_distance_km', label: '最小距离(km)', type: 'number' },
-    ],
-  },
-  [RelationshipType.PASSED_NEAR]: {
-    type: RelationshipType.PASSED_NEAR,
-    label: '经过附近',
-    color: '#00b894',
-    description: '台风经过某地附近',
-    sourceType: NodeType.TYPHOON,
-    targetType: NodeType.LOCATION,
-    fields: [
       { key: 'passed_at', label: '经过时间', type: 'datetime' },
-      { key: 'min_distance_km', label: '最小距离(km)', type: 'number' },
     ],
   },
 };
@@ -413,7 +385,6 @@ export function validateRelationship(sourceType, targetType, relationshipType) {
     [NodeType.PATH_POINT, NodeType.PATH_POINT, RelationshipType.NEXT],
     [NodeType.TYPHOON, NodeType.TIME, RelationshipType.OCCURRED_IN],
     [NodeType.TYPHOON, NodeType.LOCATION, RelationshipType.LANDED_AT],
-    [NodeType.TYPHOON, NodeType.INTENSITY, RelationshipType.REACHED_INTENSITY],
     // 扩展关系 - 台风生命周期
     [NodeType.TYPHOON, NodeType.LOCATION, RelationshipType.GENERATED_AT],
     [NodeType.TYPHOON, NodeType.LOCATION, RelationshipType.DISSIPATED_AT],
@@ -422,9 +393,8 @@ export function validateRelationship(sourceType, targetType, relationshipType) {
     [NodeType.TYPHOON, NodeType.INTENSITY, RelationshipType.WEAKENED_TO],
     // 扩展关系 - 相似性
     [NodeType.TYPHOON, NodeType.TYPHOON, RelationshipType.SIMILAR_TO],
-    // 扩展关系 - 地理影响
+    // 扩展关系 - 地理影响（AFFECTED_AREA 包含经过附近的语义）
     [NodeType.TYPHOON, NodeType.LOCATION, RelationshipType.AFFECTED_AREA],
-    [NodeType.TYPHOON, NodeType.LOCATION, RelationshipType.PASSED_NEAR],
   ];
 
   return validRelationships.some(

@@ -177,9 +177,15 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  overflow-y: auto;
   padding: 16px;
   gap: 16px;
+}
+
+/* 当有数据时，使用 flex 布局分配空间 */
+.panel-main-content > *:not(.loading-container):not(.ant-empty) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* ==================== 图谱可视化卡片 ==================== */
@@ -187,6 +193,7 @@
   border-radius: 8px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .graph-card .ant-card-body {
@@ -232,7 +239,7 @@
 /* 图表区域 */
 .graph-chart {
   width: 100%;
-  height: 320px;
+  height: 280px;
   background: #fafafa;
 }
 
@@ -334,10 +341,19 @@
 .context-text-card {
   border-radius: 8px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .context-text-card .ant-card-body {
   padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .context-text-header {
@@ -365,8 +381,9 @@
   word-wrap: break-word;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background: #fff;
-  max-height: 250px;
+  flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
 
 /* ==================== 加载状态 ==================== */
