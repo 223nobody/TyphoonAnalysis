@@ -89,6 +89,11 @@ class Settings(BaseSettings):
 
     QWEN_ASR_MODEL_PATH: str = Field(default="", description="本地Qwen ASR模型路径，为空则使用默认路径")
 
+    # 阿里云 NLS 语音识别配置
+    NLS_APPKEY: str = Field(default="", description="阿里云NLS语音服务AppKey")
+    NLS_ACCESS_KEY_ID: str = Field(default="", description="阿里云NLS语音服务AccessKey ID")
+    NLS_ACCESS_KEY_SECRET: str = Field(default="", description="阿里云NLS语音服务AccessKey Secret")
+
     class Config:
         env_file = ".env"
         case_sensitive = True

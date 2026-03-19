@@ -23,6 +23,7 @@ try:
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
+    SentenceTransformer = None  # type: ignore
     logger.warning("sentence-transformers 未安装，将使用基于规则的回退方案")
 
 
@@ -83,7 +84,7 @@ class EmbeddingService:
             logger.debug(f"查找本地模型失败: {e}")
         return None
         
-    def _load_model(self) -> Optional[SentenceTransformer]:
+    def _load_model(self):
         """懒加载模型 - 优先使用本地模型"""
         if not SENTENCE_TRANSFORMERS_AVAILABLE:
             return None

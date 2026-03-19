@@ -141,6 +141,95 @@ class CMACrawler:
                     pass
 
 
+    async def get_typhoons_by_year(self, year: int) -> List[Dict]:
+        """
+        获取指定年份的所有台风列表（包括已结束的）
+
+        Args:
+            year: 年份，如 2026
+
+        Returns:
+            List[Dict]: 台风列表
+        """
+        try:
+            logger.info(f"开始获取 {year} 年的台风列表")
+            typhoons = await self._get_typhoons_by_year_internal(year)
+            logger.info(f"成功获取 {year} 年的 {len(typhoons)} 个台风")
+            return typhoons
+        except Exception as e:
+            logger.error(f"获取 {year} 年台风列表失败: {e}")
+            return []
+
+    async def _get_typhoons_by_year_internal(self, year: int) -> List[Dict]:
+        """
+        内部方法：获取指定年份的台风列表（使用 list_{year} 接口）
+
+        Returns:
+            List[Dict]: 台风列表
+        """
+        conn = http.client.HTTPSConnection(self.base_url, port=443, timeout=30)
+
+        try:
+            t = int(time.time() * 1000)
+            url = f"/weatherservice/typhoon/jsons/list_{year}?t={t}&callback=typhoon_jsons_list_{year}"
+
+            logger.info(f"请求URL: https://{self.base_url}{url}")
+
+            conn.request('GET', url, headers=self.headers)
+            res = conn.getresponse()
+            content = res.read().decode('utf-8')
+
+            # 解析JSON
+            json_str = content.split('(', 1)[1].rsplit(')', 1)[0]
+            obj = json.loads(json_str, strict=False)
+
+            typhoons = []
+            if 'typhoonList' in obj:
+                for ty_temp in obj['typhoonList']:
+                    try:
+                        temp_id = ty_temp[0]
+                        temp_name_en = ty_temp[1] or 'nameless'
+                        temp_name_ch = ty_temp[2]
+                        temp_code = ty_temp[4]
+                        temp_status = ty_temp[7] if len(ty_temp) > 7 else 'stop'
+
+                        # 跳过无名台风
+                        if temp_name_en == 'nameless':
+                            continue
+
+                        # 从台风编号推断年份
+                        temp_code_str = str(temp_code)
+                        if len(temp_code_str) == 4:
+                            year_suffix = int(temp_code_str[:2])
+                            ty_year = 2000 + year_suffix
+                        elif len(temp_code_str) >= 6:
+                            ty_year = int(temp_code_str[:4])
+                        else:
+                            ty_year = year
+
+                        # 获取该台风的详细信息
+                        detail = await self._get_typhoon_detail(temp_id, temp_code, temp_name_en, temp_name_ch, ty_year, temp_status)
+
+                        if detail:
+                            typhoons.append(detail)
+
+                        # 避免请求过快
+                        time.sleep(0.3)
+
+                    except (IndexError, TypeError, ValueError) as e:
+                        logger.warning(f"跳过异常台风数据：{ty_temp}，错误：{e}")
+                        continue
+            else:
+                logger.warning(f"API响应中没有 'typhoonList' 字段")
+
+            return typhoons
+
+        except Exception as e:
+            logger.error(f"获取 {year} 年台风列表失败：{e}")
+            return []
+        finally:
+            conn.close()
+
     async def _get_default_typhoons(self) -> List[Dict]:
         """
         获取默认接口的台风列表（list_default）
