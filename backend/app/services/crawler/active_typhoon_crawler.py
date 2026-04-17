@@ -28,7 +28,7 @@ class ActiveTyphoonCrawler:
             'Referer': 'https://typhoon.slt.zj.gov.cn/',
         }
 
-    def fetch_active_typhoon_data(self, year_month: str = "202601") -> Optional[Dict]:
+    def fetch_active_typhoon_data(self, typhoon_identifier: str = "202601") -> Optional[Dict]:
         """
         获取活跃台风数据
 
@@ -39,11 +39,12 @@ class ActiveTyphoonCrawler:
             台风数据字典，如果失败返回None
         """
         # 尝试多个可能的URL
-        urls_to_try = [
-            f"{self.base_url}/{year_month}",
-            f"{self.base_url}?year={year_month[:4]}&month={year_month[4:]}",
-            f"{self.base_url}?yearMonth={year_month}",
-        ]
+        typhoon_identifier = str(typhoon_identifier).strip()
+        if not typhoon_identifier:
+            logger.warning("台风编号为空，无法抓取活跃台风数据")
+            return None
+
+        urls_to_try = [f"{self.base_url}/{typhoon_identifier}"]
 
         for url in urls_to_try:
             try:
@@ -358,6 +359,16 @@ class ActiveTyphoonCrawler:
 
     def _parse_time(self, time_str: str) -> datetime:
         """解析时间字符串"""
+        time_str = str(time_str).strip()
+
+        try:
+            iso_time = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
+            if iso_time.tzinfo is not None:
+                return iso_time.replace(tzinfo=None)
+            return iso_time
+        except ValueError:
+            pass
+
         formats = [
             "%Y-%m-%d %H:%M:%S",
             "%Y/%m/%d %H:%M:%S",

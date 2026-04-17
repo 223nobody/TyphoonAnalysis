@@ -85,3 +85,8 @@ temp/
 .claude
 .cursor
 .vscode
+
+# 文档文件
+*.docx
+*.pdf
+论文-基于AI的台风数据分析与可视化平台设计与实现_完整版.md

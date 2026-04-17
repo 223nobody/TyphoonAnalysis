@@ -3,7 +3,7 @@
 """
 from typing import List
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, field_validator
 
 
 class Settings(BaseSettings):
@@ -93,6 +93,24 @@ class Settings(BaseSettings):
     NLS_APPKEY: str = Field(default="", description="阿里云NLS语音服务AppKey")
     NLS_ACCESS_KEY_ID: str = Field(default="", description="阿里云NLS语音服务AccessKey ID")
     NLS_ACCESS_KEY_SECRET: str = Field(default="", description="阿里云NLS语音服务AccessKey Secret")
+
+    @field_validator("DEBUG", "CRAWLER_ENABLED", "CRAWLER_START_ON_STARTUP", mode="before")
+    @classmethod
+    def parse_bool_like_values(cls, value):
+        if isinstance(value, bool):
+            return value
+
+        if value is None:
+            return False
+
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "y", "on", "debug", "dev", "development"}:
+                return True
+            if normalized in {"0", "false", "no", "n", "off", "release", "prod", "production"}:
+                return False
+
+        return value
 
     class Config:
         env_file = ".env"

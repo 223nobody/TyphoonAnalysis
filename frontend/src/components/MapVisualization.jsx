@@ -617,7 +617,7 @@ function MapVisualization({
 
       setPathsData(newPathsData);
 
-      loadForecastPaths();
+      loadForecastPaths(newPathsData);
     } catch (err) {
       console.error("加载台风预测路径失败:", err);
       setPathError(err.message || "加载失败，请稍后重试");
@@ -626,30 +626,58 @@ function MapVisualization({
     }
   };
 
-  // 加载预测路径数据 - 只对活跃台风请求
-  const loadForecastPaths = async () => {
+  // 加载预测路径数据
+  const loadForecastPaths = async (currentPathsData = pathsData) => {
     try {
       setForecastLoading(true);
       const newForecastData = new Map();
 
       for (const typhoonId of selectedTyphoons) {
         try {
-          // 查找台风信息，检查是否为活跃台风
           const typhoonInfo = typhoons.find((t) => t.typhoon_id === typhoonId);
-
-          // 只对活跃台风（status=1）请求预报数据
           if (!typhoonInfo || typhoonInfo.status !== 1) {
-            console.log(
-              `台风 ${typhoonId} 不是活跃台风（status=${typhoonInfo?.status}），跳过预报数据请求`,
-            );
             continue;
           }
 
+          const historicalPath = currentPathsData.get(typhoonId) || [];
+          const latestHistoricalPoint =
+            historicalPath.length > 0
+              ? historicalPath[historicalPath.length - 1]
+              : null;
+
           const data = await getTyphoonForecast(typhoonId);
-          if (data && Array.isArray(data) && data.length > 0) {
-            newForecastData.set(typhoonId, data);
+          const filteredData = Array.isArray(data)
+            ? data
+                .map((agencyForecast) => {
+                  const points = Array.isArray(agencyForecast.points)
+                    ? agencyForecast.points
+                        .filter((point, index, arr) => {
+                          const pointKey = `${point.forecast_time}-${point.latitude}-${point.longitude}`;
+                          return (
+                            arr.findIndex(
+                              (candidate) =>
+                                `${candidate.forecast_time}-${candidate.latitude}-${candidate.longitude}` ===
+                                pointKey,
+                            ) === index
+                          );
+                        })
+                    : [];
+
+                  return {
+                    ...agencyForecast,
+                    points,
+                  };
+                })
+                .filter(
+                  (agencyForecast) =>
+                    Array.isArray(agencyForecast.points) &&
+                    agencyForecast.points.length > 0,
+                )
+            : [];
+          if (filteredData.length > 0) {
+            newForecastData.set(typhoonId, filteredData);
             console.log(`台风 ${typhoonId} 预测路径数据加载成功:`, data);
-            const agencies = data.map((d) => d.agency);
+            const agencies = filteredData.map((d) => d.agency);
             console.log(`台风 ${typhoonId} 的预报机构:`, agencies);
           } else {
             console.log(`台风 ${typhoonId} 暂无预测路径数据`);
@@ -1950,9 +1978,13 @@ function MapVisualization({
                       显示
                     </label>
                   </div>
-                  {Array.from(forecastData.values())
-                    .flat()
-                    .map((agencyForecast) => (
+                  {Array.from(
+                    new Map(
+                      Array.from(forecastData.values())
+                        .flat()
+                        .map((agencyForecast) => [agencyForecast.agency, agencyForecast]),
+                    ).values(),
+                  ).map((agencyForecast) => (
                       <div
                         key={agencyForecast.agency}
                         style={{

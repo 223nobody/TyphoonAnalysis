@@ -9,6 +9,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from app.core.config import settings
 from app.services.scheduler.crawler_executor import (
     run_all_crawlers,
+    run_current_year_typhoons_crawler,
     run_typhoons_crawler,
     run_active_typhoon_crawler
 )
@@ -33,6 +34,14 @@ def start_scheduler():
         trigger=IntervalTrigger(minutes=settings.CRAWLER_INTERVAL_MINUTES),
         id="typhoons_crawler",
         name="台风基本信息定时爬取",
+        replace_existing=True
+    )
+
+    scheduler.add_job(
+        run_current_year_typhoons_crawler,
+        trigger=IntervalTrigger(hours=6),
+        id="current_year_typhoons_crawler",
+        name="当前年份台风补偿同步",
         replace_existing=True
     )
 

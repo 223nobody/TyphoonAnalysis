@@ -483,7 +483,7 @@ function PredictionVisualization() {
       }
 
       setPathsData(newPathsData);
-      loadForecastPaths();
+      loadForecastPaths(newPathsData);
     } catch (err) {
       setPathError(err.message || "加载失败，请稍后重试");
     } finally {
@@ -492,7 +492,7 @@ function PredictionVisualization() {
   };
 
   // 加载预测路径数据
-  const loadForecastPaths = async () => {
+  const loadForecastPaths = async (currentPathsData = pathsData) => {
     try {
       setForecastLoading(true);
       const newForecastData = new Map();
@@ -505,9 +505,60 @@ function PredictionVisualization() {
             continue;
           }
 
+          const historicalPath = currentPathsData.get(typhoonId) || [];
+          const latestHistoricalPoint =
+            historicalPath.length > 0
+              ? historicalPath[historicalPath.length - 1]
+              : null;
+
+          const latestHistoricalTime = latestHistoricalPoint?.timestamp
+            ? new Date(latestHistoricalPoint.timestamp)
+            : null;
+          const forecastDeadline =
+            latestHistoricalTime && !Number.isNaN(latestHistoricalTime.getTime())
+              ? new Date(latestHistoricalTime.getTime() + 24 * 60 * 60 * 1000)
+              : null;
+
           const data = await getTyphoonForecast(typhoonId);
-          if (data && Array.isArray(data) && data.length > 0) {
-            newForecastData.set(typhoonId, data);
+          const filteredData = Array.isArray(data)
+            ? data
+                .map((agencyForecast) => {
+                  const points = Array.isArray(agencyForecast.points)
+                    ? agencyForecast.points
+                        .filter((point) => {
+                          if (!forecastDeadline) return true;
+                          const forecastTime = new Date(point.forecast_time);
+                          return (
+                            !Number.isNaN(forecastTime.getTime()) &&
+                            forecastTime <= forecastDeadline
+                          );
+                        })
+                        .filter((point, index, arr) => {
+                          const pointKey = `${point.forecast_time}-${point.latitude}-${point.longitude}`;
+                          return (
+                            arr.findIndex(
+                              (candidate) =>
+                                `${candidate.forecast_time}-${candidate.latitude}-${candidate.longitude}` ===
+                                pointKey,
+                            ) === index
+                          );
+                        })
+                    : [];
+
+                  return {
+                    ...agencyForecast,
+                    points,
+                  };
+                })
+                .filter(
+                  (agencyForecast) =>
+                    Array.isArray(agencyForecast.points) &&
+                    agencyForecast.points.length > 0,
+                )
+            : [];
+
+          if (filteredData.length > 0) {
+            newForecastData.set(typhoonId, filteredData);
           }
         } catch (err) {
           console.error(`加载台风 ${typhoonId} 预测路径失败:`, err);

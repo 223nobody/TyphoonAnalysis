@@ -4,7 +4,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc, or_
+from sqlalchemy import select, desc, or_, and_
 from pydantic import BaseModel
 from datetime import datetime
 import logging
@@ -333,7 +333,78 @@ async def get_typhoon_forecast(
     2. 对于base_time为NULL的机构：返回所有数据（如中国香港）
     3. 对于中国的预报数据：只返回未来的预报点（forecast_time > 最新实时时间）
     """
-    from sqlalchemy import func, and_
+    from sqlalchemy import func
+
+    latest_time_query = select(func.max(TyphoonPath.timestamp)).where(
+        TyphoonPath.typhoon_id == typhoon_id
+    )
+    latest_time_result = await db.execute(latest_time_query)
+    latest_real_time = latest_time_result.scalar()
+
+    forecasts_result = await db.execute(
+        select(ActiveTyphoonForecast).where(ActiveTyphoonForecast.typhoon_id == typhoon_id)
+    )
+    all_forecasts = forecasts_result.scalars().all()
+
+    if not all_forecasts:
+        logger.warning(f"台风 {typhoon_id} 没有预报数据")
+        return []
+
+    forecasts_by_agency = {}
+    for forecast in all_forecasts:
+        forecasts_by_agency.setdefault(forecast.forecast_agency, []).append(forecast)
+
+    agency_colors = {
+        "中国": "#DC2626",
+        "日本": "#2563EB",
+        "美国": "#16A34A",
+        "中国台湾": "#9333EA",
+        "中国香港": "#EA580C",
+    }
+
+    response = []
+    for agency, agency_forecasts in forecasts_by_agency.items():
+        future_points = []
+        current_or_past_points = []
+
+        for forecast in agency_forecasts:
+            if latest_real_time and forecast.forecast_time > latest_real_time:
+                future_points.append(forecast)
+            else:
+                current_or_past_points.append(forecast)
+
+        selected_points = []
+        if future_points:
+            future_base_times = [point.base_time for point in future_points if point.base_time is not None]
+            if future_base_times:
+                latest_future_base_time = max(future_base_times)
+                selected_points = [
+                    point for point in future_points
+                    if point.base_time == latest_future_base_time
+                ]
+            else:
+                selected_points = future_points
+        elif current_or_past_points:
+            known_base_times = [point.base_time for point in current_or_past_points if point.base_time is not None]
+            if known_base_times:
+                latest_base_time = max(known_base_times)
+                selected_points = [
+                    point for point in current_or_past_points
+                    if point.base_time == latest_base_time
+                ]
+            else:
+                selected_points = current_or_past_points
+
+        selected_points.sort(key=lambda x: x.forecast_time)
+        if selected_points:
+            response.append(ForecastPathResponse(
+                agency=agency,
+                color=agency_colors.get(agency, "#808080"),
+                points=[ForecastPointResponse.model_validate(p) for p in selected_points]
+            ))
+
+    if response:
+        return response
 
     # 1. 获取台风的最新实时位置时间点（用于过滤中国的历史预报数据）
     latest_time_query = select(func.max(TyphoonPath.timestamp)).where(
