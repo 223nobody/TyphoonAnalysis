@@ -4,6 +4,7 @@ __init__.py for models module
 from app.models.user import User
 from app.models.typhoon import Typhoon
 from app.models.image import TyphoonImage
+from app.models.image_analysis import ImageAnalysisResult
 from app.models.video import VideoAnalysisResult
 from app.models.knowledge_graph import (
     NodeType,
@@ -24,6 +25,7 @@ __all__ = [
     "User",
     "Typhoon",
     "TyphoonImage",
+    "ImageAnalysisResult",
     "VideoAnalysisResult",
     "NodeType",
     "RelationshipType",

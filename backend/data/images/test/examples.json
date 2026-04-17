@@ -1,0 +1,23 @@
+[
+  {
+    "id": "train1",
+    "filename": "train1.png",
+    "image_type": "visible",
+    "annotation_type": "red_circle_eye_center",
+    "description": "红圈中心为台风眼中心，眼区较弱但仍位于旋涡云系核心，适合用于学习眼区与外围云带的相对位置。"
+  },
+  {
+    "id": "train2",
+    "filename": "train2.png",
+    "image_type": "visible",
+    "annotation_type": "red_circle_eye_center",
+    "description": "红圈中心为台风眼中心，整体旋涡结构清晰，眼区位于致密云团核心附近，适合作为明显旋涡结构样例。"
+  },
+  {
+    "id": "train3",
+    "filename": "train3.png",
+    "image_type": "visible",
+    "annotation_type": "red_circle_eye_center",
+    "description": "红圈中心为台风眼中心，台风眼规则且清晰，眼墙环绕明显，适合作为成熟台风眼样例。"
+  }
+]

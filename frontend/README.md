@@ -19,7 +19,7 @@
 - **多维度数据分析** - ECharts 图表统计与对比
 - **AI 智能客服** - 集成多模型对话系统，**支持语音输入**
 - **GraphRAG 知识图谱** - 基于 Neo4j 的台风领域知识检索与可视化
-- **图像智能分析** - 卫星云图 AI 识别
+- **图像智能分析** - 卫星云图 few-shot 混合分析与 AI 报告
 - **响应式设计** - 适配多种屏幕尺寸
 
 ## 技术栈
@@ -71,7 +71,7 @@ fronted/
 │   │   ├── AlertCenter.jsx           # 预警管理中心
 │   │   ├── AvatarUpload.jsx          # 头像上传
 │   │   ├── Header.jsx                # 页面头部导航
-│   │   ├── ImageAnalysis.jsx         # 图像分析
+│   │   ├── ImageAnalysis.jsx         # 图像分析与 AI 报告
 │   │   ├── KnowledgeGraphPanel.jsx   # 知识图谱检索面板 (GraphRAG)
 │   │   ├── KnowledgeGraphVisualization.jsx  # 知识图谱可视化
 │   │   ├── Login.jsx                 # 登录页面
@@ -89,7 +89,7 @@ fronted/
 │   │   ├── deepseek.png       # DeepSeek 图标
 │   │   └── taifeng.gif        # 台风动画
 │   ├── services/              # API 服务层
-│   │   ├── api.js             # API 调用封装 (含 ASR 接口)
+│   │   ├── api.js             # API 调用封装 (含图像分析接口)
 │   │   ├── knowledgeGraphConfig.js  # 知识图谱配置 (节点/关系类型定义)
 │   │   ├── ossConfig.js       # OSS 配置
 │   │   ├── ossUploadService.js # OSS 上传服务
@@ -101,7 +101,7 @@ fronted/
 │   │   ├── Auth.css           # 认证页面样式
 │   │   ├── AvatarUpload.css   # 头像上传样式
 │   │   ├── Header.css         # 头部样式
-│   │   ├── ImageAnalysis.css  # 图像分析样式
+│   │   ├── ImageAnalysis.css  # 图像分析样式（含预览与悬浮提示）
 │   │   ├── KnowledgeGraphPanel.css  # 知识图谱面板样式
 │   │   ├── KnowledgeGraphVisualization.css  # 知识图谱可视化样式
 │   │   ├── MapVisualization.css # 地图可视化样式
@@ -263,14 +263,19 @@ const handleVoiceInput = async (audioBlob) => {
 
 **组件**: `ImageAnalysis.jsx`
 
-卫星云图智能分析。
+卫星云图 Few-shot 混合分析界面，支持单图上传、结构化结果展示与 AI 报告查看。
+
+**界面特性**:
+
+- 上传成功后在结果卡片下方居中预览图片
+- 同名图片重复上传时，在上传区上方显示悬浮提示
+- 结构化指标、图像信息、视觉统计与 AI 报告分区展示
 
 **分析模式**:
 
-- **基础模式** - 快速特征提取
-- **高级模式** - 详细结构分析
+- **Few-shot 混合分析（推荐）** - 通义千问 VL + 结构化结果联合判读
+- **融合模式** - 多方法结构化分析
 - **OpenCV 模式** - 传统算法
-- **融合模式** - 综合方法
 
 ### 5. 统计分析
 
@@ -361,6 +366,11 @@ export const sendChatMessage = async (message, model) => { ... }
 // 语音识别
 export const transcribeAudio = async (audioBlob, language) => { ... }
 export const checkASRHealth = async () => { ... }
+
+// 图像分析
+export const uploadImage = async (file, typhoonId) => { ... }
+export const analyzeImage = async (imageId, analysisType, imageType) => { ... }
+export const deleteImage = async (imageId) => { ... }
 
 // GraphRAG 知识图谱 (新增)
 export const graphRAGLocalSearch = async (query, options) => { ... }
@@ -533,6 +543,13 @@ A: 主要支持中文（简体）、英文、粤语，自动检测语言。
 A: 检查网络连接，确保能访问 Leaflet CDN。
 
 ## 更新日志
+
+### v1.3.0 (2026-04-17)
+
+- 图片分析页面新增上传成功图片预览
+- 重复上传同名图片时显示上传区顶部悬浮提示
+- 分析模式调整为 Few-shot 混合分析、融合分析和 OpenCV 分析
+- 图像结果页新增图像信息、视觉统计、AI 报告和风险提示展示
 
 ### v1.2.0 (2026-03-02)
 

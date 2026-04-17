@@ -1,80 +1,81 @@
 """
 图像分析服务
-提供图像处理、特征提取、AI分析等功能
-
-重构说明：
-- 已从通义千问API调用改为混合方案（传统方法 + 迁移学习）
-- 集成OpenCV传统图像处理、深度学习模型和决策融合
-- 保持API接口兼容性
+提供图像上传、结构化分析、few-shot AI 报告生成与结果持久化
 """
-import logging
+import io
 import json
-from typing import List, Optional, Dict, Any
+import logging
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-import io
+from typing import Any, Dict, List, Optional
 
+import numpy as np
+from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from PIL import Image
-import numpy as np
 
 from app.models.image import TyphoonImage
+from app.models.image_analysis import ImageAnalysisResult
+from app.services.ai.qwen_image_service import qwen_image_service
 
-# 导入新的分析模块
-from .opencv_analyzer import OpenCVAnalyzer, OPENCV_AVAILABLE
 from .dl_analyzer import DLAnalyzer, PYTORCH_AVAILABLE
 from .fusion_analyzer import FusionAnalyzer
+from .opencv_analyzer import OPENCV_AVAILABLE, OpenCVAnalyzer
 
 logger = logging.getLogger(__name__)
+
+
+class DuplicateImageError(ValueError):
+    """重复上传同名图片时抛出的异常"""
 
 
 class ImageAnalysisService:
     """
     图像分析服务类
 
-    重构说明：
-    - 集成混合方案（OpenCV + 深度学习 + 决策融合）
-    - 支持多种分析类型：basic/advanced/opencv/fusion
-    - 保持向后兼容性
+    支持：
+    - basic: 基础统计分析
+    - advanced: 高级特征提取
+    - opencv: 传统视觉分析
+    - fusion: OpenCV + 深度学习融合
+    - hybrid_ai: 结构化结果 + few-shot 通义千问报告
     """
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.save_dir = Path("data/images")
+        self.base_dir = Path(__file__).resolve().parents[3]
+        self.save_dir = self.base_dir / "data" / "images"
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
-        # 初始化分析器
         self.opencv_analyzer = None
         self.dl_analyzer = None
         self.fusion_analyzer = None
+        self.qwen_image_service = qwen_image_service
 
-        # 尝试初始化OpenCV分析器
         if OPENCV_AVAILABLE:
             try:
                 self.opencv_analyzer = OpenCVAnalyzer()
                 logger.info("✅ OpenCV分析器初始化成功")
-            except Exception as e:
-                logger.warning(f"⚠️ OpenCV分析器初始化失败: {e}")
+            except Exception as exc:
+                logger.warning("⚠️ OpenCV分析器初始化失败: %s", exc)
         else:
             logger.warning("⚠️ OpenCV未安装，传统图像处理功能不可用")
 
-        # 尝试初始化深度学习分析器
         if PYTORCH_AVAILABLE:
             try:
                 self.dl_analyzer = DLAnalyzer()
                 logger.info("✅ 深度学习分析器初始化成功")
-            except Exception as e:
-                logger.warning(f"⚠️ 深度学习分析器初始化失败: {e}")
+            except Exception as exc:
+                logger.warning("⚠️ 深度学习分析器初始化失败: %s", exc)
         else:
             logger.warning("⚠️ PyTorch未安装，深度学习功能不可用")
 
-        # 初始化决策融合分析器
         try:
             self.fusion_analyzer = FusionAnalyzer()
             logger.info("✅ 决策融合分析器初始化成功")
-        except Exception as e:
-            logger.warning(f"⚠️ 决策融合分析器初始化失败: {e}")
+        except Exception as exc:
+            logger.warning("⚠️ 决策融合分析器初始化失败: %s", exc)
 
     async def save_image(
         self,
@@ -82,37 +83,32 @@ class ImageAnalysisService:
         content: bytes,
         typhoon_id: Optional[str] = None,
         image_type: str = "satellite",
-        source: Optional[str] = None
+        source: Optional[str] = None,
     ) -> TyphoonImage:
-        """
-        保存图像到数据库
-
-        Args:
-            filename: 文件名
-            content: 图像二进制内容
-            typhoon_id: 台风ID
-            image_type: 图像类型
-            source: 数据源
-
-        Returns:
-            图像记录对象
-        """
+        """保存图像到数据库和文件系统"""
         try:
-            # 解析图像元数据
+            safe_filename = Path(filename or "").name.strip()
+            if not safe_filename:
+                raise ValueError("上传的文件名无效")
+
+            existing_image = await self.get_image_by_filename(safe_filename)
+            if existing_image:
+                raise DuplicateImageError(
+                    f"图片 {safe_filename} 已上传（ID: {existing_image.id}），同一图片无需重复上传"
+                )
+
             img = Image.open(io.BytesIO(content))
             width, height = img.size
             img_format = img.format
 
-            # 保存到文件系统
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            file_path = self.save_dir / image_type / f"{timestamp}_{filename}"
+            file_path = self.save_dir / image_type / f"{timestamp}_{safe_filename}"
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.write_bytes(content)
 
-            # 创建数据库记录
             image_record = TyphoonImage(
                 typhoon_id=typhoon_id,
-                filename=filename,
+                filename=safe_filename,
                 image_type=image_type,
                 source=source,
                 file_path=str(file_path),
@@ -120,32 +116,30 @@ class ImageAnalysisService:
                 width=width,
                 height=height,
                 format=img_format.lower() if img_format else None,
-                upload_time=datetime.now()
+                upload_time=datetime.now(),
             )
 
             self.db.add(image_record)
             await self.db.commit()
             await self.db.refresh(image_record)
 
-            logger.info(f"✅ 图像保存成功: {filename} (ID: {image_record.id})")
+            logger.info("✅ 图像保存成功: %s (ID: %s)", safe_filename, image_record.id)
             return image_record
-
-        except Exception as e:
-            logger.error(f"❌ 图像保存失败: {filename} - {e}", exc_info=True)
+        except DuplicateImageError:
+            await self.db.rollback()
+            raise
+        except Exception as exc:
+            logger.error("❌ 图像保存失败: %s - %s", filename, exc, exc_info=True)
             await self.db.rollback()
             raise
 
     async def get_image(self, image_id: int) -> Optional[TyphoonImage]:
-        """
-        获取图像记录
-
-        Args:
-            image_id: 图像ID
-
-        Returns:
-            图像记录对象
-        """
         query = select(TyphoonImage).where(TyphoonImage.id == image_id)
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_image_by_filename(self, filename: str) -> Optional[TyphoonImage]:
+        query = select(TyphoonImage).where(TyphoonImage.filename == filename)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
@@ -153,61 +147,32 @@ class ImageAnalysisService:
         self,
         typhoon_id: str,
         image_type: Optional[str] = None,
-        limit: int = 20
+        limit: int = 20,
     ) -> List[TyphoonImage]:
-        """
-        获取指定台风的图像列表
-
-        Args:
-            typhoon_id: 台风ID
-            image_type: 图像类型筛选
-            limit: 返回数量限制
-
-        Returns:
-            图像列表
-        """
         query = select(TyphoonImage).where(TyphoonImage.typhoon_id == typhoon_id)
-
         if image_type:
             query = query.where(TyphoonImage.image_type == image_type)
-
         query = query.order_by(TyphoonImage.upload_time.desc()).limit(limit)
-
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
     async def analyze_image(
         self,
         image: TyphoonImage,
-        analysis_type: str = "fusion",
-        image_type: str = "infrared"
+        analysis_type: str = "hybrid_ai",
+        image_type: str = "visible",
     ) -> Dict[str, Any]:
-        """
-        分析图像（重构版本）
-
-        Args:
-            image: 图像记录对象
-            analysis_type: 分析类型
-                - basic: 基础统计分析（保持向后兼容）
-                - advanced: 高级特征提取（保持向后兼容）
-                - opencv: 仅使用OpenCV传统方法
-                - fusion: 混合方案（OpenCV + 深度学习 + 决策融合）⭐推荐
-            image_type: 图像类型（infrared=红外图, visible=可见光图）
-
-        Returns:
-            分析结果字典
-        """
+        """分析图像并持久化分析结果"""
         start_time = datetime.now()
+        analysis_record = await self._create_analysis_record(image.id, analysis_type)
 
         try:
-            # 读取图像
             img_path = Path(image.file_path)
             if not img_path.exists():
                 raise FileNotFoundError(f"图像文件不存在: {img_path}")
 
             img = Image.open(img_path)
 
-            # 根据分析类型执行不同的分析
             if analysis_type == "basic":
                 result = await self._basic_analysis(img)
             elif analysis_type == "advanced":
@@ -216,240 +181,352 @@ class ImageAnalysisService:
                 result = await self._opencv_analysis(img, image_type)
             elif analysis_type == "fusion":
                 result = await self._fusion_analysis(img, image_type)
+            elif analysis_type == "hybrid_ai":
+                result = await self._hybrid_ai_analysis(img, img_path, image_type)
             else:
                 raise ValueError(f"不支持的分析类型: {analysis_type}")
 
-            # 计算处理时间
+            result = self._attach_image_context(result, image, img, image_type)
             processing_time = (datetime.now() - start_time).total_seconds()
+            result["analysis_id"] = analysis_record.id
+            result["status"] = "completed"
             result["processing_time"] = processing_time
+            result["analysis_type"] = analysis_type
+            result["analyzed_at"] = datetime.now().isoformat()
 
-            logger.info(f"✅ 图像分析完成: ID={image.id}, 类型={analysis_type}, 耗时={processing_time:.2f}s")
+            await self._complete_analysis_record(analysis_record, result)
+            logger.info(
+                "✅ 图像分析完成: image_id=%s, analysis_id=%s, 类型=%s, 耗时=%.2fs",
+                image.id,
+                analysis_record.id,
+                analysis_type,
+                processing_time,
+            )
             return result
-
-        except Exception as e:
-            logger.error(f"❌ 图像分析失败: {e}", exc_info=True)
+        except Exception as exc:
+            logger.error("❌ 图像分析失败: %s", exc, exc_info=True)
+            await self._fail_analysis_record(
+                analysis_record,
+                error_message=str(exc),
+                processing_time=(datetime.now() - start_time).total_seconds(),
+            )
             raise
+
+    async def _create_analysis_record(
+        self,
+        image_id: int,
+        analysis_type: str,
+    ) -> ImageAnalysisResult:
+        record = ImageAnalysisResult(
+            image_id=image_id,
+            analysis_type=analysis_type,
+            status="processing",
+            analyzed_at=datetime.now(),
+        )
+        self.db.add(record)
+        await self.db.commit()
+        await self.db.refresh(record)
+        return record
+
+    async def _complete_analysis_record(
+        self,
+        record: ImageAnalysisResult,
+        result: Dict[str, Any],
+    ) -> None:
+        stored_result = deepcopy(result)
+        stored_result.pop("ai_report", None)
+        stored_result.pop("summary", None)
+        stored_result.pop("risk_flags", None)
+        stored_result.pop("fewshot_examples_used", None)
+        stored_result.pop("model_used", None)
+        stored_result.pop("status", None)
+
+        record.status = "completed"
+        record.method = result.get("method")
+        record.result_data = json.dumps(stored_result, ensure_ascii=False)
+        record.confidence = result.get("confidence")
+        record.summary = result.get("summary")
+        record.ai_report = result.get("ai_report")
+        record.consistency_score = result.get("consistency_score")
+        record.risk_flags = json.dumps(result.get("risk_flags", []), ensure_ascii=False)
+        record.fewshot_examples = json.dumps(
+            result.get("fewshot_examples_used", []),
+            ensure_ascii=False,
+        )
+        record.ai_model = result.get("model_used")
+        record.processing_time = result.get("processing_time")
+        record.error_message = None
+        record.analyzed_at = datetime.now()
+
+        await self.db.commit()
+        await self.db.refresh(record)
+
+    async def _fail_analysis_record(
+        self,
+        record: ImageAnalysisResult,
+        error_message: str,
+        processing_time: float,
+    ) -> None:
+        record.status = "failed"
+        record.error_message = error_message
+        record.processing_time = processing_time
+        record.analyzed_at = datetime.now()
+        await self.db.commit()
 
     async def _opencv_analysis(self, img: Image.Image, image_type: str) -> Dict[str, Any]:
-        """
-        OpenCV传统图像分析
-
-        Args:
-            img: PIL图像对象
-            image_type: 图像类型
-
-        Returns:
-            分析结果
-        """
         if self.opencv_analyzer is None:
-            raise RuntimeError("OpenCV分析器未初始化，请安装opencv-python")
+            raise RuntimeError("OpenCV分析器未初始化，请安装 opencv-python")
 
-        try:
-            result = self.opencv_analyzer.analyze(img, image_type)
-            return result
-        except Exception as e:
-            logger.error(f"❌ OpenCV分析失败: {e}", exc_info=True)
-            raise
+        result = self.opencv_analyzer.analyze(img, image_type)
+        result.setdefault("method", "opencv")
+        return result
 
     async def _fusion_analysis(self, img: Image.Image, image_type: str) -> Dict[str, Any]:
-        """
-        混合方案分析（OpenCV + 深度学习 + 决策融合）
-
-        Args:
-            img: PIL图像对象
-            image_type: 图像类型
-
-        Returns:
-            分析结果
-        """
         try:
-            # 1. OpenCV传统分析
-            opencv_result = {}
+            opencv_result: Dict[str, Any]
             if self.opencv_analyzer is not None:
                 try:
                     opencv_result = self.opencv_analyzer.analyze(img, image_type)
                     logger.info("✅ OpenCV分析完成")
-                except Exception as e:
-                    logger.warning(f"⚠️ OpenCV分析失败: {e}")
-                    opencv_result = {"method": "opencv", "error": str(e)}
+                except Exception as exc:
+                    logger.warning("⚠️ OpenCV分析失败: %s", exc)
+                    opencv_result = {"method": "opencv", "error": str(exc)}
             else:
-                logger.warning("⚠️ OpenCV分析器不可用")
                 opencv_result = {"method": "opencv", "status": "unavailable"}
 
-            # 2. 深度学习分析
-            dl_result = {}
+            dl_result: Dict[str, Any]
             if self.dl_analyzer is not None:
                 try:
                     dl_result = self.dl_analyzer.analyze(img)
                     logger.info("✅ 深度学习分析完成")
-                except Exception as e:
-                    logger.warning(f"⚠️ 深度学习分析失败: {e}")
-                    dl_result = {"method": "deep_learning", "error": str(e)}
+                except Exception as exc:
+                    logger.warning("⚠️ 深度学习分析失败: %s", exc)
+                    dl_result = {"method": "deep_learning", "error": str(exc)}
             else:
-                logger.warning("⚠️ 深度学习分析器不可用")
                 dl_result = {"method": "deep_learning", "status": "unavailable"}
 
-            # 3. 决策融合
             if self.fusion_analyzer is not None:
                 try:
                     fused_result = self.fusion_analyzer.fuse(opencv_result, dl_result)
-                    logger.info("✅ 决策融合完成")
+                    fused_result["opencv_result"] = opencv_result
+                    fused_result["dl_result"] = dl_result
                     return fused_result
-                except Exception as e:
-                    logger.warning(f"⚠️ 决策融合失败: {e}")
-                    # 融合失败，返回OpenCV结果作为备选
-                    return opencv_result
-            else:
-                # 融合分析器不可用，返回OpenCV结果
-                return opencv_result
+                except Exception as exc:
+                    logger.warning("⚠️ 决策融合失败，回退到 OpenCV: %s", exc)
 
-        except Exception as e:
-            logger.error(f"❌ 混合方案分析失败: {e}", exc_info=True)
+            fallback = dict(opencv_result)
+            fallback["opencv_result"] = opencv_result
+            fallback["dl_result"] = dl_result
+            return fallback
+        except Exception as exc:
+            logger.error("❌ 混合方案分析失败: %s", exc, exc_info=True)
             raise
 
-    async def _basic_analysis(self, img: Image.Image) -> Dict[str, Any]:
-        """
-        基础图像分析
+    async def _hybrid_ai_analysis(
+        self,
+        img: Image.Image,
+        img_path: Path,
+        image_type: str,
+    ) -> Dict[str, Any]:
+        structured_result = await self._fusion_analysis(img, image_type)
 
-        Args:
-            img: PIL图像对象
+        ai_result = await self.qwen_image_service.analyze_image(
+            image_path=str(img_path),
+            image_type=image_type,
+            structured_result=structured_result,
+        )
 
-        Returns:
-            分析结果
-        """
-        # 转换为numpy数组
+        result = deepcopy(structured_result)
+        result["method"] = "hybrid_ai"
+        result["model_used"] = ai_result.get("model_used")
+        result["fewshot_examples_used"] = ai_result.get("fewshot_examples_used", [])
+        result["risk_flags"] = []
+
+        if ai_result.get("success"):
+            ai_consistency = ai_result.get("consistency_score")
+            fallback_consistency = result.get("confidence", 0.0)
+            result["summary"] = ai_result.get("summary")
+            result["ai_report"] = ai_result.get("markdown_report")
+            result["consistency_score"] = (
+                ai_consistency
+                if isinstance(ai_consistency, (int, float))
+                else fallback_consistency
+            )
+            result["risk_flags"].extend(ai_result.get("risk_flags", []))
+            result.setdefault("details", {})
+            result["details"]["ai_result"] = {
+                "overall_assessment": ai_result.get("overall_assessment"),
+                "eye_detected": ai_result.get("eye_detected"),
+                "eye_position_description": ai_result.get("eye_position_description"),
+                "eye_confidence": ai_result.get("eye_confidence"),
+                "eye_evidence": ai_result.get("eye_evidence", []),
+                "center_location_hint": ai_result.get("center_location_hint"),
+                "intensity_assessment": ai_result.get("intensity_assessment"),
+                "organization_assessment": ai_result.get("organization_assessment"),
+                "development_stage": ai_result.get("development_stage"),
+                "cloud_system_description": ai_result.get("cloud_system_description"),
+                "analysis_highlights": ai_result.get("analysis_highlights", []),
+                "analysis_limitations": ai_result.get("analysis_limitations", []),
+                "fewshot_examples_used": ai_result.get("fewshot_examples_used", []),
+            }
+
+            if (
+                isinstance(ai_result.get("eye_detected"), bool)
+                and result.get("eye")
+                and ai_result.get("eye_detected") != result["eye"].get("detected")
+            ):
+                result["risk_flags"].append("AI 判读与结构化结果在台风眼判断上存在差异")
+
+            if (
+                isinstance(result.get("consistency_score"), (int, float))
+                and result["consistency_score"] < 0.65
+            ):
+                result["risk_flags"].append("AI 判读与结构化结果一致性较低，建议人工复核")
+        else:
+            result["summary"] = "AI 报告生成失败，已返回基础结构化分析结果。"
+            result["ai_report"] = (
+                "## 图像分析说明\n"
+                f"- AI 报告生成失败：{ai_result.get('error', '未知错误')}\n"
+                "- 当前结果主要来自本地结构化分析，可作为辅助判读依据。"
+            )
+            result["consistency_score"] = result.get("confidence", 0.0)
+            result["risk_flags"].append("AI 报告生成失败，当前结果主要依赖本地结构化分析")
+
+        if not result["fewshot_examples_used"]:
+            result["risk_flags"].append("未加载到 few-shot 标注样例，AI 判读仅使用目标图和结构化结果")
+
+        if self.dl_analyzer is None or not getattr(self.dl_analyzer, "models_loaded", False):
+            result["risk_flags"].append("深度学习模型未加载，结构化结果主要依赖 OpenCV 与融合策略")
+
+        return result
+
+    def _attach_image_context(
+        self,
+        result: Dict[str, Any],
+        image: TyphoonImage,
+        img: Image.Image,
+        image_type: str,
+    ) -> Dict[str, Any]:
+        details = result.setdefault("details", {})
+        details["image_metadata"] = {
+            "filename": image.filename,
+            "image_type": image_type,
+            "stored_image_type": image.image_type,
+            "format": image.format or (img.format.lower() if img.format else None),
+            "width": image.width or img.width,
+            "height": image.height or img.height,
+            "file_size": image.file_size,
+            "mode": img.mode,
+            "bands": list(img.getbands()),
+            "upload_time": image.upload_time.isoformat() if image.upload_time else None,
+        }
+        details["visual_metrics"] = self._build_visual_metrics(img)
+
+        if result.get("opencv_result") is not None:
+            details.setdefault("opencv_result", result.get("opencv_result"))
+        if result.get("dl_result") is not None:
+            details.setdefault("dl_result", result.get("dl_result"))
+        if result.get("components") is not None:
+            details.setdefault("components", result.get("components"))
+
+        return result
+
+    def _build_visual_metrics(self, img: Image.Image) -> Dict[str, Any]:
         img_array = np.array(img)
+        return {
+            "brightness": float(np.mean(img_array)),
+            "contrast": float(np.std(img_array)),
+            "sharpness": self._calculate_sharpness(img_array),
+            "texture": self._calculate_texture(img_array),
+            "cloud_coverage": self._estimate_cloud_coverage(img_array),
+            "min_intensity": int(np.min(img_array)),
+            "max_intensity": int(np.max(img_array)),
+            "dynamic_range": int(np.max(img_array) - np.min(img_array)),
+        }
 
-        # 基础统计信息
-        result = {
+    async def _basic_analysis(self, img: Image.Image) -> Dict[str, Any]:
+        img_array = np.array(img)
+        return {
             "type": "basic",
+            "method": "basic",
             "dimensions": {
                 "width": img.width,
                 "height": img.height,
-                "channels": len(img.getbands())
+                "channels": len(img.getbands()),
             },
             "statistics": {
                 "mean": float(np.mean(img_array)),
                 "std": float(np.std(img_array)),
                 "min": int(np.min(img_array)),
-                "max": int(np.max(img_array))
+                "max": int(np.max(img_array)),
             },
             "color_info": {
                 "mode": img.mode,
-                "bands": img.getbands()
+                "bands": img.getbands(),
             },
-            "confidence": 1.0
+            "confidence": 1.0,
         }
 
-        return result
-
     async def _advanced_analysis(self, img: Image.Image) -> Dict[str, Any]:
-        """
-        高级图像分析（特征提取）
-        保持向后兼容性
-
-        Args:
-            img: PIL图像对象
-
-        Returns:
-            分析结果
-        """
         img_array = np.array(img)
-
-        # 高级特征提取
-        result = {
+        return {
             "type": "advanced",
+            "method": "advanced",
             "features": {
                 "brightness": float(np.mean(img_array)),
                 "contrast": float(np.std(img_array)),
                 "sharpness": self._calculate_sharpness(img_array),
-                "texture": self._calculate_texture(img_array)
+                "texture": self._calculate_texture(img_array),
             },
             "cloud_coverage": self._estimate_cloud_coverage(img_array),
             "intensity_distribution": self._analyze_intensity_distribution(img_array),
-            "confidence": 0.85
+            "confidence": 0.85,
         }
 
-        return result
-
     def _calculate_sharpness(self, img_array: np.ndarray) -> float:
-        """计算图像清晰度"""
-        # 使用Laplacian算子计算清晰度
-        if len(img_array.shape) == 3:
-            gray = np.mean(img_array, axis=2)
-        else:
-            gray = img_array
-
-        # 简化计算
+        gray = np.mean(img_array, axis=2) if len(img_array.shape) == 3 else img_array
         return float(np.std(gray))
 
     def _calculate_texture(self, img_array: np.ndarray) -> float:
-        """计算图像纹理复杂度"""
-        if len(img_array.shape) == 3:
-            gray = np.mean(img_array, axis=2)
-        else:
-            gray = img_array
-
-        # 简化的纹理计算
+        gray = np.mean(img_array, axis=2) if len(img_array.shape) == 3 else img_array
         return float(np.std(np.diff(gray, axis=0)) + np.std(np.diff(gray, axis=1)))
 
     def _estimate_cloud_coverage(self, img_array: np.ndarray) -> float:
-        """估算云量覆盖率"""
-        # 简化的云量估算（基于亮度阈值）
-        if len(img_array.shape) == 3:
-            brightness = np.mean(img_array, axis=2)
-        else:
-            brightness = img_array
-
+        brightness = np.mean(img_array, axis=2) if len(img_array.shape) == 3 else img_array
         cloud_pixels = np.sum(brightness > 128)
         total_pixels = brightness.size
-
         return float(cloud_pixels / total_pixels)
 
     def _analyze_intensity_distribution(self, img_array: np.ndarray) -> Dict[str, Any]:
-        """分析强度分布"""
-        if len(img_array.shape) == 3:
-            intensity = np.mean(img_array, axis=2)
-        else:
-            intensity = img_array
-
+        intensity = np.mean(img_array, axis=2) if len(img_array.shape) == 3 else img_array
         hist, bins = np.histogram(intensity, bins=10)
-
         return {
             "histogram": hist.tolist(),
             "bins": bins.tolist(),
-            "peak_intensity": float(bins[np.argmax(hist)])
+            "peak_intensity": float(bins[np.argmax(hist)]),
         }
 
     async def delete_image(self, image_id: int) -> bool:
-        """
-        删除图像
-
-        Args:
-            image_id: 图像ID
-
-        Returns:
-            是否删除成功
-        """
         try:
             image = await self.get_image(image_id)
             if not image:
                 return False
 
-            # 删除文件
+            result_query = select(ImageAnalysisResult).where(ImageAnalysisResult.image_id == image_id)
+            result_rows = await self.db.execute(result_query)
+            for analysis_result in result_rows.scalars().all():
+                await self.db.delete(analysis_result)
+
             if image.file_path:
                 file_path = Path(image.file_path)
                 if file_path.exists():
                     file_path.unlink()
 
-            # 删除数据库记录
             await self.db.delete(image)
             await self.db.commit()
-
-            logger.info(f"✅ 图像删除成功: ID={image_id}")
+            logger.info("✅ 图像删除成功: ID=%s", image_id)
             return True
-
-        except Exception as e:
-            logger.error(f"❌ 图像删除失败: {e}", exc_info=True)
+        except Exception as exc:
+            logger.error("❌ 图像删除失败: %s", exc, exc_info=True)
             await self.db.rollback()
             return False

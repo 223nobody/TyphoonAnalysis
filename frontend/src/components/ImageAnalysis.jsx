@@ -8,7 +8,7 @@
  * - 新增视频分析功能：支持视频上传、AI视频分析
  * - 美化UI，支持拖放上传
  */
-import React, { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { marked } from "marked";
 marked.setOptions({
   async: false,
@@ -28,20 +28,23 @@ function ImageAnalysis() {
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [uploadedImageId, setUploadedImageId] = useState(null);
+  const [uploadInfo, setUploadInfo] = useState(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState("");
+  const [uploadToast, setUploadToast] = useState(null);
   const [imageDragOver, setImageDragOver] = useState(false);
   const imageInputRef = useRef(null);
+  const imageReportContentRef = useRef(null);
 
   const [analysisForm, setAnalysisForm] = useState({
     typhoonId: "",
     imageFile: null,
-    analysisType: "fusion",
-    imageType: "infrared",
+    analysisType: "hybrid_ai",
+    imageType: "visible",
   });
 
   // ============ 视频分析状态 ============
   const [activeTab, setActiveTab] = useState("image");
   const [videoFile, setVideoFile] = useState(null);
-  const [analysisId, setAnalysisId] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [videoResult, setVideoResult] = useState(null);
   const [videoError, setVideoError] = useState(null);
@@ -49,7 +52,7 @@ function ImageAnalysis() {
   const videoInputRef = useRef(null);
 
   // PDF导出引用
-  const reportContentRef = useRef(null);
+  const videoReportContentRef = useRef(null);
 
   const [videoAnalysisConfig, setVideoAnalysisConfig] = useState({
     analysisType: "comprehensive",
@@ -66,71 +69,77 @@ function ImageAnalysis() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  // 获取报告内容
-  const getReportContent = () => {
-    if (!videoResult) return "";
-    const aiAnalysis = videoResult.ai_analysis;
-    let reportContent = "";
-
-    if (aiAnalysis) {
-      if (typeof aiAnalysis === "string") {
-        reportContent = aiAnalysis;
-      } else if (aiAnalysis.description) {
-        const desc = aiAnalysis.description;
-        if (typeof desc === "string") {
-          reportContent = desc;
-        } else if (Array.isArray(desc)) {
-          reportContent = desc
-            .map((item) => {
-              if (typeof item === "string") return item;
-              if (item && item.text) return item.text;
-              return JSON.stringify(item);
-            })
-            .join("\n");
-        } else if (typeof desc === "object") {
-          reportContent = JSON.stringify(desc, null, 2);
-        } else {
-          reportContent = String(desc);
-        }
-      } else {
-        reportContent = JSON.stringify(aiAnalysis, null, 2);
-      }
-    }
-    return reportContent;
+  const formatDateTime = (value) => {
+    if (!value) return null;
+    return new Date(value).toLocaleString("zh-CN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
-  // 下载报告（Markdown格式）
-  const handleDownloadReport = () => {
-    const reportContent = getReportContent();
-    if (!reportContent) {
-      alert("暂无报告内容可下载");
+  const formatPercentage = (value) => {
+    if (typeof value !== "number") return "暂无";
+    return `${(value * 100).toFixed(1)}%`;
+  };
+
+  useEffect(() => {
+    if (!analysisForm.imageFile) {
+      setUploadPreviewUrl("");
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(analysisForm.imageFile);
+    setUploadPreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [analysisForm.imageFile]);
+
+  useEffect(() => {
+    if (!uploadToast) return undefined;
+
+    const timer = window.setTimeout(() => {
+      setUploadToast(null);
+    }, 2000);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [uploadToast]);
+
+  const downloadMarkdown = (content, filename, emptyMessage) => {
+    if (!content) {
+      alert(emptyMessage);
       return;
     }
 
-    const blob = new Blob([reportContent], { type: "text/markdown" });
+    const blob = new Blob([content], { type: "text/markdown" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `video_analysis_${videoResult.analysis_id}.md`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   };
 
-  // 导出为PDF
-  const handleExportPDF = () => {
-    if (!reportContentRef.current) {
-      alert("暂无报告内容可导出");
+  const exportElementToPdf = (elementRef, filename, emptyMessage) => {
+    if (!elementRef.current) {
+      alert(emptyMessage);
       return;
     }
 
     const timestamp = new Date().toISOString().slice(0, 10);
+    const finalFilename = `${filename}_${timestamp}.pdf`;
 
-    // PDF配置选项
     const opt = {
       margin: [15, 15, 15, 15],
-      filename: `视频分析报告_${videoResult.analysis_id}_${timestamp}.pdf`,
+      filename: finalFilename,
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: {
         scale: 2,
@@ -153,10 +162,7 @@ function ImageAnalysis() {
       },
     };
 
-    // 克隆报告内容以避免修改原始DOM
-    const element = reportContentRef.current.cloneNode(true);
-
-    // 移除所有高度限制和滚动条，确保完整内容可见
+    const element = elementRef.current.cloneNode(true);
     const contentSections = element.querySelectorAll(".content-text");
     contentSections.forEach((section) => {
       section.style.maxHeight = "none";
@@ -164,7 +170,6 @@ function ImageAnalysis() {
       section.style.height = "auto";
     });
 
-    // 添加PDF样式优化 - 紧凑格式
     const style = document.createElement("style");
     style.textContent = `
       * {
@@ -280,20 +285,17 @@ function ImageAnalysis() {
     `;
     element.insertBefore(style, element.firstChild);
 
-    // 显示加载提示
     const loadingMsg = document.createElement("div");
     loadingMsg.textContent = "正在生成PDF，请稍候...";
     loadingMsg.style.cssText =
       "position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 20px 40px; border-radius: 8px; z-index: 9999; font-size: 16px;";
     document.body.appendChild(loadingMsg);
 
-    // 生成PDF
     html2pdf()
       .set(opt)
       .from(element)
       .save()
       .then(() => {
-        console.log("PDF导出成功");
         document.body.removeChild(loadingMsg);
         alert("PDF导出成功！");
       })
@@ -304,10 +306,85 @@ function ImageAnalysis() {
       });
   };
 
+  const getVideoReportContent = () => {
+    if (!videoResult) return "";
+    const aiAnalysis = videoResult.ai_analysis;
+    let reportContent = "";
+
+    if (aiAnalysis) {
+      if (typeof aiAnalysis === "string") {
+        reportContent = aiAnalysis;
+      } else if (aiAnalysis.description) {
+        const desc = aiAnalysis.description;
+        if (typeof desc === "string") {
+          reportContent = desc;
+        } else if (Array.isArray(desc)) {
+          reportContent = desc
+            .map((item) => {
+              if (typeof item === "string") return item;
+              if (item && item.text) return item.text;
+              return JSON.stringify(item);
+            })
+            .join("\n");
+        } else if (typeof desc === "object") {
+          reportContent = JSON.stringify(desc, null, 2);
+        } else {
+          reportContent = String(desc);
+        }
+      } else {
+        reportContent = JSON.stringify(aiAnalysis, null, 2);
+      }
+    }
+    return reportContent;
+  };
+
+  const getImageReportContent = () => {
+    if (!result?.ai_report) return "";
+    return typeof result.ai_report === "string"
+      ? result.ai_report
+      : JSON.stringify(result.ai_report, null, 2);
+  };
+
+  const handleDownloadVideoReport = () => {
+    downloadMarkdown(
+      getVideoReportContent(),
+      `video_analysis_${videoResult.analysis_id}.md`,
+      "暂无报告内容可下载",
+    );
+  };
+
+  const handleDownloadImageReport = () => {
+    downloadMarkdown(
+      getImageReportContent(),
+      `image_analysis_${result.analysis_id}.md`,
+      "暂无图像分析报告可下载",
+    );
+  };
+
+  const handleExportVideoPDF = () => {
+    exportElementToPdf(
+      videoReportContentRef,
+      `视频分析报告_${videoResult.analysis_id}`,
+      "暂无报告内容可导出",
+    );
+  };
+
+  const handleExportImagePDF = () => {
+    exportElementToPdf(
+      imageReportContentRef,
+      `图像分析报告_${result.analysis_id}`,
+      "暂无图像分析报告可导出",
+    );
+  };
+
   // ============ 图像分析处理函数 ============
   const handleImageFile = (file) => {
     if (!file) return;
     setAnalysisForm({ ...analysisForm, imageFile: file });
+    setUploadedImageId(null);
+    setUploadInfo(null);
+    setUploadToast(null);
+    setResult(null);
     setError(null);
   };
 
@@ -355,9 +432,16 @@ function ImageAnalysis() {
       );
 
       setUploadedImageId(data.image_id);
-      alert(`图像上传成功！图像ID: ${data.image_id}`);
+      setUploadInfo(data);
+      setUploadToast(null);
+      setResult(null);
     } catch (err) {
-      setError(err.message || "图像上传失败");
+      setUploadInfo(null);
+      setError(null);
+      setUploadToast({
+        type: "error",
+        message: err.message || "图像上传失败",
+      });
     } finally {
       setLoading(false);
     }
@@ -408,7 +492,6 @@ function ImageAnalysis() {
     }
     setVideoFile(file);
     setVideoError(null);
-    setAnalysisId(null);
     setVideoResult(null);
   };
 
@@ -459,7 +542,6 @@ function ImageAnalysis() {
       );
 
       if (data.success && data.analysis_id) {
-        setAnalysisId(data.analysis_id);
         setVideoResult(data);
       } else {
         setVideoError(data.error || "分析失败");
@@ -475,113 +557,548 @@ function ImageAnalysis() {
   const renderImageResult = () => {
     if (!result) return null;
 
+    const reportContent = getImageReportContent();
+    const formattedTime = formatDateTime(result.analyzed_at);
+    const imageMetadata = result.details?.image_metadata || null;
+    const visualMetrics = result.details?.visual_metrics || null;
+    const aiDetails = result.details?.ai_result || {};
+    const eyeEvidence = Array.isArray(aiDetails.eye_evidence)
+      ? aiDetails.eye_evidence
+      : [];
+    const analysisHighlights = Array.isArray(aiDetails.analysis_highlights)
+      ? aiDetails.analysis_highlights
+      : [];
+    const analysisLimitations = Array.isArray(aiDetails.analysis_limitations)
+      ? aiDetails.analysis_limitations
+      : [];
+
     return (
       <div className="info-card" style={{ marginTop: "20px" }}>
-        <h4>图像分析结果</h4>
-        <div style={{ marginBottom: "20px" }}>
-          <p>
-            <strong>图像ID:</strong> {result.image_id}
-          </p>
-          <p>
-            <strong>分析类型:</strong> {result.analysis_type}
-          </p>
-          <p>
-            <strong>分析方法:</strong> {result.method}
-          </p>
-          <p>
-            <strong>综合置信度:</strong>{" "}
-            <span
-              style={{
-                color:
-                  result.confidence >= 0.8
-                    ? "#10b981"
-                    : result.confidence >= 0.6
-                      ? "#f59e0b"
-                      : "#ef4444",
-                fontWeight: "bold",
-              }}
-            >
-              {(result.confidence * 100).toFixed(1)}%
-            </span>
-          </p>
-          <p>
-            <strong>处理时间:</strong> {result.processing_time?.toFixed(2)}秒
-          </p>
-        </div>
-
-        {result.center && (
-          <div style={{ marginBottom: "20px" }}>
-            <h5>台风中心位置</h5>
-            <div
-              style={{
-                background: "#f9fafb",
-                padding: "15px",
-                borderRadius: "8px",
-              }}
-            >
-              <p>
-                <strong>坐标:</strong> ({result.center.pixel_x?.toFixed(1)},{" "}
-                {result.center.pixel_y?.toFixed(1)}) 像素
-              </p>
-              <p>
-                <strong>置信度:</strong>{" "}
-                {(result.center.confidence * 100).toFixed(1)}%
-              </p>
-            </div>
-          </div>
-        )}
-
-        {result.intensity && (
-          <div style={{ marginBottom: "20px" }}>
-            <h5>强度评估</h5>
-            <div
-              style={{
-                background: "#f9fafb",
-                padding: "15px",
-                borderRadius: "8px",
-              }}
-            >
-              <p>
-                <strong>强度等级:</strong>{" "}
-                <span
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "15px",
+            flexWrap: "wrap",
+            gap: "10px",
+          }}
+        >
+          <h3>🖼️ 图像分析报告</h3>
+          <div style={{ display: "flex", gap: "10px" }}>
+            {reportContent && (
+              <>
+                <button
+                  className="btn"
+                  onClick={handleDownloadImageReport}
+                  style={{ padding: "8px 15px", fontSize: "14px" }}
+                >
+                  📥 下载Markdown
+                </button>
+                <button
+                  className="btn"
+                  onClick={handleExportImagePDF}
                   style={{
-                    fontSize: "18px",
-                    fontWeight: "bold",
-                    color: "#dc2626",
+                    padding: "8px 15px",
+                    fontSize: "14px",
+                    background:
+                      "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)",
                   }}
                 >
-                  {result.intensity.level}
-                </span>
-              </p>
-              <p>
-                <strong>置信度:</strong>{" "}
-                {(result.intensity.confidence * 100).toFixed(1)}%
-              </p>
-            </div>
+                  📄 导出PDF
+                </button>
+              </>
+            )}
           </div>
-        )}
+        </div>
 
-        {result.eye && (
-          <div style={{ marginBottom: "20px" }}>
-            <h5>台风眼检测</h5>
+        <div ref={imageReportContentRef}>
+          <div
+            className="meta-info"
+            style={{
+              marginBottom: "20px",
+              padding: "15px",
+              background: "#f9fafb",
+              borderRadius: "8px",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "10px",
+            }}
+          >
+            <div className="meta-item">
+              <span style={{ fontWeight: 600, color: "#666" }}>🆔 分析ID:</span>
+              <span style={{ marginLeft: "8px" }}>{result.analysis_id}</span>
+            </div>
+            <div className="meta-item">
+              <span style={{ fontWeight: 600, color: "#666" }}>🖼️ 图像ID:</span>
+              <span style={{ marginLeft: "8px" }}>{result.image_id}</span>
+            </div>
+            <div className="meta-item">
+              <span style={{ fontWeight: 600, color: "#666" }}>📊 分析类型:</span>
+              <span style={{ marginLeft: "8px" }}>
+                {result.analysis_type === "hybrid_ai" && "Few-shot 混合分析"}
+                {result.analysis_type === "fusion" && "融合分析"}
+                {result.analysis_type === "opencv" && "OpenCV 分析"}
+              </span>
+            </div>
+            <div className="meta-item">
+              <span style={{ fontWeight: 600, color: "#666" }}>🧠 分析方法:</span>
+              <span style={{ marginLeft: "8px" }}>{result.method}</span>
+            </div>
+            <div className="meta-item">
+              <span style={{ fontWeight: 600, color: "#666" }}>📈 综合置信度:</span>
+              <span
+                style={{
+                  marginLeft: "8px",
+                  fontWeight: "bold",
+                  color:
+                    result.confidence >= 0.8
+                      ? "#10b981"
+                      : result.confidence >= 0.6
+                        ? "#f59e0b"
+                        : "#ef4444",
+                }}
+              >
+                {(result.confidence * 100).toFixed(1)}%
+              </span>
+            </div>
+            {typeof result.consistency_score === "number" && (
+              <div className="meta-item">
+                <span style={{ fontWeight: 600, color: "#666" }}>
+                  🔍 一致性评分:
+                </span>
+                <span style={{ marginLeft: "8px", fontWeight: "bold" }}>
+                  {(result.consistency_score * 100).toFixed(1)}%
+                </span>
+              </div>
+            )}
+            {result.processing_time && (
+              <div className="meta-item">
+                <span style={{ fontWeight: 600, color: "#666" }}>
+                  ⏱️ 处理时间:
+                </span>
+                <span style={{ marginLeft: "8px" }}>
+                  {result.processing_time.toFixed(2)}秒
+                </span>
+              </div>
+            )}
+            {formattedTime && (
+              <div className="meta-item">
+                <span style={{ fontWeight: 600, color: "#666" }}>
+                  🕐 分析时间:
+                </span>
+                <span style={{ marginLeft: "8px" }}>{formattedTime}</span>
+              </div>
+            )}
+            {result.model_used && (
+              <div className="meta-item">
+                <span style={{ fontWeight: 600, color: "#666" }}>🤖 视觉模型:</span>
+                <span style={{ marginLeft: "8px" }}>{result.model_used}</span>
+              </div>
+            )}
+            {imageMetadata?.filename && (
+              <div className="meta-item">
+                <span style={{ fontWeight: 600, color: "#666" }}>🖼 文件名:</span>
+                <span style={{ marginLeft: "8px" }}>{imageMetadata.filename}</span>
+              </div>
+            )}
+            {imageMetadata?.width && imageMetadata?.height && (
+              <div className="meta-item">
+                <span style={{ fontWeight: 600, color: "#666" }}>📐 分辨率:</span>
+                <span style={{ marginLeft: "8px" }}>
+                  {imageMetadata.width} × {imageMetadata.height}
+                </span>
+              </div>
+            )}
+            {result.fewshot_examples_used?.length > 0 && (
+              <div className="meta-item">
+                <span style={{ fontWeight: 600, color: "#666" }}>
+                  🧪 Few-shot 样例:
+                </span>
+                <span style={{ marginLeft: "8px" }}>
+                  {result.fewshot_examples_used.join(", ")}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+              gap: "15px",
+              marginBottom: "20px",
+            }}
+          >
+            {result.center && (
+              <div
+                style={{
+                  background: "#f9fafb",
+                  padding: "15px",
+                  borderRadius: "8px",
+                }}
+              >
+                <h5 style={{ marginBottom: "10px" }}>台风中心位置</h5>
+                <p>
+                  <strong>坐标:</strong> ({result.center.pixel_x?.toFixed(1)},{" "}
+                  {result.center.pixel_y?.toFixed(1)}) 像素
+                </p>
+                <p>
+                  <strong>置信度:</strong>{" "}
+                  {(result.center.confidence * 100).toFixed(1)}%
+                </p>
+              </div>
+            )}
+
+            {result.intensity && (
+              <div
+                style={{
+                  background: "#f9fafb",
+                  padding: "15px",
+                  borderRadius: "8px",
+                }}
+              >
+                <h5 style={{ marginBottom: "10px" }}>强度评估</h5>
+                <p>
+                  <strong>强度等级:</strong>{" "}
+                  <span
+                    style={{
+                      fontSize: "18px",
+                      fontWeight: "bold",
+                      color: "#dc2626",
+                    }}
+                  >
+                    {result.intensity.level}
+                  </span>
+                </p>
+                <p>
+                  <strong>置信度:</strong>{" "}
+                  {(result.intensity.confidence * 100).toFixed(1)}%
+                </p>
+              </div>
+            )}
+
+            {result.eye && (
+              <div
+                style={{
+                  background: "#f9fafb",
+                  padding: "15px",
+                  borderRadius: "8px",
+                }}
+              >
+                <h5 style={{ marginBottom: "10px" }}>台风眼检测</h5>
+                <p>
+                  <strong>检测结果:</strong>{" "}
+                  {result.eye.detected ? "检测到台风眼" : "未检测到台风眼"}
+                </p>
+                {result.eye.diameter_km && (
+                  <p>
+                    <strong>估计直径:</strong> {result.eye.diameter_km.toFixed(1)} km
+                  </p>
+                )}
+                <p>
+                  <strong>置信度:</strong>{" "}
+                  {(result.eye.confidence * 100).toFixed(1)}%
+                </p>
+              </div>
+            )}
+
+            {result.structure && (
+              <div
+                style={{
+                  background: "#f9fafb",
+                  padding: "15px",
+                  borderRadius: "8px",
+                }}
+              >
+                <h5 style={{ marginBottom: "10px" }}>结构特征</h5>
+                <p>
+                  <strong>螺旋评分:</strong>{" "}
+                  {(result.structure.spiral_score * 100).toFixed(1)}%
+                </p>
+                {result.structure.organization && (
+                  <p>
+                    <strong>组织程度:</strong> {result.structure.organization}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: "15px",
+              marginBottom: "20px",
+            }}
+          >
+            {imageMetadata && (
+              <div
+                style={{
+                  background: "#f9fafb",
+                  padding: "15px",
+                  borderRadius: "8px",
+                }}
+              >
+                <h5 style={{ marginBottom: "10px" }}>图片基础信息</h5>
+                <p>
+                  <strong>格式:</strong> {imageMetadata.format || "未知"}
+                </p>
+                <p>
+                  <strong>色彩模式:</strong> {imageMetadata.mode || "未知"}
+                </p>
+                <p>
+                  <strong>通道:</strong>{" "}
+                  {Array.isArray(imageMetadata.bands)
+                    ? imageMetadata.bands.join(", ")
+                    : "未知"}
+                </p>
+                {imageMetadata.file_size ? (
+                  <p>
+                    <strong>文件大小:</strong>{" "}
+                    {formatFileSize(imageMetadata.file_size)}
+                  </p>
+                ) : null}
+              </div>
+            )}
+
+            {visualMetrics && (
+              <div
+                style={{
+                  background: "#f9fafb",
+                  padding: "15px",
+                  borderRadius: "8px",
+                }}
+              >
+                <h5 style={{ marginBottom: "10px" }}>视觉统计特征</h5>
+                <p>
+                  <strong>亮度均值:</strong>{" "}
+                  {typeof visualMetrics.brightness === "number"
+                    ? visualMetrics.brightness.toFixed(1)
+                    : "暂无"}
+                </p>
+                <p>
+                  <strong>对比度:</strong>{" "}
+                  {typeof visualMetrics.contrast === "number"
+                    ? visualMetrics.contrast.toFixed(1)
+                    : "暂无"}
+                </p>
+                <p>
+                  <strong>清晰度:</strong>{" "}
+                  {typeof visualMetrics.sharpness === "number"
+                    ? visualMetrics.sharpness.toFixed(1)
+                    : "暂无"}
+                </p>
+                <p>
+                  <strong>云量覆盖估计:</strong>{" "}
+                  {formatPercentage(visualMetrics.cloud_coverage)}
+                </p>
+              </div>
+            )}
+
+            {(aiDetails.eye_position_description ||
+              aiDetails.center_location_hint ||
+              aiDetails.overall_assessment) && (
+              <div
+                style={{
+                  background: "#f9fafb",
+                  padding: "15px",
+                  borderRadius: "8px",
+                }}
+              >
+                <h5 style={{ marginBottom: "10px" }}>AI 眼区判读</h5>
+                <p>
+                  <strong>综合判断:</strong>{" "}
+                  {aiDetails.overall_assessment || "未提供"}
+                </p>
+                <p>
+                  <strong>眼区位置:</strong>{" "}
+                  {aiDetails.eye_position_description || "未提供"}
+                </p>
+                <p>
+                  <strong>相对方位:</strong>{" "}
+                  {aiDetails.center_location_hint || "未提供"}
+                </p>
+                <p>
+                  <strong>AI 置信度:</strong>{" "}
+                  {formatPercentage(aiDetails.eye_confidence)}
+                </p>
+              </div>
+            )}
+
+            {(aiDetails.intensity_assessment ||
+              aiDetails.organization_assessment ||
+              aiDetails.development_stage ||
+              aiDetails.cloud_system_description) && (
+              <div
+                style={{
+                  background: "#f9fafb",
+                  padding: "15px",
+                  borderRadius: "8px",
+                }}
+              >
+                <h5 style={{ marginBottom: "10px" }}>AI 结构解读</h5>
+                <p>
+                  <strong>强度解读:</strong>{" "}
+                  {aiDetails.intensity_assessment || "未提供"}
+                </p>
+                <p>
+                  <strong>组织程度:</strong>{" "}
+                  {aiDetails.organization_assessment || "未提供"}
+                </p>
+                <p>
+                  <strong>发展阶段:</strong>{" "}
+                  {aiDetails.development_stage || "未提供"}
+                </p>
+                <p>
+                  <strong>云系结构:</strong>{" "}
+                  {aiDetails.cloud_system_description || "未提供"}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {(eyeEvidence.length > 0 ||
+            analysisHighlights.length > 0 ||
+            analysisLimitations.length > 0) && (
             <div
               style={{
-                background: "#f9fafb",
-                padding: "15px",
-                borderRadius: "8px",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: "15px",
+                marginBottom: "20px",
               }}
             >
-              <p>
-                <strong>检测结果:</strong>{" "}
-                {result.eye.detected ? "检测到台风眼" : "未检测到台风眼"}
-              </p>
-              <p>
-                <strong>置信度:</strong>{" "}
-                {(result.eye.confidence * 100).toFixed(1)}%
-              </p>
+              {eyeEvidence.length > 0 && (
+                <div
+                  style={{
+                    padding: "15px",
+                    background: "#eff6ff",
+                    borderRadius: "8px",
+                    border: "1px solid #bfdbfe",
+                  }}
+                >
+                  <h4 style={{ marginBottom: "8px" }}>台风眼判读依据</h4>
+                  <ul style={{ margin: 0, paddingLeft: "20px" }}>
+                    {eyeEvidence.map((item, index) => (
+                      <li key={`${item}-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {analysisHighlights.length > 0 && (
+                <div
+                  style={{
+                    padding: "15px",
+                    background: "#ecfdf5",
+                    borderRadius: "8px",
+                    border: "1px solid #a7f3d0",
+                  }}
+                >
+                  <h4 style={{ marginBottom: "8px" }}>关键发现</h4>
+                  <ul style={{ margin: 0, paddingLeft: "20px" }}>
+                    {analysisHighlights.map((item, index) => (
+                      <li key={`${item}-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {analysisLimitations.length > 0 && (
+                <div
+                  style={{
+                    padding: "15px",
+                    background: "#fff7ed",
+                    borderRadius: "8px",
+                    border: "1px solid #fdba74",
+                  }}
+                >
+                  <h4 style={{ marginBottom: "8px" }}>分析局限</h4>
+                  <ul style={{ margin: 0, paddingLeft: "20px" }}>
+                    {analysisLimitations.map((item, index) => (
+                      <li key={`${item}-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )}
+
+          {result.summary && (
+            <div
+              style={{
+                padding: "15px",
+                background: "#eff6ff",
+                borderRadius: "8px",
+                marginBottom: "20px",
+                border: "1px solid #bfdbfe",
+              }}
+            >
+              <h4 style={{ marginBottom: "8px" }}>AI 摘要</h4>
+              <p style={{ margin: 0 }}>{result.summary}</p>
+            </div>
+          )}
+
+          {result.risk_flags?.length > 0 && (
+            <div
+              style={{
+                padding: "15px",
+                background: "#fef3c7",
+                borderRadius: "8px",
+                color: "#92400e",
+                marginBottom: "20px",
+              }}
+            >
+              <h4 style={{ marginBottom: "8px" }}>风险提示</h4>
+              <ul style={{ margin: 0, paddingLeft: "20px" }}>
+                {result.risk_flags.map((item, index) => (
+                  <li key={`${item}-${index}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {reportContent ? (
+            <div className="content-section">
+              <div
+                className="content-text markdown-body"
+                style={{
+                  background: "white",
+                  padding: "20px",
+                  borderRadius: "8px",
+                  border: "1px solid #e5e7eb",
+                  maxHeight: "600px",
+                  overflowY: "auto",
+                  lineHeight: "1.6",
+                }}
+                dangerouslySetInnerHTML={{
+                  __html: (() => {
+                    try {
+                      return marked.parse(reportContent);
+                    } catch (e) {
+                      console.error("marked.parse error:", e);
+                      return `<pre>${reportContent}</pre>`;
+                    }
+                  })(),
+                }}
+              />
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: "15px",
+                background: "#fef3c7",
+                borderRadius: "8px",
+                color: "#f59e0b",
+              }}
+            >
+              <h4>⚠️ 提示</h4>
+              <p>暂无图像分析报告内容</p>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -589,17 +1106,8 @@ function ImageAnalysis() {
   const renderVideoResult = () => {
     if (!videoResult) return null;
 
-    const reportContent = getReportContent();
-
-    const formattedTime = videoResult.created_at
-      ? new Date(videoResult.created_at).toLocaleString("zh-CN", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : null;
+    const reportContent = getVideoReportContent();
+    const formattedTime = formatDateTime(videoResult.created_at);
 
     return (
       <div className="info-card" style={{ marginTop: "20px" }}>
@@ -619,14 +1127,14 @@ function ImageAnalysis() {
               <>
                 <button
                   className="btn"
-                  onClick={handleDownloadReport}
+                  onClick={handleDownloadVideoReport}
                   style={{ padding: "8px 15px", fontSize: "14px" }}
                 >
                   📥 下载Markdown
                 </button>
                 <button
                   className="btn"
-                  onClick={handleExportPDF}
+                  onClick={handleExportVideoPDF}
                   style={{
                     padding: "8px 15px",
                     fontSize: "14px",
@@ -642,7 +1150,7 @@ function ImageAnalysis() {
         </div>
 
         {/* 报告内容容器 - 添加ref用于PDF导出 */}
-        <div ref={reportContentRef}>
+        <div ref={videoReportContentRef}>
           <div
             className="meta-info"
             style={{
@@ -841,7 +1349,21 @@ function ImageAnalysis() {
       </div>
 
       {activeTab === "image" && (
-        <div>
+        <div className="image-upload-stage">
+          {uploadToast && (
+            <div className={`upload-toast upload-toast-${uploadToast.type}`}>
+              <span>{uploadToast.message}</span>
+              <button
+                type="button"
+                className="upload-toast-close"
+                onClick={() => setUploadToast(null)}
+                aria-label="关闭提示"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
           <h3 style={{ marginBottom: "20px" }}>卫星云图分析</h3>
 
           <div className="form-group">
@@ -946,20 +1468,63 @@ function ImageAnalysis() {
             {loading ? "上传中..." : "上传图像"}
           </button>
 
-          {uploadedImageId && (
-            <div
-              className="info-card"
-              style={{
-                marginBottom: "15px",
-                background: "#ecfdf5",
-                border: "1px solid #a7f3d0",
-                borderRadius: "8px",
-              }}
-            >
-              <p style={{ margin: 0, color: "#10b981" }}>
-                ✅ 图像已上传，ID: {uploadedImageId}
-              </p>
-            </div>
+          {uploadedImageId && uploadInfo && (
+            <>
+              <div
+                className="info-card"
+                style={{
+                  marginBottom: "15px",
+                  background: "#ecfdf5",
+                  border: "1px solid #a7f3d0",
+                  borderRadius: "8px",
+                  textAlign: "center",
+                }}
+              >
+                <p style={{ margin: 0, color: "#10b981", fontWeight: 600 }}>
+                  ✅ 图像已上传，ID: {uploadedImageId}
+                </p>
+                <div
+                  style={{
+                    marginTop: "8px",
+                    display: "flex",
+                    justifyContent: "center",
+                    flexWrap: "wrap",
+                    gap: "12px",
+                    fontSize: "13px",
+                    color: "#065f46",
+                  }}
+                >
+                  <span>{uploadInfo.filename}</span>
+                  {uploadInfo.width && uploadInfo.height ? (
+                    <span>
+                      {uploadInfo.width} × {uploadInfo.height}
+                    </span>
+                  ) : null}
+                  {uploadInfo.format ? <span>{uploadInfo.format}</span> : null}
+                  {uploadInfo.size ? (
+                    <span>{formatFileSize(uploadInfo.size)}</span>
+                  ) : null}
+                </div>
+              </div>
+
+              {uploadPreviewUrl && (
+                <div className="image-preview">
+                  <div
+                    className="image-preview-title"
+                    style={{ textAlign: "center" }}
+                  >
+                    上传图片预览
+                  </div>
+                  <div className="image-preview-wrapper">
+                    <img
+                      className="image-preview-img"
+                      src={uploadPreviewUrl}
+                      alt={uploadInfo.filename || "上传图片预览"}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           <div className="form-group">
@@ -984,10 +1549,9 @@ function ImageAnalysis() {
                 background: "white",
               }}
             >
-              <option value="fusion">混合方案（推荐）</option>
+              <option value="hybrid_ai">Few-shot 混合分析（推荐）</option>
+              <option value="fusion">融合结构化分析</option>
               <option value="opencv">OpenCV传统方法</option>
-              <option value="advanced">高级特征提取</option>
-              <option value="basic">基础统计分析</option>
             </select>
           </div>
 
@@ -1010,8 +1574,8 @@ function ImageAnalysis() {
                 background: "white",
               }}
             >
+              <option value="visible">可见光卫星云图（支持样例增强）</option>
               <option value="infrared">红外卫星云图</option>
-              <option value="visible">可见光卫星云图</option>
             </select>
           </div>
 

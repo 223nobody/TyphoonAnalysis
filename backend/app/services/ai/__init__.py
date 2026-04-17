@@ -4,6 +4,7 @@ AI服务模块
 """
 from app.services.ai.deepseek_service import DeepSeekService, deepseek_service
 from app.services.ai.qwen_service import QwenService, qwen_service
+from app.services.ai.qwen_image_service import QwenImageService, qwen_image_service
 from app.services.ai.glm_service import GlmService, glm_service
 
 __all__ = [
@@ -11,6 +12,8 @@ __all__ = [
     "deepseek_service",
     "QwenService",
     "qwen_service",
+    "QwenImageService",
+    "qwen_image_service",
     "GlmService",
     "glm_service",
 ]

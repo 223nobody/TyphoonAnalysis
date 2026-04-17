@@ -9,7 +9,7 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
-from app.api import typhoon, prediction, analysis, report, crawler, statistics, export, alert, ai_agent, auth, user_stats, asr, knowledge_graph
+from app.api import typhoon, prediction, report, crawler, statistics, export, alert, ai_agent, auth, user_stats, asr, knowledge_graph
 from app.api.v1 import images, video_analysis
 from app.services.scheduler import start_scheduler, shutdown_scheduler
 
@@ -89,7 +89,6 @@ app.add_middleware(
 # 注册路由
 app.include_router(typhoon.router, prefix="/api")
 app.include_router(prediction.router, prefix="/api")
-app.include_router(analysis.router, prefix="/api")
 app.include_router(report.router, prefix="/api")
 app.include_router(crawler.router, prefix="/api")
 app.include_router(statistics.router, prefix="/api")

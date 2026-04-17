@@ -19,7 +19,7 @@
 - **多 AI 模型支持** - 集成 DeepSeek、GLM、Qwen 等主流大模型
 - **GraphRAG 知识图谱** - 基于 Neo4j 的台风领域知识图谱检索与推理
 - **智能语音识别** - 集成阿里云 NLS 语音识别服务，支持语音转文字
-- **智能图像分析** - 卫星云图自动识别与分析
+- **智能图像分析** - 卫星云图 few-shot 混合分析与 AI 报告
 - **实时数据爬取** - 自动获取中国气象局台风数据
 - **完整用户系统** - JWT 认证 + OSS 头像存储
 
@@ -60,7 +60,7 @@ backend/
 │   │   ├── v1/                   # API 版本控制
 │   │   ├── ai_agent.py           # AI 智能客服
 │   │   ├── alert.py              # 预警管理
-│   │   ├── analysis.py           # 图像分析
+│   │   ├── images.py             # 图像分析
 │   │   ├── asr.py                # 语音识别
 │   │   ├── auth.py               # 用户认证
 │   │   ├── crawler.py            # 数据爬取
@@ -77,18 +77,24 @@ backend/
 │   ├── models/                   # 数据模型
 │   │   ├── typhoon.py            # 台风模型
 │   │   ├── user.py               # 用户模型
-│   │   └── image.py              # 图像模型
+│   │   ├── image.py              # 图像模型
+│   │   └── image_analysis.py     # 图像分析结果模型
 │   ├── schemas/                  # Pydantic 模式
 │   └── services/                 # 业务服务层
 │       ├── ai/                   # AI 服务
 │       │   ├── deepseek_service.py
 │       │   ├── glm_service.py
-│       │   └── qwen_service.py
+│       │   ├── qwen_service.py
+│       │   └── qwen_image_service.py
 │       ├── asr/                  # 语音识别服务 (阿里云 NLS)
 │       ├── crawler/              # 数据爬取
 │       │   ├── cma_crawler.py    # 中国气象局
 │       │   └── bulletin_crawler.py
 │       ├── image/                # 图像分析
+│       │   ├── image_service.py
+│       │   ├── opencv_analyzer.py
+│       │   ├── fusion_analyzer.py
+│       │   └── dl_analyzer.py
 │       ├── lstm/                 # LSTM 预测
 │       ├── prediction/           # 预测服务
 │       │   ├── data/             # 数据处理
@@ -106,7 +112,9 @@ backend/
 │           ├── relevance_ranker.py         # 相关性排序器
 │           └── quality_assessor.py         # 质量评估器
 ├── data/                         # 数据目录
-│   └── csv/                      # CSV 数据集
+│   ├── csv/                      # CSV 数据集
+│   └── images/
+│       └── test/                 # few-shot 标注样例与 examples.json
 ├── models/                       # 预训练模型
 ├── training/                     # 模型训练脚本
 │   ├── train_model.py            # 基础训练
@@ -163,7 +171,7 @@ GET    /api/ai/questions         # 热门问题
 | DeepSeek-R1 | 深度思考 | 复杂推理 |
 | DeepSeek-V3 | 通用对话 | 日常问答 |
 | GLM-4 | 中文优化 | 报告生成 |
-| Qwen-VL | 多模态 | 图像分析 |
+| Qwen-VL | 多模态 | 图像 few-shot 分析 |
 
 ### 3. 语音识别系统
 
@@ -234,14 +242,16 @@ NLS_URL=wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1
 
 ### 4. 图像分析服务
 
-卫星云图智能分析，提取台风特征。
+卫星云图智能分析，结合结构化算法与通义千问视觉模型输出更完整的判读结果。
 
-**分析模式**:
+**核心能力**:
 
-- **基础模式** - 快速特征提取
-- **高级模式** - 详细结构分析
+- **hybrid_ai 模式** - Qwen-VL few-shot + OpenCV/融合结果联合分析
+- **融合模式** - 多方法结构化分析
 - **OpenCV 模式** - 传统图像算法
-- **融合模式** - 多方法综合
+- **样例学习** - 读取 `backend/data/images/test/examples.json` 与红圈标注图辅助台风眼判读
+- **结果增强** - 返回图像元数据、视觉统计、AI 报告、一致性评分和风险提示
+- **上传约束** - `typhoon_images.filename` 唯一，重复图片拒绝入库
 
 ### 5. GraphRAG 知识图谱服务（新增）
 
@@ -474,7 +484,7 @@ python test_best_model.py
 | AI 客服  | `/api/ai`          | 智能对话      |
 | 知识图谱 | `/api/kg`          | GraphRAG 检索 |
 | 语音识别 | `/api/asr`         | 语音转文字    |
-| 图像分析 | `/api/analysis`    | 云图分析      |
+| 图像分析 | `/api/images`      | 图像上传与云图分析 |
 | 报告生成 | `/api/reports`     | 分析报告      |
 | 用户认证 | `/api/auth`        | 登录注册      |
 
@@ -667,6 +677,13 @@ pip install setuptools==69.5.1
 ```
 
 ## 更新日志
+
+### v1.4.0 (2026-04-17)
+
+- 新增 Qwen-VL few-shot 图像分析服务
+- 接入标注样例驱动的台风眼位置学习
+- 扩展图像分析返回字段，补充图像元数据、视觉统计与风险提示
+- 调整 `typhoon_images.filename` 为唯一约束并同步数据库迁移
 
 ### v1.3.0 (2026-03-02)
 

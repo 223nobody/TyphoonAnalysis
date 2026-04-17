@@ -13,7 +13,7 @@ class TyphoonImage(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     typhoon_id = Column(String(20), index=True, nullable=True, comment="台风ID")
-    filename = Column(String(255), nullable=False, comment="文件名")
+    filename = Column(String(255), unique=True, nullable=False, comment="文件名")
     image_type = Column(String(50), nullable=False, comment="图像类型：satellite/nwp/environment/track")
     source = Column(String(50), nullable=True, comment="数据源：himawari/fengyun/gfs等")
     file_path = Column(String(500), nullable=True, comment="文件存储路径")

@@ -126,7 +126,7 @@ function MapController({ center, zoom, onZoomChange, onMouseMove }) {
   useEffect(() => {
     if (center && center.length === 2 && zoom) {
       console.log(
-        `🗺️ 地图定位到: [${center[0]}, ${center[1]}], 缩放级别: ${zoom}`,
+        `🗺️ 地图定位到: [${center[0]}, ${center[1]}], 缩放级别: ${zoom}`
       );
       map.setView(center, zoom, {
         animate: true,
@@ -248,6 +248,9 @@ function MapVisualization({
   // 鼠标位置经纬度状态
   const [mousePosition, setMousePosition] = useState(null);
 
+  // 图例展开/折叠状态
+  const [legendExpanded, setLegendExpanded] = useState(true);
+
   // 收藏相关状态
   const [collectTyphoons, setCollectTyphoons] = useState([]);
   const [isCollecting, setIsCollecting] = useState(false);
@@ -327,7 +330,7 @@ function MapVisualization({
         if (hasTriedYearSwitch.current) {
           // 如果已经尝试过切换年份但还是找不到，显示警告
           console.warn(
-            `⚠️ 台风 ${urlTyphoonId} 在列表中未找到（已尝试切换年份）`,
+            `⚠️ 台风 ${urlTyphoonId} 在列表中未找到（已尝试切换年份）`
           );
           message.warning(`台风 ${urlTyphoonId} 在当前年份列表中未找到`);
           hasProcessedUrlTyphoonId.current = true;
@@ -381,7 +384,9 @@ function MapVisualization({
       // 默认选中第一个活跃台风
       const firstActiveTyphoon = activeTyphoons[0];
       console.log(
-        `🌀 检测到活跃台风，自动选中: ${firstActiveTyphoon.typhoon_id} - ${firstActiveTyphoon.typhoon_name_cn || firstActiveTyphoon.typhoon_name}`,
+        `🌀 检测到活跃台风，自动选中: ${firstActiveTyphoon.typhoon_id} - ${
+          firstActiveTyphoon.typhoon_name_cn || firstActiveTyphoon.typhoon_name
+        }`
       );
 
       if (onTyphoonSelect) {
@@ -435,14 +440,14 @@ function MapVisualization({
 
       if (data && data.items && Array.isArray(data.items)) {
         console.log(
-          `[MapVisualization] ✅ 台风列表加载成功，数量: ${data.items.length}`,
+          `[MapVisualization] ✅ 台风列表加载成功，数量: ${data.items.length}`
         );
         setTyphoons(data.items);
         // 总是更新 filteredTyphoons，确保列表显示正确
         setFilteredTyphoons(data.items);
       } else if (data && Array.isArray(data)) {
         console.log(
-          `[MapVisualization] ✅ 台风列表加载成功，数量: ${data.length}`,
+          `[MapVisualization] ✅ 台风列表加载成功，数量: ${data.length}`
         );
         setTyphoons(data);
         // 总是更新 filteredTyphoons，确保列表显示正确
@@ -462,7 +467,7 @@ function MapVisualization({
   // 加载台风列表 - 组件挂载和筛选条件变化时都会执行
   useEffect(() => {
     console.log(
-      `[MapVisualization] 加载台风列表 - 年份: ${filters.year}, 状态: ${filters.status}`,
+      `[MapVisualization] 加载台风列表 - 年份: ${filters.year}, 状态: ${filters.status}`
     );
     loadTyphoons();
     loadCollectTyphoons();
@@ -493,7 +498,7 @@ function MapVisualization({
 
       // 检测新选中的台风并定位地图
       const newlySelected = Array.from(selectedTyphoons).find(
-        (id) => !prevSelectedTyphoons.has(id),
+        (id) => !prevSelectedTyphoons.has(id)
       );
 
       if (newlySelected) {
@@ -650,17 +655,16 @@ function MapVisualization({
             ? data
                 .map((agencyForecast) => {
                   const points = Array.isArray(agencyForecast.points)
-                    ? agencyForecast.points
-                        .filter((point, index, arr) => {
-                          const pointKey = `${point.forecast_time}-${point.latitude}-${point.longitude}`;
-                          return (
-                            arr.findIndex(
-                              (candidate) =>
-                                `${candidate.forecast_time}-${candidate.latitude}-${candidate.longitude}` ===
-                                pointKey,
-                            ) === index
-                          );
-                        })
+                    ? agencyForecast.points.filter((point, index, arr) => {
+                        const pointKey = `${point.forecast_time}-${point.latitude}-${point.longitude}`;
+                        return (
+                          arr.findIndex(
+                            (candidate) =>
+                              `${candidate.forecast_time}-${candidate.latitude}-${candidate.longitude}` ===
+                              pointKey
+                          ) === index
+                        );
+                      })
                     : [];
 
                   return {
@@ -671,7 +675,7 @@ function MapVisualization({
                 .filter(
                   (agencyForecast) =>
                     Array.isArray(agencyForecast.points) &&
-                    agencyForecast.points.length > 0,
+                    agencyForecast.points.length > 0
                 )
             : [];
           if (filteredData.length > 0) {
@@ -689,7 +693,7 @@ function MapVisualization({
 
       setForecastData(newForecastData);
       console.log(
-        `✅ 预测路径数据已更新，当前包含 ${newForecastData.size} 个台风的预测数据`,
+        `✅ 预测路径数据已更新，当前包含 ${newForecastData.size} 个台风的预测数据`
       );
     } catch (err) {
       console.error("加载预测路径失败:", err);
@@ -737,7 +741,7 @@ function MapVisualization({
           const lng = parseFloat(latestPoint.longitude); // 直接使用原始经度
 
           console.log(
-            `✅ 地图定位到台风 ${typhoonId} 的中心位置: [${lat}, ${lng}]`,
+            `✅ 地图定位到台风 ${typhoonId} 的中心位置: [${lat}, ${lng}]`
           );
 
           // 更新地图中心和缩放级别
@@ -1087,7 +1091,7 @@ function MapVisualization({
             >
               {filteredTyphoons.map((typhoon) => {
                 const isCollected = collectTyphoons.includes(
-                  typhoon.typhoon_id,
+                  typhoon.typhoon_id
                 );
                 const isSelected =
                   selectedTyphoons && selectedTyphoons.has(typhoon.typhoon_id);
@@ -1344,7 +1348,7 @@ function MapVisualization({
                             positions={generateIrregularWindCircle(
                               [point.latitude, point.longitude],
                               120,
-                              7,
+                              7
                             )}
                             pathOptions={{
                               fillColor: "rgba(200, 200, 200, 0.45)",
@@ -1360,7 +1364,7 @@ function MapVisualization({
                             positions={generateIrregularWindCircle(
                               [point.latitude, point.longitude],
                               65,
-                              10,
+                              10
                             )}
                             pathOptions={{
                               fillColor: "rgba(255, 165, 0, 0.35)",
@@ -1376,7 +1380,7 @@ function MapVisualization({
                             positions={generateIrregularWindCircle(
                               [point.latitude, point.longitude],
                               30,
-                              12,
+                              12
                             )}
                             pathOptions={{
                               fillColor: "rgba(255, 255, 0, 0.4)",
@@ -1402,10 +1406,12 @@ function MapVisualization({
                                 {(() => {
                                   // 查找台风名称
                                   const typhoonInfo = typhoons.find(
-                                    (t) => t.typhoon_id === typhoonId,
+                                    (t) => t.typhoon_id === typhoonId
                                   );
                                   const typhoonName = typhoonInfo
-                                    ? `${typhoonInfo.typhoon_id} - ${typhoonInfo.typhoon_name || ""} - ${typhoonInfo.typhoon_name_cn || ""}`
+                                    ? `${typhoonInfo.typhoon_id} - ${
+                                        typhoonInfo.typhoon_name || ""
+                                      } - ${typhoonInfo.typhoon_name_cn || ""}`
                                     : typhoonId;
                                   return createPopupContent(point, typhoonName);
                                 })()}
@@ -1459,7 +1465,7 @@ function MapVisualization({
 
                       // 获取预测路径坐标 - 直接使用原始经度值
                       const forecastCoordinates = fullForecastPath.map(
-                        (point) => [point.latitude, point.longitude],
+                        (point) => [point.latitude, point.longitude]
                       );
 
                       return (
@@ -1477,7 +1483,7 @@ function MapVisualization({
                           {points.map((point, index) => {
                             // 归一化经度用于显示（仅用于Tooltip显示）
                             const normalizedLng = normalizeLongitudeForDisplay(
-                              point.longitude,
+                              point.longitude
                             );
 
                             return (
@@ -1516,7 +1522,7 @@ function MapVisualization({
                                     <div>
                                       <strong>预报时间：</strong>
                                       {new Date(
-                                        point.forecast_time,
+                                        point.forecast_time
                                       ).toLocaleString("zh-CN")}
                                     </div>
                                     <div>
@@ -1552,7 +1558,7 @@ function MapVisualization({
                     })}
                   </React.Fragment>
                 );
-              },
+              }
             )}
         </MapContainer>
 
@@ -1736,17 +1742,48 @@ function MapVisualization({
               padding: "15px",
               borderRadius: "10px",
               boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
-              maxWidth: "280px",
+              width: "200px",
               zIndex: 1000,
             }}
           >
-            <div style={{ marginBottom: "10px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: legendExpanded ? "10px" : 0,
+              }}
+            >
               <h4 style={{ fontSize: "14px", color: "#333", margin: 0 }}>
                 图例
               </h4>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                  fontSize: "11px",
+                  color: "#888",
+                  fontWeight: "normal",
+                  userSelect: "none",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={legendExpanded}
+                  onChange={(e) => setLegendExpanded(e.target.checked)}
+                  style={{ cursor: "pointer", width: "13px", height: "13px" }}
+                />
+                展开
+              </label>
             </div>
             <div
-              style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+              style={{
+                display: legendExpanded ? "flex" : "none",
+                flexDirection: "column",
+                gap: "12px",
+              }}
             >
               {/* 强度等级 */}
               <div
@@ -1982,31 +2019,34 @@ function MapVisualization({
                     new Map(
                       Array.from(forecastData.values())
                         .flat()
-                        .map((agencyForecast) => [agencyForecast.agency, agencyForecast]),
-                    ).values(),
+                        .map((agencyForecast) => [
+                          agencyForecast.agency,
+                          agencyForecast,
+                        ])
+                    ).values()
                   ).map((agencyForecast) => (
+                    <div
+                      key={agencyForecast.agency}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        fontSize: "12px",
+                        color: "#555",
+                      }}
+                    >
                       <div
-                        key={agencyForecast.agency}
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          fontSize: "12px",
-                          color: "#555",
+                          width: "20px",
+                          height: "2px",
+                          background: agencyForecast.color,
+                          borderRadius: "1px",
+                          border: `1px dashed ${agencyForecast.color}`,
                         }}
-                      >
-                        <div
-                          style={{
-                            width: "20px",
-                            height: "2px",
-                            background: agencyForecast.color,
-                            borderRadius: "1px",
-                            border: `1px dashed ${agencyForecast.color}`,
-                          }}
-                        ></div>
-                        <span>{agencyForecast.agency}预报</span>
-                      </div>
-                    ))}
+                      ></div>
+                      <span>{agencyForecast.agency}预报</span>
+                    </div>
+                  ))}
                 </div>
               )}
               {selectedTyphoons &&

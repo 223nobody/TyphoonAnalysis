@@ -430,13 +430,13 @@ export const uploadImage = async (file, typhoonId = null) => {
 /**
  * 分析图像（重构版本）
  * @param {number} imageId - 图像ID
- * @param {string} analysisType - 分析类型（basic/advanced/opencv/fusion）
+ * @param {string} analysisType - 分析类型（hybrid_ai/fusion/opencv/basic/advanced）
  * @param {string} imageType - 图像类型（infrared/visible）
  */
 export const analyzeImage = async (
   imageId,
-  analysisType = "fusion",
-  imageType = "infrared",
+  analysisType = "hybrid_ai",
+  imageType = "visible",
 ) => {
   return apiClient.post(
     `/images/analyze/${imageId}?analysis_type=${analysisType}&image_type=${imageType}`,
@@ -457,28 +457,10 @@ export const getTyphoonImages = async (
 };
 
 /**
- * 获取图像分析历史
- */
-export const getImageAnalysisHistory = async (imageId) => {
-  return apiClient.get(`/images/analysis/history/${imageId}`);
-};
-
-/**
  * 删除图像
  */
 export const deleteImage = async (imageId) => {
   return apiClient.delete(`/images/${imageId}`);
-};
-
-/**
- * 卫星云图分析（旧版本，保持向后兼容）
- * @deprecated 请使用 uploadImage + analyzeImage 替代
- */
-export const analyzeSatelliteImage = async (typhoonId, imageUrl) => {
-  return apiClient.post("/analysis/satellite", {
-    typhoon_id: typhoonId,
-    image_url: imageUrl,
-  });
 };
 
 // ========== 报告生成API ==========

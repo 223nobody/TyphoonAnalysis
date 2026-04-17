@@ -193,7 +193,7 @@ function PredictionVisualization() {
   const loadSavedSelectedTyphoons = () => {
     try {
       const saved = sessionStorage.getItem(
-        "predictionVisualization_selectedTyphoons",
+        "predictionVisualization_selectedTyphoons"
       );
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -208,7 +208,7 @@ function PredictionVisualization() {
   };
 
   const [selectedTyphoons, setSelectedTyphoons] = useState(
-    loadSavedSelectedTyphoons(),
+    loadSavedSelectedTyphoons()
   );
   const [allowMultipleTyphoons, setAllowMultipleTyphoons] = useState(false);
 
@@ -218,7 +218,7 @@ function PredictionVisualization() {
       const array = Array.from(selectedTyphoons);
       sessionStorage.setItem(
         "predictionVisualization_selectedTyphoons",
-        JSON.stringify(array),
+        JSON.stringify(array)
       );
     } catch (e) {
       console.error("保存选中状态失败:", e);
@@ -299,6 +299,9 @@ function PredictionVisualization() {
   const [collectTyphoons, setCollectTyphoons] = useState([]);
   const [isCollecting, setIsCollecting] = useState(false);
 
+  // 图例展开/折叠状态
+  const [legendExpanded, setLegendExpanded] = useState(true);
+
   // ===== 预测可视化新增状态 =====
   const [selectedPoint, setSelectedPoint] = useState(null);
   const [predictionData, setPredictionData] = useState(null);
@@ -333,7 +336,7 @@ function PredictionVisualization() {
       loadTyphoonPaths();
 
       const newlySelected = Array.from(selectedTyphoons).find(
-        (id) => !prevSelectedTyphoons.has(id),
+        (id) => !prevSelectedTyphoons.has(id)
       );
 
       if (newlySelected) {
@@ -515,7 +518,8 @@ function PredictionVisualization() {
             ? new Date(latestHistoricalPoint.timestamp)
             : null;
           const forecastDeadline =
-            latestHistoricalTime && !Number.isNaN(latestHistoricalTime.getTime())
+            latestHistoricalTime &&
+            !Number.isNaN(latestHistoricalTime.getTime())
               ? new Date(latestHistoricalTime.getTime() + 24 * 60 * 60 * 1000)
               : null;
 
@@ -539,7 +543,7 @@ function PredictionVisualization() {
                             arr.findIndex(
                               (candidate) =>
                                 `${candidate.forecast_time}-${candidate.latitude}-${candidate.longitude}` ===
-                                pointKey,
+                                pointKey
                             ) === index
                           );
                         })
@@ -553,7 +557,7 @@ function PredictionVisualization() {
                 .filter(
                   (agencyForecast) =>
                     Array.isArray(agencyForecast.points) &&
-                    agencyForecast.points.length > 0,
+                    agencyForecast.points.length > 0
                 )
             : [];
 
@@ -597,7 +601,10 @@ function PredictionVisualization() {
         const offsetHours = Math.floor(Math.abs(timezoneOffset) / 60);
         const offsetMinutes = Math.abs(timezoneOffset) % 60;
         const offsetSign = timezoneOffset >= 0 ? "+" : "-";
-        const offsetStr = `${offsetSign}${String(offsetHours).padStart(2, "0")}:${String(offsetMinutes).padStart(2, "0")}`;
+        const offsetStr = `${offsetSign}${String(offsetHours).padStart(
+          2,
+          "0"
+        )}:${String(offsetMinutes).padStart(2, "0")}`;
         formattedTimeStr = startTimeStr + offsetStr;
       }
 
@@ -610,13 +617,13 @@ function PredictionVisualization() {
         parseFloat(point.longitude),
         point.center_pressure || null,
         point.max_wind_speed || null,
-        12, // 12小时预测
+        12 // 12小时预测
       );
 
       setPredictionData(response);
       setShowPredictionPanel(true);
       message.success(
-        `已生成从 ${displayTime.toLocaleString("zh-CN")} 开始的12小时预测`,
+        `已生成从 ${displayTime.toLocaleString("zh-CN")} 开始的12小时预测`
       );
     } catch (err) {
       console.error("预测失败:", err);
@@ -927,7 +934,7 @@ function PredictionVisualization() {
             >
               {filteredTyphoons.map((typhoon) => {
                 const isCollected = collectTyphoons.includes(
-                  typhoon.typhoon_id,
+                  typhoon.typhoon_id
                 );
                 const isSelected =
                   selectedTyphoons && selectedTyphoons.has(typhoon.typhoon_id);
@@ -1147,7 +1154,7 @@ function PredictionVisualization() {
                             positions={generateIrregularWindCircle(
                               [point.latitude, point.longitude],
                               120,
-                              7,
+                              7
                             )}
                             pathOptions={{
                               fillColor: "rgba(200, 200, 200, 0.45)",
@@ -1161,7 +1168,7 @@ function PredictionVisualization() {
                             positions={generateIrregularWindCircle(
                               [point.latitude, point.longitude],
                               65,
-                              10,
+                              10
                             )}
                             pathOptions={{
                               fillColor: "rgba(255, 165, 0, 0.35)",
@@ -1175,7 +1182,7 @@ function PredictionVisualization() {
                             positions={generateIrregularWindCircle(
                               [point.latitude, point.longitude],
                               30,
-                              12,
+                              12
                             )}
                             pathOptions={{
                               fillColor: "rgba(255, 255, 0, 0.4)",
@@ -1202,10 +1209,12 @@ function PredictionVisualization() {
                                 {(() => {
                                   // 查找台风名称
                                   const typhoonInfo = typhoons.find(
-                                    (t) => t.typhoon_id === typhoonId,
+                                    (t) => t.typhoon_id === typhoonId
                                   );
                                   const typhoonName = typhoonInfo
-                                    ? `${typhoonInfo.typhoon_id} - ${typhoonInfo.typhoon_name || ""} - ${typhoonInfo.typhoon_name_cn || ""}`
+                                    ? `${typhoonInfo.typhoon_id} - ${
+                                        typhoonInfo.typhoon_name || ""
+                                      } - ${typhoonInfo.typhoon_name_cn || ""}`
                                     : typhoonId;
                                   return createPopupContent(point, typhoonName);
                                 })()}
@@ -1269,11 +1278,11 @@ function PredictionVisualization() {
                 // 根据预测风速获取强度等级和对应颜色
                 const intensity = getIntensityLevel(
                   point.predicted_wind_speed,
-                  point.predicted_pressure,
+                  point.predicted_pressure
                 );
                 const pointColor = getColorByIntensity(intensity);
                 const pointRadius = getRadiusByWindSpeed(
-                  point.predicted_wind_speed,
+                  point.predicted_wind_speed
                 );
 
                 return (
@@ -1314,7 +1323,7 @@ function PredictionVisualization() {
                         <p style={{ margin: "4px 0" }}>
                           <strong>预报时间：</strong>
                           {new Date(point.forecast_time).toLocaleString(
-                            "zh-CN",
+                            "zh-CN"
                           )}
                         </p>
                         <p style={{ margin: "4px 0" }}>
@@ -1385,7 +1394,7 @@ function PredictionVisualization() {
                     🔴 预测起点
                     <br />
                     {new Date(
-                      selectedPoint.timestamp || selectedPoint.record_time,
+                      selectedPoint.timestamp || selectedPoint.record_time
                     ).toLocaleString("zh-CN")}
                   </div>
                 </Tooltip>
@@ -1416,7 +1425,7 @@ function PredictionVisualization() {
                       }
 
                       const forecastCoordinates = fullForecastPath.map(
-                        (point) => [point.latitude, point.longitude],
+                        (point) => [point.latitude, point.longitude]
                       );
 
                       return (
@@ -1431,7 +1440,7 @@ function PredictionVisualization() {
 
                           {points.map((point, index) => {
                             const normalizedLng = normalizeLongitudeForDisplay(
-                              point.longitude,
+                              point.longitude
                             );
 
                             return (
@@ -1470,7 +1479,7 @@ function PredictionVisualization() {
                                     <div>
                                       <strong>预报时间：</strong>
                                       {new Date(
-                                        point.forecast_time,
+                                        point.forecast_time
                                       ).toLocaleString("zh-CN")}
                                     </div>
                                     <div>
@@ -1500,7 +1509,7 @@ function PredictionVisualization() {
                     })}
                   </React.Fragment>
                 );
-              },
+              }
             )}
         </MapContainer>
 
@@ -1716,17 +1725,48 @@ function PredictionVisualization() {
               padding: "15px",
               borderRadius: "10px",
               boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
-              maxWidth: "250px",
+              width: "200px",
               zIndex: 1000,
             }}
           >
-            <div style={{ marginBottom: "10px" }}>
+            <div
+              style={{
+                marginBottom: legendExpanded ? "10px" : 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
               <h4 style={{ fontSize: "14px", color: "#333", margin: 0 }}>
                 图例
               </h4>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                  fontSize: "11px",
+                  color: "#888",
+                  fontWeight: "normal",
+                  userSelect: "none",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={legendExpanded}
+                  onChange={(e) => setLegendExpanded(e.target.checked)}
+                  style={{ cursor: "pointer", width: "13px", height: "13px" }}
+                />
+                展开
+              </label>
             </div>
             <div
-              style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+              style={{
+                display: legendExpanded ? "flex" : "none",
+                flexDirection: "column",
+                gap: "12px",
+              }}
             >
               {/* 预测图例 */}
               {predictionData && predictionData.length > 0 && (
@@ -1900,77 +1940,77 @@ function PredictionVisualization() {
                   <span>风速较大 (~50m/s)</span>
                 </div>
               </div>
-            </div>
 
-            {/* 预测路径图例 */}
-            {forecastData.size > 0 && (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "5px",
-                  paddingTop: "8px",
-                  borderTop: "1px solid #e0e0e0",
-                }}
-              >
+              {/* 预测路径图例 */}
+              {forecastData.size > 0 && (
                 <div
                   style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#666",
-                    marginBottom: "3px",
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
+                    flexDirection: "column",
+                    gap: "5px",
+                    paddingTop: "8px",
+                    borderTop: "1px solid #e0e0e0",
                   }}
                 >
-                  <span>机构预测路径</span>
-                  <label
+                  <div
                     style={{
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: "#666",
+                      marginBottom: "3px",
                       display: "flex",
                       alignItems: "center",
-                      gap: "4px",
-                      cursor: "pointer",
-                      fontSize: "11px",
-                      fontWeight: "normal",
+                      justifyContent: "space-between",
                     }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={showForecast}
-                      onChange={(e) => setShowForecast(e.target.checked)}
-                      style={{ cursor: "pointer" }}
-                    />
-                    显示
-                  </label>
-                </div>
-                {Array.from(forecastData.values())
-                  .flat()
-                  .map((agencyForecast) => (
-                    <div
-                      key={agencyForecast.agency}
+                    <span>机构预测路径</span>
+                    <label
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: "8px",
-                        fontSize: "12px",
-                        color: "#555",
+                        gap: "4px",
+                        cursor: "pointer",
+                        fontSize: "11px",
+                        fontWeight: "normal",
                       }}
                     >
-                      <div
-                        style={{
-                          width: "20px",
-                          height: "2px",
-                          background: agencyForecast.color,
-                          borderRadius: "1px",
-                          border: `1px dashed ${agencyForecast.color}`,
-                        }}
+                      <input
+                        type="checkbox"
+                        checked={showForecast}
+                        onChange={(e) => setShowForecast(e.target.checked)}
+                        style={{ cursor: "pointer" }}
                       />
-                      <span>{agencyForecast.agency}预报</span>
-                    </div>
-                  ))}
-              </div>
-            )}
+                      显示
+                    </label>
+                  </div>
+                  {Array.from(forecastData.values())
+                    .flat()
+                    .map((agencyForecast) => (
+                      <div
+                        key={agencyForecast.agency}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          fontSize: "12px",
+                          color: "#555",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "20px",
+                            height: "2px",
+                            background: agencyForecast.color,
+                            borderRadius: "1px",
+                            border: `1px dashed ${agencyForecast.color}`,
+                          }}
+                        />
+                        <span>{agencyForecast.agency}预报</span>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -2032,7 +2072,7 @@ function PredictionVisualization() {
                 <strong>预测起点：</strong>
                 {selectedPoint &&
                   new Date(
-                    selectedPoint.timestamp || selectedPoint.record_time,
+                    selectedPoint.timestamp || selectedPoint.record_time
                   ).toLocaleString("zh-CN")}
               </p>
               <p style={{ margin: "5px 0" }}>
@@ -2057,7 +2097,9 @@ function PredictionVisualization() {
                   background: "white",
                   padding: "12px",
                   borderRadius: "8px",
-                  borderLeft: `4px solid ${getConfidenceColor(point.confidence)}`,
+                  borderLeft: `4px solid ${getConfidenceColor(
+                    point.confidence
+                  )}`,
                   fontSize: "12px",
                 }}
               >
@@ -2117,7 +2159,7 @@ function PredictionVisualization() {
                   >
                     {getIntensityLevel(
                       point.predicted_wind_speed,
-                      point.predicted_pressure,
+                      point.predicted_pressure
                     )}
                   </span>
                 </p>
