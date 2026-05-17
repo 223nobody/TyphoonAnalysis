@@ -23,13 +23,17 @@ class Settings(BaseSettings):
     # AI服务提供商选择
     AI_PROVIDER: str = Field(default="", description="AI服务提供商，可选值: qwen, deepseek, glm")
 
-    # 统一AI API配置（aiping.cn）
-    AI_API_KEY: str = Field(..., description="统一AI API密钥（用于DeepSeek、Qwen和GLM）")
-    AI_API_BASE_URL: str = Field(default="https://aiping.cn/api/v1", description="统一AI API基础URL")
+    # Qwen/GLM 通用AI API配置（aiping.cn）
+    AI_API_KEY: str = Field(..., description="通用AI API密钥（用于Qwen和GLM）")
+    AI_API_BASE_URL: str = Field(default="https://aiping.cn/api/v1", description="通用AI API基础URL")
 
-    # 深度思考模式专用配置
-    AI_API_KEY_THINKING: str = Field(default="", description="深度思考模式专用API密钥")
-    AI_API_BASE_URL_THINKING: str = Field(default="", description="深度思考模式专用API基础URL")
+    # DeepSeek 专用 API 配置
+    DEEPSEEK_API_KEY: str = Field(default="", description="DeepSeek专用API密钥")
+    DEEPSEEK_API_BASE_URL: str = Field(default="", description="DeepSeek专用API基础URL")
+
+    # 深度思考模式兼容配置（未配置 DeepSeek 专用配置时使用）
+    AI_API_KEY_THINKING: str = Field(default="", description="深度思考模式兼容API密钥")
+    AI_API_BASE_URL_THINKING: str = Field(default="", description="深度思考模式兼容API基础URL")
 
     # 视觉语言模型专用配置
     AI_API_KEY_VL: str = Field(default="", description="视觉语言模型专用API密钥（用于视频/图像分析）")
@@ -41,6 +45,35 @@ class Settings(BaseSettings):
     QWEN_TEXT_MODEL: str = Field(default="", description="Qwen文本生成模型")
     QWEN_VL_MODEL: str = Field(default="qwen-vl-max-latest", description="Qwen视觉语言模型")
     GLM_MODEL: str = Field(default="", description="GLM模型名称")
+
+    # AI调用性能与输出质量配置
+    AI_REPORT_MAX_TOKENS: int = Field(default=4096, description="报告生成最大输出Token数")
+    AI_REPORT_TIMEOUT: float = Field(default=150.0, description="报告生成请求超时秒数")
+    AI_REPORT_MAX_RETRIES: int = Field(default=2, description="报告生成最大重试次数")
+    AI_REPORT_RETRY_DELAY: float = Field(default=1.5, description="报告生成重试基础等待秒数")
+    AI_REPORT_TEMPERATURE: float = Field(default=0.45, description="报告生成采样温度")
+    AI_REPORT_TOP_P: float = Field(default=0.9, description="报告生成top_p")
+
+    AI_CHAT_SIMPLE_MAX_TOKENS: int = Field(default=2400, description="AI客服简单问题最大输出Token数")
+    AI_CHAT_COMPLEX_MAX_TOKENS: int = Field(default=4096, description="AI客服复杂问题最大输出Token数")
+    AI_CHAT_THINKING_MAX_TOKENS: int = Field(default=6144, description="AI客服深度思考最大输出Token数")
+    AI_CHAT_TIMEOUT: float = Field(default=75.0, description="AI客服普通请求超时秒数")
+    AI_CHAT_THINKING_TIMEOUT: float = Field(default=180.0, description="AI客服深度思考请求超时秒数")
+    AI_CHAT_TEMPERATURE: float = Field(default=0.65, description="AI客服采样温度")
+    AI_CHAT_TOP_P: float = Field(default=0.9, description="AI客服top_p")
+    AI_CHAT_PRESENCE_PENALTY: float = Field(default=0.05, description="AI客服存在惩罚")
+    AI_CHAT_FREQUENCY_PENALTY: float = Field(default=0.1, description="AI客服频率惩罚")
+
+    AI_VL_IMAGE_MAX_TOKENS: int = Field(default=2400, description="图像视觉分析最大输出Token数")
+    AI_VL_IMAGE_TIMEOUT: float = Field(default=160.0, description="图像视觉分析请求超时秒数")
+    AI_VL_IMAGE_MAX_RETRIES: int = Field(default=2, description="图像视觉分析最大重试次数")
+    AI_VL_IMAGE_TEMPERATURE: float = Field(default=0.2, description="图像视觉分析采样温度")
+    AI_VL_VIDEO_MAX_TOKENS: int = Field(default=2400, description="视频视觉分析最大输出Token数")
+    AI_VL_VIDEO_FRAME_MAX_TOKENS: int = Field(default=1200, description="视频单帧分析最大输出Token数")
+    AI_VL_VIDEO_TIMEOUT: float = Field(default=240.0, description="视频视觉分析请求超时秒数")
+    AI_VL_VIDEO_MAX_RETRIES: int = Field(default=2, description="视频视觉分析最大重试次数")
+    AI_VL_VIDEO_TEMPERATURE: float = Field(default=0.55, description="视频视觉分析采样温度")
+    AI_VL_RETRY_DELAY: float = Field(default=1.5, description="视觉分析重试基础等待秒数")
 
 
     # CORS配置

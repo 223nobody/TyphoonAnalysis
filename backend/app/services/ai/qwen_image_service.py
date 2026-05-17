@@ -23,9 +23,11 @@ class QwenImageService:
         self.api_key = settings.AI_API_KEY_VL or settings.AI_API_KEY
         self.base_url = settings.AI_API_BASE_URL_VL or "https://dashscope.aliyuncs.com/api/v1"
         self.model = settings.QWEN_VL_MODEL or "qwen-vl-max-latest"
-        self.timeout = 180.0
-        self.max_retries = 3
-        self.retry_delay = 2
+        self.timeout = settings.AI_VL_IMAGE_TIMEOUT
+        self.max_tokens = settings.AI_VL_IMAGE_MAX_TOKENS
+        self.max_retries = settings.AI_VL_IMAGE_MAX_RETRIES
+        self.retry_delay = settings.AI_VL_RETRY_DELAY
+        self.temperature = settings.AI_VL_IMAGE_TEMPERATURE
         self.backend_dir = Path(__file__).resolve().parents[3]
         self.examples_dir = self.backend_dir / "data" / "images" / "test"
         self.examples_manifest = self.examples_dir / "examples.json"
@@ -301,8 +303,8 @@ class QwenImageService:
                     ]
                 },
                 "parameters": {
-                    "max_tokens": 2200,
-                    "temperature": 0.2,
+                    "max_tokens": self.max_tokens,
+                    "temperature": self.temperature,
                 },
             }
 

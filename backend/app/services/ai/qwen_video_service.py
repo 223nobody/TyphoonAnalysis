@@ -47,9 +47,12 @@ class BailianVideoService:
         self.api_key = settings.AI_API_KEY_VL or settings.AI_API_KEY
         self.base_url = settings.AI_API_BASE_URL_VL or "https://dashscope.aliyuncs.com/api/v1"
         self.model = settings.QWEN_VL_MODEL or self.MODELS.get("qwen-vl-max")
-        self.timeout = 300.0  # 5分钟超时
-        self.max_retries = 3  # 最大重试次数
-        self.retry_delay = 2  # 重试间隔（秒）
+        self.timeout = settings.AI_VL_VIDEO_TIMEOUT
+        self.max_tokens = settings.AI_VL_VIDEO_MAX_TOKENS
+        self.frame_max_tokens = settings.AI_VL_VIDEO_FRAME_MAX_TOKENS
+        self.max_retries = settings.AI_VL_VIDEO_MAX_RETRIES
+        self.retry_delay = settings.AI_VL_RETRY_DELAY
+        self.temperature = settings.AI_VL_VIDEO_TEMPERATURE
         logger.info(f"百炼视频服务初始化: model={self.model}, base_url={self.base_url}")
 
     def _create_client(self):
@@ -384,8 +387,8 @@ class BailianVideoService:
                     ]
                 },
                 "parameters": {
-                    "max_tokens": 2000,
-                    "temperature": 0.7
+                    "max_tokens": self.max_tokens,
+                    "temperature": self.temperature
                 }
             }
             
@@ -575,8 +578,8 @@ class BailianVideoService:
                     ]
                 },
                 "parameters": {
-                    "max_tokens": 1000,
-                    "temperature": 0.7
+                    "max_tokens": self.frame_max_tokens,
+                    "temperature": self.temperature
                 }
             }
             

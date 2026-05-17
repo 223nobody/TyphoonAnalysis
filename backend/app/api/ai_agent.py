@@ -303,14 +303,21 @@ async def call_ai_service_with_retry(
 
 """
 
-    # 根据问题复杂度动态调整 max_tokens
+    # 根据问题复杂度动态调整输出长度，避免简单问题过度生成、复杂问题被截断。
     question_length = len(question)
     is_simple_question = (
         question_length < 50 or
         any(keyword in question.lower() for keyword in ['吗', '吧', '是否', '对不对', '可以吗', '能不能', '会不会'])
     )
 
-    max_tokens = 2000 if is_simple_question else 3000
+    if use_thinking_config:
+        max_tokens = settings.AI_CHAT_THINKING_MAX_TOKENS
+    else:
+        max_tokens = (
+            settings.AI_CHAT_SIMPLE_MAX_TOKENS
+            if is_simple_question
+            else settings.AI_CHAT_COMPLEX_MAX_TOKENS
+        )
     logger.info(f"问题复杂度判断 - 问题长度: {question_length}, 简单问题: {is_simple_question}, max_tokens: {max_tokens}")
 
     payload = {
@@ -320,27 +327,39 @@ async def call_ai_service_with_retry(
             {"role": "user", "content": question}
         ],
         "stream": stream,
-        "temperature": 0.8,  # 降低随机性
-        "top_p": 0.95,        # 提升聚焦性
-        "presence_penalty": 0.1,  # 新增：减少重复内容，提升多样性
-        "frequency_penalty": 0.1, # 新增：避免模型过度谨慎
+        "temperature": settings.AI_CHAT_TEMPERATURE,
+        "top_p": settings.AI_CHAT_TOP_P,
+        "presence_penalty": settings.AI_CHAT_PRESENCE_PENALTY,
+        "frequency_penalty": settings.AI_CHAT_FREQUENCY_PENALTY,
         "max_tokens": max_tokens,
         "stop": None
     }
 
-    # 根据是否使用深度思考模式选择不同的API配置
-    if use_thinking_config:
-        # 深度思考模式：使用专用的API配置
-        api_key = settings.AI_API_KEY_THINKING if settings.AI_API_KEY_THINKING else settings.AI_API_KEY
-        api_base_url = settings.AI_API_BASE_URL_THINKING if settings.AI_API_BASE_URL_THINKING else settings.AI_API_BASE_URL
-        logger.info(f"使用深度思考模式配置 - API Base URL: {api_base_url}")
+    # DeepSeek 使用专用配置；Qwen/GLM 继续使用原有统一 API 配置。
+    if model_key == "deepseek":
+        api_key = (
+            settings.DEEPSEEK_API_KEY
+            or settings.AI_API_KEY_THINKING
+            or settings.AI_API_KEY
+        )
+        api_base_url = (
+            settings.DEEPSEEK_API_BASE_URL
+            or settings.AI_API_BASE_URL_THINKING
+            or settings.AI_API_BASE_URL
+        )
+        logger.info(f"使用 DeepSeek API 配置 - API Base URL: {api_base_url}")
+    elif use_thinking_config:
+        api_key = settings.AI_API_KEY_THINKING or settings.AI_API_KEY
+        api_base_url = settings.AI_API_BASE_URL_THINKING or settings.AI_API_BASE_URL
+        logger.info(f"使用深度思考兼容配置 - API Base URL: {api_base_url}")
     else:
-        # 普通模式：使用默认的API配置
         api_key = settings.AI_API_KEY
         api_base_url = settings.AI_API_BASE_URL
 
+    authorization = api_key if api_key.lower().startswith("bearer ") else f"Bearer {api_key}"
+
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": authorization,
         "Content-Type": "application/json"
     }
 
@@ -349,8 +368,11 @@ async def call_ai_service_with_retry(
         try:
             logger.info(f"尝试调用AI服务 - 模型: {model_key} ({model_name}), 尝试次数: {attempt + 1}/{max_retries}, 流式: {stream}")
 
-            # 根据是否使用深度思考模式设置不同的超时时间
-            timeout_seconds = 120.0 if use_thinking_config else 60.0
+            timeout_seconds = (
+                settings.AI_CHAT_THINKING_TIMEOUT
+                if use_thinking_config
+                else settings.AI_CHAT_TIMEOUT
+            )
             
             if stream:
                 # 流式传输模式 - 返回异步生成器
@@ -519,7 +541,7 @@ async def ask_question(
         else:
             # 未启用深度思考模式：根据用户选择的模型决定
             if request.model == "deepseek":
-                # 选择 deepseek 且未启用深度思考，使用 DEEPSEEK_NOTHINK_MODEL
+                # 选择 deepseek 且未启用深度思考，使用普通 DeepSeek 模型
                 actual_model_name = settings.DEEPSEEK_MODEL
                 actual_model_key = "deepseek"
                 logger.info(f"使用 DeepSeek 非深度思考模型: {actual_model_name}")

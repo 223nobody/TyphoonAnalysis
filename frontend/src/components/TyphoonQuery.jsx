@@ -60,12 +60,12 @@ function TyphoonQuery() {
       let filteredData = data.items || [];
       if (listForm.year) {
         filteredData = filteredData.filter(
-          (t) => t.year === parseInt(listForm.year),
+          (t) => t.year === parseInt(listForm.year)
         );
       }
       if (listForm.status !== "") {
         filteredData = filteredData.filter(
-          (t) => t.status === parseInt(listForm.status),
+          (t) => t.status === parseInt(listForm.status)
         );
       }
 
@@ -101,7 +101,7 @@ function TyphoonQuery() {
       console.log(`✅ 台风详情数据加载成功:`, detailData);
       console.log(
         `✅ 台风路径数据加载成功，路径点数量:`,
-        (pathData.items || pathData || []).length,
+        (pathData.items || pathData || []).length
       );
 
       // 从路径数据中计算统计信息
@@ -158,7 +158,7 @@ function TyphoonQuery() {
           }
           if (!detailData.end_time) {
             detailData.end_time = new Date(
-              timestamps[timestamps.length - 1],
+              timestamps[timestamps.length - 1]
             ).toISOString();
           }
         }
@@ -250,7 +250,7 @@ function TyphoonQuery() {
           console.log(`✅ 台风详情数据加载成功:`, detailData);
           console.log(
             `✅ 台风路径数据加载成功，路径点数量:`,
-            (pathData.items || pathData || []).length,
+            (pathData.items || pathData || []).length
           );
 
           // 从路径数据中计算统计信息
@@ -306,7 +306,7 @@ function TyphoonQuery() {
               }
               if (!detailData.end_time) {
                 detailData.end_time = new Date(
-                  timestamps[timestamps.length - 1],
+                  timestamps[timestamps.length - 1]
                 ).toISOString();
               }
             }
@@ -316,7 +316,9 @@ function TyphoonQuery() {
           setDetailForm({ typhoonId: urlTyphoonId });
 
           // 构建组合格式的显示文本：台风ID - 英文名 - 中文名
-          const displayName = `${urlTyphoonId} - ${detailData.typhoon_name || "暂无"}${
+          const displayName = `${urlTyphoonId} - ${
+            detailData.typhoon_name || "暂无"
+          }${
             detailData.typhoon_name_cn ? ` - ${detailData.typhoon_name_cn}` : ""
           }`;
           setDisplayText(displayName);
@@ -713,8 +715,8 @@ function TyphoonQuery() {
                   {data.start_time
                     ? new Date(data.start_time).toLocaleString("zh-CN")
                     : data.created_at
-                      ? new Date(data.created_at).toLocaleString("zh-CN")
-                      : "暂无数据"}
+                    ? new Date(data.created_at).toLocaleString("zh-CN")
+                    : "暂无数据"}
                 </td>
               </tr>
               <tr>
@@ -725,8 +727,8 @@ function TyphoonQuery() {
                   {data.end_time
                     ? new Date(data.end_time).toLocaleString("zh-CN")
                     : data.updated_at
-                      ? new Date(data.updated_at).toLocaleString("zh-CN")
-                      : "暂无数据"}
+                    ? new Date(data.updated_at).toLocaleString("zh-CN")
+                    : "暂无数据"}
                 </td>
               </tr>
               <tr>
@@ -847,7 +849,7 @@ function TyphoonQuery() {
 
       return {
         title: {
-          text: "台风路径可视化",
+          text: "台风数据可视化",
           left: "center",
           textStyle: {
             color: "#1f2937",

@@ -22,13 +22,29 @@ class DeepSeekService:
     """DeepSeek AI服务类 - 专注于文本报告生成"""
 
     def __init__(self):
-        self.api_key = settings.AI_API_KEY  # 使用统一的API Key
-        self.base_url = settings.AI_API_BASE_URL  # 使用统一的Base URL
+        self.api_key = (
+            settings.DEEPSEEK_API_KEY
+            or settings.AI_API_KEY_THINKING
+            or settings.AI_API_KEY
+        )
+        self.base_url = (
+            settings.DEEPSEEK_API_BASE_URL
+            or settings.AI_API_BASE_URL_THINKING
+            or settings.AI_API_BASE_URL
+        )
         self.model = settings.DEEPSEEK_MODEL
-        self.timeout = 120  # 使用配置的超时时间（120秒）
-        self.max_tokens = 3000  # 使用配置的最大token数
-        self.max_retries = 3  # 最大重试次数
-        self.retry_delay = 2  # 重试间隔（秒）
+        self.timeout = settings.AI_REPORT_TIMEOUT
+        self.max_tokens = settings.AI_REPORT_MAX_TOKENS
+        self.max_retries = settings.AI_REPORT_MAX_RETRIES
+        self.retry_delay = settings.AI_REPORT_RETRY_DELAY
+        self.temperature = settings.AI_REPORT_TEMPERATURE
+        self.top_p = settings.AI_REPORT_TOP_P
+
+    def _authorization_header(self) -> str:
+        """兼容直接填写 key 或填写完整 Bearer token 的两种配置方式。"""
+        if self.api_key.lower().startswith("bearer "):
+            return self.api_key
+        return f"Bearer {self.api_key}"
 
     async def _make_api_request(
         self,
@@ -156,14 +172,15 @@ class DeepSeekService:
                     }
                 ],
                 "stream": False,
-                "temperature": 0.5,
+                "temperature": self.temperature,
                 "max_tokens": self.max_tokens,
+                "top_p": self.top_p,
                 "frequency_penalty": 0.3,
                 "response_format": {"type": "text"}
             }
 
             headers = {
-                "Authorization": self.api_key,
+                "Authorization": self._authorization_header(),
                 "Content-Type": "application/json"
             }
 
@@ -1438,14 +1455,15 @@ class DeepSeekService:
                         }
                     ],
                     "stream": False,
-                    "temperature": 0.5,
+                    "temperature": self.temperature,
                     "max_tokens": self.max_tokens,
+                    "top_p": self.top_p,
                     "frequency_penalty": 0.3,
                     "response_format": {"type": "text"}
                 }
 
                 headers = {
-                    "Authorization": self.api_key,
+                    "Authorization": self._authorization_header(),
                     "Content-Type": "application/json"
                 }
 

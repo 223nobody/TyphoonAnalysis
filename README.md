@@ -46,7 +46,7 @@
 
 - **Neo4j 知识图谱**: 构建台风领域知识图谱，包含台风、路径点、地理位置、时间、强度等级等实体类型
 - **GraphRAG LocalSearch**: 基于图结构的智能检索，支持多跳推理和实体关系遍历
-- **台风领域意图识别**: 支持12种意图类型（基本信息、路径查询、强度分析、影响评估等）
+- **台风领域意图识别**: 支持 12 种意图类型（基本信息、路径查询、强度分析、影响评估等）
 - **动态 Prompt 构建**: 根据查询意图动态生成专用检索指令
 - **分层检索策略**: 先检索 depth=1 节点，再检索 depth=2 节点，确保结果完整性
 - **相关性排序**: 多维度评分（语义相似度、结构重要性、时效性、多样性）
@@ -55,7 +55,7 @@
 
 ### 🎤 语音识别
 
-- 集成本地ASR模型 (智能语音交互) 服务进行语音转文字
+- 集成本地 ASR 模型 (智能语音交互) 服务进行语音转文字
 - 支持中文、英文、粤语自动检测
 - 自动繁体转简体文本规范化
 - 实时录音与流式识别
@@ -92,7 +92,7 @@
 
 !\[数据爬取时序图]\(backend/data/images/plantuml/数据爬取时序图.png null)
 
-_图17: 数据爬取时序图，展示调度器定时触发CMA爬虫、公报爬虫、活跃台风爬虫，从中国气象局API获取数据并更新数据库的完整流程_
+_图 17: 数据爬取时序图，展示调度器定时触发 CMA 爬虫、公报爬虫、活跃台风爬虫，从中国气象局 API 获取数据并更新数据库的完整流程_
 
 #### 功能特点
 
@@ -113,7 +113,7 @@ _图17: 数据爬取时序图，展示调度器定时触发CMA爬虫、公报爬
 
 !\[用例图]\(backend/data/images/plantuml/用例图.png null)
 
-_图2: 台风分析系统用例图，展示普通用户和管理员可使用的全部功能，包括用户认证、台风查询、统计分析、智能预测、AI服务、预警管理、数据导出和系统管理等模块_
+_图 2: 台风分析系统用例图，展示普通用户和管理员可使用的全部功能，包括用户认证、台风查询、统计分析、智能预测、AI 服务、预警管理、数据导出和系统管理等模块_
 
 ## 🏗️ 技术架构
 
@@ -121,7 +121,7 @@ _图2: 台风分析系统用例图，展示普通用户和管理员可使用的�
 
 !\[系统架构图]\(backend/data/images/plantuml/系统架构图.png null)
 
-_图1: 台风分析系统整体架构图，展示前后端分离架构、数据库、AI服务、外部服务的整体关系_
+_图 1: 台风分析系统整体架构图，展示前后端分离架构、数据库、AI 服务、外部服务的整体关系_
 
 ### 架构层次说明
 
@@ -347,7 +347,7 @@ python main.py
 
 > **首次启动说明**:
 >
-> - 确保已在 `.env` 文件中配置阿里云 NLS 参数（NLS\_APPKEY, NLS\_ACCESS\_KEY\_ID, NLS\_ACCESS\_KEY\_SECRET）
+> - 确保已在 `.env` 文件中配置阿里云 NLS 参数（NLS_APPKEY, NLS_ACCESS_KEY_ID, NLS_ACCESS_KEY_SECRET）
 > - 阿里云 NLS 服务需要联网使用，无需下载本地模型
 > - 获取方式：登录 [阿里云智能语音交互控制台](https://nls-portal.console.aliyun.com/) 创建项目获取 AppKey
 
@@ -384,17 +384,17 @@ yarn dev
 
 !\[用户认证流程图]\(backend/data/images/plantuml/用户认证流程图.png null)
 
-_图3: 用户认证流程图，展示用户提交登录请求、验证用户名密码、生成JWT Token、前端存储Token的完整认证流程_
+_图 3: 用户认证流程图，展示用户提交登录请求、验证用户名密码、生成 JWT Token、前端存储 Token 的完整认证流程_
 
 #### 操作步骤
 
 1. 访问前端首页，点击"登录"
 2. 输入用户名和密码
 3. 系统验证身份信息
-4. 验证通过后生成JWT Token
-5. 前端存储Token，后续请求自动携带
+4. 验证通过后生成 JWT Token
+5. 前端存储 Token，后续请求自动携带
 
-***
+---
 
 ### 2. 台风路径可视化
 
@@ -402,7 +402,7 @@ _图3: 用户认证流程图，展示用户提交登录请求、验证用户名�
 
 !\[台风路径预测时序图]\(backend/data/images/plantuml/台风路径预测时序图.png null)
 
-_图4: 台风路径预测时序图，展示用户选择台风后，系统查询历史路径、LSTM模型推理、返回预测结果的完整流程_
+_图 4: 台风路径预测时序图，展示用户选择台风后，系统查询历史路径、LSTM 模型推理、返回预测结果的完整流程_
 
 #### 操作步骤
 
@@ -425,9 +425,9 @@ _图4: 台风路径预测时序图，展示用户选择台风后，系统查询�
 
 #### 对话流程
 
-!\[AI对话时序图]\(backend/data/images/plantuml/AI对话时序图.png null)
+!\[AI 对话时序图]\(backend/data/images/plantuml/AI 对话时序图.png null)
 
-_图5: AI客服对话时序图，展示用户通过文字或语音输入问题，系统进行语音识别、匹配预设问题或调用AI模型流式响应的完整流程_
+_图 5: AI 客服对话时序图，展示用户通过文字或语音输入问题，系统进行语音识别、匹配预设问题或调用 AI 模型流式响应的完整流程_
 
 #### 操作步骤
 
@@ -450,13 +450,13 @@ _图5: AI客服对话时序图，展示用户通过文字或语音输入问题�
 
 !\[视频分析时序图]\(backend/data/images/plantuml/视频分析时序图.png null)
 
-_图6: 视频分析时序图，展示用户上传视频后，系统进行文件验证、关键帧提取、AI视觉分析、保存结果的完整流程_
+_图 6: 视频分析时序图，展示用户上传视频后，系统进行文件验证、关键帧提取、AI 视觉分析、保存结果的完整流程_
 
 #### 图像分析操作步骤
 
 1. 进入"图像分析"面板
 2. 上传单张卫星云图（支持红外/可见光图像），上传成功后可在下方预览
-3. 选择分析模式（Few-shot混合分析/OpenCV/融合）
+3. 选择分析模式（Few-shot 混合分析/OpenCV/融合）
 4. 点击"开始分析"
 5. 查看结构化指标、图像信息、视觉统计、AI 报告和风险提示
 
@@ -470,19 +470,19 @@ _图6: 视频分析时序图，展示用户上传视频后，系统进行文件�
 4. 点击"开始预测"
 5. 查看预测路径和置信度
 
-#### 5.2 LSTM路径预测流程
+#### 5.2 LSTM 路径预测流程
 
-!\[LSTM路径预测流程图]\(backend/data/images/plantuml/LSTM路径预测流程图.png null)
+!\[LSTM 路径预测流程图]\(backend/data/images/plantuml/LSTM 路径预测流程图.png null)
 
-_图7: LSTM路径预测流程图，展示从接收预测请求、数据预处理、LSTM编码器处理、多头预测输出到返回结果的完整算法流程_
+_图 7: LSTM 路径预测流程图，展示从接收预测请求、数据预处理、LSTM 编码器处理、多头预测输出到返回结果的完整算法流程_
 
 #### 5.3 预测模型说明
 
 本系统采用 **Transformer + LSTM** 混合架构的深度学习模型进行台风路径和强度预测，具有以下特点：
 
 - **模型架构**: Transformer 编码器 + LSTM 解码器
-- **输入特征**: 14维特征（位置、强度、移动速度、时间特征等）
-- **预测范围**: 支持 6-48 小时多步预测（每6小时一个预测点）
+- **输入特征**: 14 维特征（位置、强度、移动速度、时间特征等）
+- **预测范围**: 支持 6-48 小时多步预测（每 6 小时一个预测点）
 - **置信度评估**: 提供每个预测点的置信度分数
 
 #### 5.4 模型训练结果
@@ -491,42 +491,42 @@ _图7: LSTM路径预测流程图，展示从接收预测请求、数据预处理
 
 **训练过程可视化**
 
-!\[训练历史]\(backend/training/results/training\_history.png null)
+!\[训练历史]\(backend/training/results/training_history.png null)
 
-_图8: 训练与验证损失曲线、学习率变化、路径误差和强度误差随训练轮次的变化_
+_图 8: 训练与验证损失曲线、学习率变化、路径误差和强度误差随训练轮次的变化_
 
 **按预测时间步的误差分析**
 
-!\[时间步误差]\(backend/training/results/time\_step\_errors.png null)
+!\[时间步误差]\(backend/training/results/time_step_errors.png null)
 
-_图9: 不同预测时间步（6h/12h/18h/.../48h）的经纬度误差和路径误差分布_
+_图 9: 不同预测时间步（6h/12h/18h/.../48h）的经纬度误差和路径误差分布_
 
 **预测结果分析**
 
-!\[预测分析]\(backend/training/results/prediction\_analysis.png null)
+!\[预测分析]\(backend/training/results/prediction_analysis.png null)
 
-_图10: 预测值与真实值的对比散点图、误差分布直方图和路径对比可视化_
+_图 10: 预测值与真实值的对比散点图、误差分布直方图和路径对比可视化_
 
 **置信度分析**
 
-!\[置信度分析]\(backend/training/results/confidence\_analysis.png null)
+!\[置信度分析]\(backend/training/results/confidence_analysis.png null)
 
-_图11: 模型预测置信度的分布情况和按预测时间步的变化趋势_
+_图 11: 模型预测置信度的分布情况和按预测时间步的变化趋势_
 
 **数据探索可视化**
 
-!\[数据探索]\(backend/training/results/data\_exploration.png null)
+!\[数据探索]\(backend/training/results/data_exploration.png null)
 
-_图12: 训练数据的分布情况，包括台风路径分布、年度数量统计、强度分布等_
+_图 12: 训练数据的分布情况，包括台风路径分布、年度数量统计、强度分布等_
 
 #### 5.4 模型性能指标
 
-| 指标     | 说明         | 典型值    |
-| ------ | ---------- | ------ |
-| 路径 MAE | 平均路径误差（度）  | \~1.5° |
+| 指标     | 说明                 | 典型值 |
+| -------- | -------------------- | ------ |
+| 路径 MAE | 平均路径误差（度）   | \~1.5° |
 | 纬度 MAE | 纬度预测平均绝对误差 | \~0.8° |
 | 经度 MAE | 经度预测平均绝对误差 | \~1.2° |
-| 置信度    | 预测置信度均值    | \~0.85 |
+| 置信度   | 预测置信度均值       | \~0.85 |
 
 > 💡 **提示**: 模型训练代码和详细说明请参考 `backend/training/` 目录下的 Jupyter Notebook 文件。
 
@@ -536,7 +536,7 @@ _图12: 训练数据的分布情况，包括台风路径分布、年度数量统
 
 !\[预警生成流程图]\(backend/data/images/plantuml/预警生成流程图.png null)
 
-_图13: 台风预警生成流程图，展示系统从获取台风公报、解析内容、判断强度等级到生成不同级别预警（蓝/黄/橙/红）的完整流程_
+_图 13: 台风预警生成流程图，展示系统从获取台风公报、解析内容、判断强度等级到生成不同级别预警（蓝/黄/橙/红）的完整流程_
 
 #### 操作步骤
 
@@ -565,35 +565,35 @@ _图13: 台风预警生成流程图，展示系统从获取台风公报、解析
 
 ### 主要端点
 
-| 端点                         | 方法   | 说明            |
-| -------------------------- | ---- | ------------- |
-| `/typhoons`                | GET  | 获取台风列表        |
-| `/typhoons/{id}`           | GET  | 获取台风详情        |
-| `/typhoons/{id}/path`      | GET  | 获取台风路径        |
-| `/typhoons/{id}/forecast`  | GET  | 获取预报路径        |
-| `/statistics/yearly`       | GET  | 获取年度统计        |
-| `/statistics/intensity`    | GET  | 获取强度统计        |
-| `/statistics/comparison`   | POST | 台风对比分析        |
-| `/export/typhoon/{id}`     | GET  | 导出台风数据        |
-| `/export/batch`            | POST | 批量导出          |
-| `/prediction/path`         | POST | 预测台风路径        |
-| `/prediction/intensity`    | POST | 预测台风强度        |
-| `/alert/active`            | GET  | 获取活跃预警        |
-| `/alert/history`           | GET  | 获取预警历史        |
-| `/crawler/trigger`         | POST | 手动触发爬虫        |
-| `/crawler/status`          | GET  | 获取爬虫状态        |
-| `/ai-agent/sessions`       | POST | 创建 AI 对话会话    |
-| `/ai-agent/sessions`       | GET  | 获取会话列表        |
-| `/ai-agent/sessions/{id}`  | GET  | 获取会话历史        |
-| `/ai-agent/questions`      | GET  | 获取热门问题        |
-| `/ai-agent/ask`            | POST | 发送问题获取回答      |
+| 端点                       | 方法 | 说明                       |
+| -------------------------- | ---- | -------------------------- |
+| `/typhoons`                | GET  | 获取台风列表               |
+| `/typhoons/{id}`           | GET  | 获取台风详情               |
+| `/typhoons/{id}/path`      | GET  | 获取台风路径               |
+| `/typhoons/{id}/forecast`  | GET  | 获取预报路径               |
+| `/statistics/yearly`       | GET  | 获取年度统计               |
+| `/statistics/intensity`    | GET  | 获取强度统计               |
+| `/statistics/comparison`   | POST | 台风对比分析               |
+| `/export/typhoon/{id}`     | GET  | 导出台风数据               |
+| `/export/batch`            | POST | 批量导出                   |
+| `/prediction/path`         | POST | 预测台风路径               |
+| `/prediction/intensity`    | POST | 预测台风强度               |
+| `/alert/active`            | GET  | 获取活跃预警               |
+| `/alert/history`           | GET  | 获取预警历史               |
+| `/crawler/trigger`         | POST | 手动触发爬虫               |
+| `/crawler/status`          | GET  | 获取爬虫状态               |
+| `/ai-agent/sessions`       | POST | 创建 AI 对话会话           |
+| `/ai-agent/sessions`       | GET  | 获取会话列表               |
+| `/ai-agent/sessions/{id}`  | GET  | 获取会话历史               |
+| `/ai-agent/questions`      | GET  | 获取热门问题               |
+| `/ai-agent/ask`            | POST | 发送问题获取回答           |
 | `/api/images/upload`       | POST | 上传单张图像（文件名唯一） |
 | `/api/images/analyze/{id}` | POST | 执行 few-shot 混合图像分析 |
-| `/api/images/typhoon/{id}` | GET  | 获取台风图像列表      |
-| `/report/generate`         | POST | 生成台风报告        |
-| `/asr/transcribe`          | POST | 语音转文字 (新增)    |
-| `/asr/health`              | GET  | ASR 健康检查 (新增) |
-| `/asr/languages`           | GET  | ASR 支持语言 (新增) |
+| `/api/images/typhoon/{id}` | GET  | 获取台风图像列表           |
+| `/report/generate`         | POST | 生成台风报告               |
+| `/asr/transcribe`          | POST | 语音转文字 (新增)          |
+| `/asr/health`              | GET  | ASR 健康检查 (新增)        |
+| `/asr/languages`           | GET  | ASR 支持语言 (新增)        |
 
 详细 API 文档请访问: <http://localhost:8000/docs>
 
@@ -625,11 +625,11 @@ _图13: 台风预警生成流程图，展示系统从获取台风公报、解析
 
 ## 🛠️ 开发指南
 
-### AI服务架构
+### AI 服务架构
 
-!\[AI服务工厂模式类图]\(backend/data/images/plantuml/AI服务工厂模式类图.png null)
+!\[AI 服务工厂模式类图]\(backend/data/images/plantuml/AI 服务工厂模式类图.png null)
 
-_图15: AI服务工厂模式类图，展示AIServiceFactory、BaseAIService、DeepSeekService、QwenService、GLMService等类的继承和依赖关系_
+_图 15: AI 服务工厂模式类图，展示 AIServiceFactory、BaseAIService、DeepSeekService、QwenService、GLMService 等类的继承和依赖关系_
 
 ### 后端开发
 
@@ -673,22 +673,22 @@ npm run preview
 
 ## 📊 数据说明
 
-### 数据库ER图
+### 数据库 ER 图
 
-!\[ER图]\(backend/data/images/plantuml/ER图.png null)
+!\[ER 图]\(backend/data/images/plantuml/ER 图.png null)
 
-_图14: 台风分析系统数据库ER图，展示Typhoon、TyphoonPath、User、Prediction、ImageAnalysis等实体之间的关系_
+_图 14: 台风分析系统数据库 ER 图，展示 Typhoon、TyphoonPath、User、Prediction、ImageAnalysis 等实体之间的关系_
 
 ### 台风强度等级
 
-| 等级    | 风速范围          | 颜色  |
-| ----- | ------------- | --- |
-| 热带低压  | < 17.2 m/s    | 蓝色  |
-| 热带风暴  | 17.2-24.4 m/s | 绿色  |
-| 强热带风暴 | 24.5-32.6 m/s | 黄色  |
-| 台风    | 32.7-41.4 m/s | 橙色  |
-| 强台风   | 41.5-50.9 m/s | 红色  |
-| 超强台风  | ≥ 51.0 m/s    | 深红色 |
+| 等级       | 风速范围      | 颜色   |
+| ---------- | ------------- | ------ |
+| 热带低压   | < 17.2 m/s    | 蓝色   |
+| 热带风暴   | 17.2-24.4 m/s | 绿色   |
+| 强热带风暴 | 24.5-32.6 m/s | 黄色   |
+| 台风       | 32.7-41.4 m/s | 橙色   |
+| 强台风     | 41.5-50.9 m/s | 红色   |
+| 超强台风   | ≥ 51.0 m/s    | 深红色 |
 
 ### 数据来源
 
@@ -701,29 +701,29 @@ _图14: 台风分析系统数据库ER图，展示Typhoon、TyphoonPath、User、
 
 **实体类型**:
 
-| 实体类型      | 说明   | 属性示例                                          |
-| --------- | ---- | --------------------------------------------- |
-| Typhoon   | 台风   | typhoon\_id, name\_cn, year, max\_wind\_speed |
-| PathPoint | 路径点  | sequence, lat, lon, pressure, wind\_speed     |
-| Location  | 地理位置 | name, lat, lon, intensity                     |
-| Time      | 时间节点 | year, total\_typhoons, strongest\_typhoon\_id |
-| Intensity | 强度等级 | level, name\_cn, wind\_speed\_min/max         |
+| 实体类型  | 说明     | 属性示例                                   |
+| --------- | -------- | ------------------------------------------ |
+| Typhoon   | 台风     | typhoon_id, name_cn, year, max_wind_speed  |
+| PathPoint | 路径点   | sequence, lat, lon, pressure, wind_speed   |
+| Location  | 地理位置 | name, lat, lon, intensity                  |
+| Time      | 时间节点 | year, total_typhoons, strongest_typhoon_id |
+| Intensity | 强度等级 | level, name_cn, wind_speed_min/max         |
 
-**关系类型** (11种):
+**关系类型** (11 种):
 
-| 关系类型             | 说明             | 连接实体                  |
-| ---------------- | -------------- | --------------------- |
-| HAS\_PATH\_POINT | 拥有路径点          | Typhoon → PathPoint   |
-| NEXT             | 路径顺序           | PathPoint → PathPoint |
-| OCCURRED\_IN     | 发生时间           | Typhoon → Time        |
-| LANDED\_AT       | 登陆地点           | Typhoon → Location    |
-| GENERATED\_AT    | 生成于            | Typhoon → Location    |
-| DISSIPATED\_AT   | 消散于            | Typhoon → Location    |
-| INTENSIFIED\_TO  | 增强为（包含达到强度的语义） | Typhoon → Intensity   |
-| WEAKENED\_TO     | 减弱为（包含达到强度的语义） | Typhoon → Intensity   |
-| SIMILAR\_TO      | 相似于            | Typhoon → Typhoon     |
-| AFFECTED\_AREA   | 影响区域           | Typhoon → Location    |
-| PASSED\_NEAR     | 经过附近           | Typhoon → Location    |
+| 关系类型       | 说明                         | 连接实体              |
+| -------------- | ---------------------------- | --------------------- |
+| HAS_PATH_POINT | 拥有路径点                   | Typhoon → PathPoint   |
+| NEXT           | 路径顺序                     | PathPoint → PathPoint |
+| OCCURRED_IN    | 发生时间                     | Typhoon → Time        |
+| LANDED_AT      | 登陆地点                     | Typhoon → Location    |
+| GENERATED_AT   | 生成于                       | Typhoon → Location    |
+| DISSIPATED_AT  | 消散于                       | Typhoon → Location    |
+| INTENSIFIED_TO | 增强为（包含达到强度的语义） | Typhoon → Intensity   |
+| WEAKENED_TO    | 减弱为（包含达到强度的语义） | Typhoon → Intensity   |
+| SIMILAR_TO     | 相似于                       | Typhoon → Typhoon     |
+| AFFECTED_AREA  | 影响区域                     | Typhoon → Location    |
+| PASSED_NEAR    | 经过附近                     | Typhoon → Location    |
 
 ## 🐛 常见问题
 
@@ -793,7 +793,7 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 1. 检查浏览器是否授予麦克风权限
 2. 确认后端 ASR 服务正常运行（访问 <http://localhost:8000/api/asr/health> 检查状态）
-3. 检查 `.env` 文件中 NLS\_APPKEY 等配置是否正确
+3. 检查 `.env` 文件中 NLS_APPKEY 等配置是否正确
 4. 确认阿里云账号已开通语音识别服务
 5. 生产环境需使用 HTTPS
 6. 检查浏览器是否支持 Web Audio API
@@ -853,7 +853,7 @@ python data.py
 
 !\[部署架构图]\(backend/data/images/plantuml/部署架构图.png null)
 
-_图16: 台风分析系统部署架构图，展示客户端层、网关层、应用服务层、数据存储层、AI服务层和外部数据源的完整部署方案_
+_图 16: 台风分析系统部署架构图，展示客户端层、网关层、应用服务层、数据存储层、AI 服务层和外部数据源的完整部署方案_
 
 ## �� 安全建议
 
@@ -1047,7 +1047,7 @@ _图16: 台风分析系统部署架构图，展示客户端层、网关层、应
 - [计量单位换算](http://photino.cwb.gov.tw/rdcweb/lib/comput2.htm)
 - [海平面气压订正](http://www.ab126.com/Geography/2204.html)
 - [百度台风吧](https://tieba.baidu.com/f?kw=%E5%8F%B0%E9%A3%8E)
-- [台风论坛](http://bbs.typhoon.org.cn/index.php?c=thread\&fid=79)
+- [台风论坛](http://bbs.typhoon.org.cn/index.php?c=thread&fid=79)
 
 ## 🙏 致谢
 
@@ -1055,12 +1055,25 @@ _图16: 台风分析系统部署架构图，展示客户端层、网关层、应
 - 感谢开源社区的优秀项目
 - 感谢所有贡献者的支持
 
-***
+---
 
 **⚡ 快速链接**
 
 - [前端文档](service/README.md)
 - [后端文档](backend/README.md)
 - [API 文档](http://www.223nobody.xyz/docs)
+
+## 📬 联系方式
+
+如需交流项目使用、反馈问题或获取部署支持，欢迎通过以下方式联系我。
+
+<div align="center">
+
+| 微信交流 | QQ 联系 |
+| :------: | :-----: |
+| <img src="backend/data/images/info/微信二维码.png" alt="微信二维码" width="220"> | <img src="backend/data/images/info/qq二维码.png" alt="QQ二维码" width="220"> |
+| 扫码添加微信 | 扫码添加 QQ |
+
+</div>
 
 **🌟 如果这个项目对您有帮助，请给我们一个 Star！**

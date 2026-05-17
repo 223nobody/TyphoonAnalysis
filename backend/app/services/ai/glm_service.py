@@ -25,10 +25,12 @@ class GlmService:
         self.api_key = settings.AI_API_KEY  # 使用统一的API Key
         self.base_url = settings.AI_API_BASE_URL  # 使用统一的Base URL
         self.model = settings.GLM_MODEL
-        self.timeout = 120  # 使用配置的超时时间（120秒）
-        self.max_tokens = 3000  # 使用配置的最大token数
-        self.max_retries = 3  # 最大重试次数
-        self.retry_delay = 2  # 重试间隔（秒）
+        self.timeout = settings.AI_REPORT_TIMEOUT
+        self.max_tokens = settings.AI_REPORT_MAX_TOKENS
+        self.max_retries = settings.AI_REPORT_MAX_RETRIES
+        self.retry_delay = settings.AI_REPORT_RETRY_DELAY
+        self.temperature = settings.AI_REPORT_TEMPERATURE
+        self.top_p = settings.AI_REPORT_TOP_P
 
     async def _make_api_request(
         self,
@@ -156,9 +158,9 @@ class GlmService:
                     }
                 ],
                 "stream": False,
-                "temperature": 0.5,
+                "temperature": self.temperature,
                 "max_tokens": self.max_tokens,
-                "top_p": 0.9,
+                "top_p": self.top_p,
                 "frequency_penalty": 0.3,
                 "response_format": {"type": "text"}
             }
@@ -1439,9 +1441,9 @@ class GlmService:
                         }
                     ],
                     "stream": False,
-                    "temperature": 0.5,
+                    "temperature": self.temperature,
                     "max_tokens": self.max_tokens,
-                    "top_p": 0.9,
+                    "top_p": self.top_p,
                     "frequency_penalty": 0.3,
                     "response_format": {"type": "text"}
                 }
