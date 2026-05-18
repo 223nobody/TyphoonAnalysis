@@ -56,9 +56,14 @@ import {
   graphRAGLocalSearch,
 } from "../services/api";
 import KnowledgeGraphPanel from "./KnowledgeGraphPanel";
+import aiAvatarIcon from "../pictures/AI.svg";
 import "../styles/AIAgent.css";
 
 const { Title, Text } = Typography;
+
+const AIAvatar = () => (
+  <img src={aiAvatarIcon} alt="AI" className="ai-avatar-img" />
+);
 
 /**
  * 欢迎界面子组件
@@ -591,7 +596,7 @@ const MessageList = ({
               <UserOutlined />
             )
           ) : (
-            <RobotOutlined />
+            <AIAvatar />
           ),
         variant: msg.role === "user" ? "filled" : "shadow",
         content: (
@@ -662,7 +667,7 @@ const MessageList = ({
         roles={{
           ai: {
             placement: "start",
-            avatar: <RobotOutlined />,
+            avatar: <AIAvatar />,
             variant: "shadow",
             shape: "round",
           },

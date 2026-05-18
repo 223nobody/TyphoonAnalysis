@@ -46,7 +46,7 @@ function ReportGeneration() {
   const [reportForm, setReportForm] = useState({
     typhoonId: "",
     reportType: "comprehensive", // 修改默认值为comprehensive
-    aiProvider: "glm",
+    aiProvider: "deepseek",
   });
 
   // 下拉选择器状态
@@ -103,7 +103,11 @@ function ReportGeneration() {
       console.log(`📌 检测到URL参数中的report_id: ${urlReportId}`);
 
       // 验证report_id格式（必须是数字）
-      if (!urlReportId || urlReportId.trim() === "" || isNaN(parseInt(urlReportId))) {
+      if (
+        !urlReportId ||
+        urlReportId.trim() === "" ||
+        isNaN(parseInt(urlReportId))
+      ) {
         console.warn(`⚠️ 无效的报告ID: ${urlReportId}，跳过自动加载`);
         hasProcessedUrlReportId.current = true;
         return;
@@ -121,7 +125,7 @@ function ReportGeneration() {
           const typhoonId = reportData.typhoon_id || "";
           const reportType = reportData.report_type || "comprehensive";
           const aiProvider =
-            reportData.ai_provider || reportData.model_used || "glm";
+            reportData.ai_provider || reportData.model_used || "deepseek";
 
           setReportForm({
             typhoonId: typhoonId,
@@ -181,7 +185,7 @@ function ReportGeneration() {
         } catch (err) {
           console.error(`❌ 获取报告详情失败:`, err);
           setError(
-            err.response?.data?.detail || err.message || "获取报告详情失败",
+            err.response?.data?.detail || err.message || "获取报告详情失败"
           );
           hasProcessedUrlReportId.current = true;
         }
@@ -263,7 +267,7 @@ function ReportGeneration() {
       const response = await generateReport(
         reportForm.typhoonId,
         reportForm.reportType,
-        reportForm.aiProvider,
+        reportForm.aiProvider
       );
       // apiClient 的响应拦截器已经返回了 response.data
       console.log("报告生成成功，响应数据:", response);
@@ -805,7 +809,7 @@ function ReportGeneration() {
         "loading:",
         loading,
         "error:",
-        error,
+        error
       )}
       {result && <div key={result.id || Date.now()}>{renderResult()}</div>}
     </div>
