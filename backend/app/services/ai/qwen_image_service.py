@@ -3,13 +3,16 @@
 基于 few-shot 标注样例与结构化结果增强单张卫星图分析
 """
 import base64
+import io
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import httpx
+from PIL import Image
 
 from app.core.config import settings
 
@@ -22,12 +25,19 @@ class QwenImageService:
     def __init__(self):
         self.api_key = settings.AI_API_KEY_VL or settings.AI_API_KEY
         self.base_url = settings.AI_API_BASE_URL_VL or "https://dashscope.aliyuncs.com/api/v1"
-        self.model = settings.QWEN_VL_MODEL or "qwen-vl-max-latest"
+        self.model = (
+            settings.QWEN_VL_IMAGE_MODEL
+            or settings.QWEN_VL_MODEL
+            or "qwen-vl-plus-latest"
+        )
         self.timeout = settings.AI_VL_IMAGE_TIMEOUT
         self.max_tokens = settings.AI_VL_IMAGE_MAX_TOKENS
         self.max_retries = settings.AI_VL_IMAGE_MAX_RETRIES
         self.retry_delay = settings.AI_VL_RETRY_DELAY
         self.temperature = settings.AI_VL_IMAGE_TEMPERATURE
+        self.fewshot_limit = settings.AI_VL_IMAGE_FEWSHOT_LIMIT
+        self.image_max_side = settings.AI_VL_IMAGE_MAX_SIDE
+        self.image_jpeg_quality = settings.AI_VL_IMAGE_JPEG_QUALITY
         self.backend_dir = Path(__file__).resolve().parents[3]
         self.examples_dir = self.backend_dir / "data" / "images" / "test"
         self.examples_manifest = self.examples_dir / "examples.json"
@@ -71,15 +81,27 @@ class QwenImageService:
         return result
 
     def _encode_image_to_data_url(self, image_path: Path) -> str:
-        suffix = image_path.suffix.lower()
-        mime_type = {
-            ".png": "image/png",
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".webp": "image/webp",
-        }.get(suffix, "image/png")
-        encoded = base64.b64encode(image_path.read_bytes()).decode("utf-8")
-        return f"data:{mime_type};base64,{encoded}"
+        with Image.open(image_path) as image:
+            image = image.convert("RGB")
+            resample_filter = getattr(
+                getattr(Image, "Resampling", Image),
+                "LANCZOS",
+            )
+            image.thumbnail(
+                (self.image_max_side, self.image_max_side),
+                resample_filter,
+            )
+
+            buffer = io.BytesIO()
+            image.save(
+                buffer,
+                format="JPEG",
+                quality=self.image_jpeg_quality,
+                optimize=True,
+            )
+
+        encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return f"data:image/jpeg;base64,{encoded}"
 
     def _build_analysis_prompt(
         self,
@@ -121,29 +143,31 @@ class QwenImageService:
             "【已标注样例说明】\n"
             f"{example_descriptions}\n\n"
             "【结构化分析参考】\n"
-            f"{json.dumps(structured_snapshot, ensure_ascii=False, indent=2)}\n\n"
+            f"{json.dumps(structured_snapshot, ensure_ascii=False, separators=(',', ':'))}\n\n"
             "【输出要求】\n"
-            "1. 只输出 JSON，不要输出代码块或额外说明。\n"
+            "1. 只输出 JSON，不要输出代码块、Markdown 围栏或额外说明。\n"
             "2. 不要编造精确像素坐标；如果无法判断，请使用 null 或明确写出“不确定”。\n"
-            "3. markdown_report 使用 Markdown，至少包含“图像概览”“台风眼判断”“云系结构”“强度和发展阶段”“与结构化结果的一致性”“风险与局限”“结论”七个部分。\n"
-            "4. JSON 字段必须包含：\n"
+            "3. markdown_report 使用 Markdown，控制在 700-1000 个中文字符，内容要有证据链但避免空泛套话。\n"
+            "4. markdown_report 至少包含以下章节：图像概览、台风眼与中心判读、云系结构、强度和发展阶段、与结构化结果的一致性、风险与局限、结论建议。\n"
+            "5. markdown_report 必须作为 JSON 字符串返回，换行使用 \\n，文本中不要使用未转义的英文双引号。\n"
+            "6. JSON 字段必须包含：\n"
             "{\n"
-            '  "summary": "一句话摘要",\n'
-            '  "overall_assessment": "综合判断",\n'
+            '  "summary": "2-3句话摘要",\n'
+            '  "overall_assessment": "较详细的综合判断",\n'
             '  "eye_detected": true,\n'
             '  "eye_position_description": "台风眼大致位置描述",\n'
             '  "eye_confidence": 0.0,\n'
-            '  "eye_evidence": ["判读依据1", "判读依据2"],\n'
+            '  "eye_evidence": ["判读依据1", "判读依据2", "判读依据3"],\n'
             '  "center_location_hint": "相对画面位置描述",\n'
-            '  "intensity_assessment": "强度语义解读",\n'
-            '  "organization_assessment": "组织程度评估",\n'
+            '  "intensity_assessment": "较详细的强度语义解读",\n'
+            '  "organization_assessment": "较详细的组织程度评估",\n'
             '  "development_stage": "发展阶段",\n'
-            '  "cloud_system_description": "云系结构描述",\n'
-            '  "analysis_highlights": ["关键发现1", "关键发现2"],\n'
+            '  "cloud_system_description": "云系结构描述，限180字",\n'
+            '  "analysis_highlights": ["关键发现1", "关键发现2", "关键发现3"],\n'
             '  "analysis_limitations": ["局限1", "局限2"],\n'
             '  "consistency_score": 0.0,\n'
             '  "risk_flags": ["风险提示"],\n'
-            '  "markdown_report": "Markdown 报告"\n'
+            '  "markdown_report": "包含上述章节的详细Markdown报告"\n'
             "}"
         )
 
@@ -171,6 +195,8 @@ class QwenImageService:
 
     def _parse_ai_response(self, content: str) -> Dict[str, Any]:
         text = content.strip()
+        parse_candidates = [text]
+
         if text.startswith("```"):
             lines = text.splitlines()
             if lines and lines[0].startswith("```"):
@@ -180,13 +206,25 @@ class QwenImageService:
             text = "\n".join(lines).strip()
             if text.lower().startswith("json"):
                 text = text[4:].strip()
+            parse_candidates.append(text)
 
-        try:
-            parsed = json.loads(text)
-            if isinstance(parsed, dict):
-                return parsed
-        except json.JSONDecodeError:
-            logger.warning("Qwen 图像分析返回非 JSON，降级为 Markdown 文本")
+        fenced_json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL | re.IGNORECASE)
+        if fenced_json_match:
+            parse_candidates.append(fenced_json_match.group(1).strip())
+
+        extracted_json = self._extract_json_object(content)
+        if extracted_json:
+            parse_candidates.append(extracted_json)
+
+        for candidate in parse_candidates:
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    return parsed
+            except json.JSONDecodeError:
+                continue
+
+        logger.warning("Qwen 图像分析返回非 JSON，降级为 Markdown 文本")
 
         return {
             "summary": "AI 返回了非结构化文本结果",
@@ -206,6 +244,37 @@ class QwenImageService:
             "risk_flags": ["AI 返回格式不稳定，已按纯文本报告展示"],
             "markdown_report": content,
         }
+
+    def _extract_json_object(self, text: str) -> Optional[str]:
+        start = text.find("{")
+        if start == -1:
+            return None
+
+        depth = 0
+        in_string = False
+        escaped = False
+
+        for index in range(start, len(text)):
+            char = text[index]
+            if escaped:
+                escaped = False
+                continue
+            if char == "\\":
+                escaped = True
+                continue
+            if char == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start : index + 1]
+
+        return None
 
     async def _make_api_request_with_retry(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         api_url = f"{self.base_url}/services/aigc/multimodal-generation/generation"
@@ -243,7 +312,7 @@ class QwenImageService:
 
         start_time = datetime.now()
         target_path = Path(image_path)
-        examples = self._load_examples(image_type=image_type, limit=3)
+        examples = self._load_examples(image_type=image_type, limit=self.fewshot_limit)
 
         try:
             content: List[Dict[str, Any]] = [
@@ -262,9 +331,8 @@ class QwenImageService:
                     {
                         "type": "text",
                         "text": (
-                            f"样例 {index}（已标注教学样例）：{example.get('description', '')} "
-                            "请注意，样例图中的红色圆圈中心点就是台风眼中心，"
-                            "你需要学习红圈中心与周围云系结构的对应关系。"
+                            f"样例{index}: 红圈中心为台风眼。"
+                            f"{example.get('description', '')}"
                         ),
                     }
                 )

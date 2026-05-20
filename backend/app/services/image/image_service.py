@@ -42,20 +42,33 @@ class ImageAnalysisService:
     - hybrid_ai: 结构化结果 + few-shot 通义千问报告
     """
 
+    _opencv_analyzer = None
+    _dl_analyzer = None
+    _fusion_analyzer = None
+    _analyzers_initialized = False
+
     def __init__(self, db: AsyncSession):
         self.db = db
         self.base_dir = Path(__file__).resolve().parents[3]
         self.save_dir = self.base_dir / "data" / "images"
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
-        self.opencv_analyzer = None
-        self.dl_analyzer = None
-        self.fusion_analyzer = None
+        self.__class__._initialize_analyzers()
+        self.opencv_analyzer = self.__class__._opencv_analyzer
+        self.dl_analyzer = self.__class__._dl_analyzer
+        self.fusion_analyzer = self.__class__._fusion_analyzer
         self.qwen_image_service = qwen_image_service
+
+    @classmethod
+    def _initialize_analyzers(cls) -> None:
+        if cls._analyzers_initialized:
+            return
+
+        cls._analyzers_initialized = True
 
         if OPENCV_AVAILABLE:
             try:
-                self.opencv_analyzer = OpenCVAnalyzer()
+                cls._opencv_analyzer = OpenCVAnalyzer()
                 logger.info("✅ OpenCV分析器初始化成功")
             except Exception as exc:
                 logger.warning("⚠️ OpenCV分析器初始化失败: %s", exc)
@@ -64,7 +77,7 @@ class ImageAnalysisService:
 
         if PYTORCH_AVAILABLE:
             try:
-                self.dl_analyzer = DLAnalyzer()
+                cls._dl_analyzer = DLAnalyzer()
                 logger.info("✅ 深度学习分析器初始化成功")
             except Exception as exc:
                 logger.warning("⚠️ 深度学习分析器初始化失败: %s", exc)
@@ -72,7 +85,7 @@ class ImageAnalysisService:
             logger.warning("⚠️ PyTorch未安装，深度学习功能不可用")
 
         try:
-            self.fusion_analyzer = FusionAnalyzer()
+            cls._fusion_analyzer = FusionAnalyzer()
             logger.info("✅ 决策融合分析器初始化成功")
         except Exception as exc:
             logger.warning("⚠️ 决策融合分析器初始化失败: %s", exc)
@@ -345,7 +358,7 @@ class ImageAnalysisService:
         if ai_result.get("success"):
             ai_consistency = ai_result.get("consistency_score")
             fallback_consistency = result.get("confidence", 0.0)
-            result["summary"] = ai_result.get("summary")
+            result["summary"] = ai_result.get("summary") or ai_result.get("overall_assessment")
             result["ai_report"] = ai_result.get("markdown_report")
             result["consistency_score"] = (
                 ai_consistency
@@ -368,6 +381,18 @@ class ImageAnalysisService:
                 "analysis_highlights": ai_result.get("analysis_highlights", []),
                 "analysis_limitations": ai_result.get("analysis_limitations", []),
                 "fewshot_examples_used": ai_result.get("fewshot_examples_used", []),
+            }
+
+            result["details"]["ai_report_outline"] = {
+                "summary": ai_result.get("summary"),
+                "overall_assessment": ai_result.get("overall_assessment"),
+                "cloud_system_description": ai_result.get("cloud_system_description"),
+                "intensity_assessment": ai_result.get("intensity_assessment"),
+                "organization_assessment": ai_result.get("organization_assessment"),
+                "development_stage": ai_result.get("development_stage"),
+                "analysis_highlights": ai_result.get("analysis_highlights", []),
+                "analysis_limitations": ai_result.get("analysis_limitations", []),
+                "risk_flags": ai_result.get("risk_flags", []),
             }
 
             if (

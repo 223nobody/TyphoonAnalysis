@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     DEEPSEEK_MODEL_THINKING: str = Field(default="", description="DeepSeek模型名称（深度思考模式）")
     QWEN_TEXT_MODEL: str = Field(default="", description="Qwen文本生成模型")
     QWEN_VL_MODEL: str = Field(default="qwen-vl-max-latest", description="Qwen视觉语言模型")
+    QWEN_VL_IMAGE_MODEL: str = Field(default="qwen-vl-plus-latest", description="Qwen图像分析视觉语言模型")
     GLM_MODEL: str = Field(default="", description="GLM模型名称")
 
     # AI调用性能与输出质量配置
@@ -64,12 +65,15 @@ class Settings(BaseSettings):
     AI_CHAT_PRESENCE_PENALTY: float = Field(default=0.05, description="AI客服存在惩罚")
     AI_CHAT_FREQUENCY_PENALTY: float = Field(default=0.1, description="AI客服频率惩罚")
 
-    AI_VL_IMAGE_MAX_TOKENS: int = Field(default=2400, description="图像视觉分析最大输出Token数")
-    AI_VL_IMAGE_TIMEOUT: float = Field(default=160.0, description="图像视觉分析请求超时秒数")
-    AI_VL_IMAGE_MAX_RETRIES: int = Field(default=2, description="图像视觉分析最大重试次数")
+    AI_VL_IMAGE_MAX_TOKENS: int = Field(default=1800, description="图像视觉分析最大输出Token数")
+    AI_VL_IMAGE_TIMEOUT: float = Field(default=100.0, description="图像视觉分析请求超时秒数")
+    AI_VL_IMAGE_MAX_RETRIES: int = Field(default=1, description="图像视觉分析最大重试次数")
     AI_VL_IMAGE_TEMPERATURE: float = Field(default=0.2, description="图像视觉分析采样温度")
-    AI_VL_VIDEO_MAX_TOKENS: int = Field(default=2400, description="视频视觉分析最大输出Token数")
-    AI_VL_VIDEO_FRAME_MAX_TOKENS: int = Field(default=1200, description="视频单帧分析最大输出Token数")
+    AI_VL_IMAGE_FEWSHOT_LIMIT: int = Field(default=3, description="图像视觉分析few-shot样例数量")
+    AI_VL_IMAGE_MAX_SIDE: int = Field(default=768, description="发送给视觉模型的图像最长边")
+    AI_VL_IMAGE_JPEG_QUALITY: int = Field(default=68, description="发送给视觉模型的JPEG质量")
+    AI_VL_VIDEO_MAX_TOKENS: int = Field(default=1200, description="视频视觉分析最大输出Token数")
+    AI_VL_VIDEO_FRAME_MAX_TOKENS: int = Field(default=600, description="视频单帧分析最大输出Token数")
     AI_VL_VIDEO_TIMEOUT: float = Field(default=240.0, description="视频视觉分析请求超时秒数")
     AI_VL_VIDEO_MAX_RETRIES: int = Field(default=2, description="视频视觉分析最大重试次数")
     AI_VL_VIDEO_TEMPERATURE: float = Field(default=0.55, description="视频视觉分析采样温度")
